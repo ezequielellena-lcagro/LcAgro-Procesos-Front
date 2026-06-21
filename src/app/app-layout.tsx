@@ -53,12 +53,12 @@ export function AppLayout() {
               aria-label={procHidden ? "Mostrar procesos" : "Ocultar procesos"}
               aria-expanded={!procHidden}
               onClick={() => setProcHidden((h) => !h)}
-              className="no-print absolute left-[-15px] top-[13px] z-20 hidden size-[30px] place-items-center rounded-full border border-line bg-panel text-slate-brand shadow-[0_4px_12px_-4px_rgba(33,48,58,.32)] transition hover:scale-110 hover:border-clementina-deep hover:text-clementina-deep md:grid"
+              className="no-print absolute left-[-15px] top-[13px] z-50 hidden size-[30px] place-items-center rounded-full border border-line bg-panel text-slate-brand shadow-[0_4px_12px_-4px_rgba(33,48,58,.32)] transition hover:scale-110 hover:border-clementina-deep hover:text-clementina-deep md:grid"
             >
               <ChevronLeft className={cn("size-[15px] transition-transform", procHidden && "rotate-180")} />
             </button>
             <div className="app-scroll h-full overflow-y-auto">
-              <div className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-6 md:px-7">
+              <div className="mx-auto w-full px-4 pb-16 pt-6 md:px-6">
                 <Suspense fallback={<PageLoader />}>
                   <Outlet />
                 </Suspense>
