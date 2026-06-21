@@ -1,0 +1,135 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ===================== Tokens de marca LcAgro =====================
+   Paleta y tipografías tomadas del mockup (apps/mockup-web/index.html
+   del repo backend). Ver docs/02-design-system.md. */
+@theme {
+  --font-display: "Fraunces Variable", Fraunces, Georgia, serif;
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+
+  /* Tinta */
+  --color-ink: #21303a;
+  --color-ink-soft: #6c7a83;
+
+  /* Superficies y líneas */
+  --color-cream: #f6f2e9;
+  --color-panel: #fffdf8;
+  --color-panel-soft: #fbf7ee;
+  --color-line: #e7e1d3;
+  --color-line-soft: #efeadf;
+
+  /* Slate (navegación / chrome) */
+  --color-slate-brand: #2b4150;
+  --color-slate-2: #223340;
+  --color-slate-3: #1c2a34;
+  --color-slate-soft: #9fb0bb;
+
+  /* Acento clementina */
+  --color-clementina: #ffc10e;
+  --color-clementina-deep: #e3a400;
+
+  /* Semánticos */
+  --color-verde: #3a805a;
+  --color-verde-bg: #e7f1ea;
+  --color-rojo: #bf5439;
+  --color-rojo-bg: #f7e9e4;
+
+  /* Radios y sombras */
+  --radius-card: 14px;
+  --shadow-card: 0 1px 2px rgb(33 48 58 / 0.04), 0 8px 24px -12px rgb(33 48 58 / 0.18);
+  --shadow-float: 0 24px 60px -20px rgb(33 48 58 / 0.35);
+}
+
+/* ===================== Variables shadcn/ui =====================
+   Mapeadas a la marca, para que cualquier componente shadcn salga con
+   la identidad LcAgro. Ver docs/02-design-system.md §6.3. */
+:root {
+  --radius: 0.625rem;
+  --background: #f6f2e9;
+  --foreground: #21303a;
+  --card: #fffdf8;
+  --card-foreground: #21303a;
+  --popover: #fffdf8;
+  --popover-foreground: #21303a;
+  --primary: #2b4150;
+  --primary-foreground: #ffffff;
+  --secondary: #fbf7ee;
+  --secondary-foreground: #21303a;
+  --muted: #fbf7ee;
+  --muted-foreground: #6c7a83;
+  --accent: #ffc10e;
+  --accent-foreground: #243744;
+  --destructive: #bf5439;
+  --border: #e7e1d3;
+  --input: #e7e1d3;
+  --ring: #e3a400;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  body {
+    background-color: var(--color-cream);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Impresión / "Guardar como PDF": oculta el chrome y deja fluir el contenido. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  .app-scroll {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}
