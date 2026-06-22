@@ -26,12 +26,30 @@ const columns: Column<PosicionDto>[] = [
 ];
 
 export function PosicionTable({ filas }: { filas: PosicionDto[] }) {
+  const suma = (get: (r: PosicionDto) => number) => filas.reduce((s, r) => s + get(r), 0);
+  const totalPosicion = suma((r) => r.posicionFinal);
+
+  // Fila de totales (una celda por columna; en precios/márgenes no tiene sentido sumar → vacío).
+  const footer = [
+    "TOTAL",
+    numero(suma((r) => r.tnCompra)),
+    "",
+    numero(suma((r) => r.tnVenta)),
+    "",
+    numero(suma((r) => r.tnCalzadas)),
+    "",
+    "",
+    usd(suma((r) => r.resultadoUsd)),
+    <span className={cn(totalPosicion >= 0 ? "text-verde" : "text-rojo")}>{numero(totalPosicion)}</span>,
+  ];
+
   return (
     <DataTable
       columns={columns}
       rows={filas}
       getRowKey={(r) => `${r.campania}-${r.cereal}`}
       empty="No hay posición para estos filtros."
+      footer={footer}
     />
   );
 }

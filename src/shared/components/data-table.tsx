@@ -14,13 +14,15 @@ interface DataTableProps<T> {
   rows: T[];
   getRowKey: (row: T, index: number) => string | number;
   empty?: ReactNode;
+  /** Celdas de la fila de totales (una por columna). Se muestra solo si hay filas. */
+  footer?: ReactNode[];
 }
 
 function alignCls(a?: "left" | "right" | "center") {
   return a === "right" ? "text-right" : a === "center" ? "text-center" : "text-left";
 }
 
-export function DataTable<T>({ columns, rows, getRowKey, empty }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, getRowKey, empty, footer }: DataTableProps<T>) {
   return (
     <div className="overflow-x-auto rounded-card border border-line bg-panel shadow-card">
       <table className="w-full border-collapse text-sm">
@@ -52,6 +54,17 @@ export function DataTable<T>({ columns, rows, getRowKey, empty }: DataTableProps
             ))
           )}
         </tbody>
+        {footer && rows.length > 0 && (
+          <tfoot>
+            <tr className="border-t-2 border-line bg-panel-soft font-semibold text-ink">
+              {columns.map((c, i) => (
+                <td key={c.key} className={cn("px-3.5 py-2.5 tabular", alignCls(c.align), c.className)}>
+                  {footer[i]}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );

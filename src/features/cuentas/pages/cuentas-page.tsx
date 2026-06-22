@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/auth-context";
 import { env } from "@/lib/env";
@@ -9,8 +10,8 @@ import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { Pagination } from "@/shared/components/pagination";
 import { exportToPdf } from "@/shared/export/export-pdf";
-import { exportToCsv } from "@/shared/export/to-csv";
-import { usd } from "@/shared/format/format";
+import type { ExportColumn, ExportSpec } from "@/shared/export/export-types";
+import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { CuentasKpis } from "../components/cuentas-kpis";
 import { CuentasSkeleton } from "../components/cuentas-skeleton";
 import { CuentasTable } from "../components/cuentas-table";
@@ -38,28 +39,38 @@ export function CuentasPage() {
     pageSize: PAGE_SIZE,
   });
 
-  const exportarExcel = () =>
-    exportToCsv<CuentaDto>(
-      "cuentas-usd",
-      [
-        { header: "Vendedor", value: (r) => r.vendedor },
-        { header: "Cuenta", value: (r) => r.cuenta },
-        { header: "Cliente", value: (r) => r.denominacion },
-        { header: "Vencido USD", value: (r) => usd(r.saldoVencido) },
-        { header: "A vencer USD", value: (r) => usd(r.saldoAVencer) },
-        { header: "Saldo USD", value: (r) => usd(r.saldo) },
-        { header: "Devolución", value: (r) => r.devolucion ?? "" },
-        { header: "Observaciones", value: (r) => r.observaciones ?? "" },
-      ],
-      cuentas.data?.items ?? [],
-    );
+  const exportColumns: ExportColumn<CuentaDto>[] = [
+    { header: "Vendedor", get: (r) => r.vendedor },
+    { header: "Cuenta", get: (r) => r.cuenta },
+    { header: "Cliente", get: (r) => r.denominacion },
+    { header: "Vencido USD", get: (r) => r.saldoVencido, format: "usd", total: true },
+    { header: "A vencer USD", get: (r) => r.saldoAVencer, format: "usd", total: true },
+    { header: "Saldo USD", get: (r) => r.saldo, format: "usd", total: true },
+    { header: "Devolución", get: (r) => r.devolucion ?? "" },
+    { header: "Observaciones", get: (r) => r.observaciones ?? "" },
+  ];
+
+  const exportSpec = (): ExportSpec<CuentaDto> => ({
+    filename: "cuentas-usd",
+    title: "Cuentas Corrientes USD",
+    subtitle: `Saldos USD · ${new Date().toLocaleDateString("es-AR")}`,
+    columns: exportColumns,
+    rows: cuentas.data?.items ?? [],
+  });
+
+  const exportarExcel = () => {
+    void exportToXlsx(exportSpec()).catch(() => toast.error("No se pudo generar el Excel."));
+  };
+  const exportarPdf = () => {
+    void exportToPdf(exportSpec()).catch(() => toast.error("No se pudo generar el PDF."));
+  };
 
   return (
     <>
       <PageHeader
         title="Cuentas Corrientes USD"
         subtitle="Saldos vencidos y a vencer en USD (modelo open-item)."
-        actions={<ExportButtons onExcel={exportarExcel} onPdf={exportToPdf} />}
+        actions={<ExportButtons onExcel={exportarExcel} onPdf={exportarPdf} />}
       />
 
       {env.useMocks && (

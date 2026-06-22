@@ -1,6 +1,8 @@
 import { Sliders } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth-context";
 import { EmptyState } from "@/shared/components/empty-state";
@@ -9,8 +11,8 @@ import { ExportButtons } from "@/shared/components/export-buttons";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { exportToPdf } from "@/shared/export/export-pdf";
-import { exportToCsv } from "@/shared/export/to-csv";
-import { numero, oDash, pct, usd } from "@/shared/format/format";
+import type { ExportColumn, ExportSpec } from "@/shared/export/export-types";
+import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { AjustesDialog } from "../components/ajustes-dialog";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionSkeleton } from "../components/posicion-skeleton";
@@ -26,31 +28,46 @@ export function PosicionPage() {
   const campanias = useCampanias();
   const [campaniaSel, setCampaniaSel] = useState<string>();
   const [cereal, setCereal] = useState("");
+  const [precioMin, setPrecioMin] = useState(50);
+  const [precioMax, setPrecioMax] = useState(700);
   const [ajustesOpen, setAjustesOpen] = useState(false);
 
-  // Campaña efectiva: la elegida, o la más reciente de la lista (derivado, sin efecto).
-  const campania = campaniaSel ?? campanias.data?.[0];
+  // Campaña por defecto: el año en curso define la campaña (año-1)-(año). Ej.: 2026 → "2025-2026".
+  // Si esa campaña no está en la lista, cae a la más reciente (derivado, sin efecto).
+  const anioActual = new Date().getFullYear();
+  const campaniaActual = `${anioActual - 1}-${anioActual}`;
+  const campania =
+    campaniaSel ?? (campanias.data?.includes(campaniaActual) ? campaniaActual : campanias.data?.[0]);
 
-  const posicion = usePosicion(campania, cereal || undefined);
+  const posicion = usePosicion(campania, cereal || undefined, precioMin, precioMax);
 
-  const exportarExcel = () =>
-    exportToCsv<PosicionDto>(
-      `posicion-${campania ?? "campania"}`,
-      [
-        { header: "Campaña", value: (r) => r.campania },
-        { header: "Cereal", value: (r) => r.cereal },
-        { header: "Compra tn", value: (r) => numero(r.tnCompra) },
-        { header: "P. compra", value: (r) => oDash(r.precioCompra, usd) },
-        { header: "Venta tn", value: (r) => numero(r.tnVenta) },
-        { header: "P. venta", value: (r) => oDash(r.precioVenta, usd) },
-        { header: "Calzadas", value: (r) => numero(r.tnCalzadas) },
-        { header: "Margen US$/tn", value: (r) => oDash(r.margenUsdTn, usd) },
-        { header: "Margen %", value: (r) => oDash(r.margenPct, pct) },
-        { header: "Resultado US$", value: (r) => usd(r.resultadoUsd) },
-        { header: "Posición tn", value: (r) => numero(r.posicionFinal) },
-      ],
-      posicion.data ?? [],
-    );
+  const exportColumns: ExportColumn<PosicionDto>[] = [
+    { header: "Cereal", get: (r) => r.cereal },
+    { header: "Compra tn", get: (r) => r.tnCompra, format: "number", total: true },
+    { header: "P. compra", get: (r) => r.precioCompra, format: "usd" },
+    { header: "Venta tn", get: (r) => r.tnVenta, format: "number", total: true },
+    { header: "P. venta", get: (r) => r.precioVenta, format: "usd" },
+    { header: "Calzadas", get: (r) => r.tnCalzadas, format: "number", total: true },
+    { header: "Margen US$/tn", get: (r) => r.margenUsdTn, format: "usd" },
+    { header: "Margen %", get: (r) => r.margenPct, format: "percent" },
+    { header: "Resultado US$", get: (r) => r.resultadoUsd, format: "usd", total: true },
+    { header: "Posición tn", get: (r) => r.posicionFinal, format: "number", total: true },
+  ];
+
+  const exportSpec = (): ExportSpec<PosicionDto> => ({
+    filename: `posicion-${campania ?? "campania"}`,
+    title: "Posición de Cereal",
+    subtitle: `Campaña ${campania ?? "—"} · ${new Date().toLocaleDateString("es-AR")}`,
+    columns: exportColumns,
+    rows: posicion.data ?? [],
+  });
+
+  const exportarExcel = () => {
+    void exportToXlsx(exportSpec()).catch(() => toast.error("No se pudo generar el Excel."));
+  };
+  const exportarPdf = () => {
+    void exportToPdf(exportSpec()).catch(() => toast.error("No se pudo generar el PDF."));
+  };
 
   return (
     <>
@@ -59,7 +76,7 @@ export function PosicionPage() {
         subtitle="Compras − ventas + ajustes, por campaña y cereal."
         actions={
           <>
-            <ExportButtons onExcel={exportarExcel} onPdf={exportToPdf} />
+            <ExportButtons onExcel={exportarExcel} onPdf={exportarPdf} />
             {puedeGestionar && campania && (
               <Button type="button" size="sm" onClick={() => setAjustesOpen(true)}>
                 <Sliders className="size-4" /> Ajustes
@@ -92,6 +109,24 @@ export function PosicionPage() {
               </option>
             ))}
           </Select>
+        </FilterField>
+        <FilterField label="Precio mín (US$/tn)">
+          <Input
+            type="number"
+            min={0}
+            defaultValue={precioMin}
+            className="w-28"
+            onBlur={(e) => setPrecioMin(Number(e.target.value) || 0)}
+          />
+        </FilterField>
+        <FilterField label="Precio máx (US$/tn)">
+          <Input
+            type="number"
+            min={0}
+            defaultValue={precioMax}
+            className="w-28"
+            onBlur={(e) => setPrecioMax(Number(e.target.value) || 0)}
+          />
         </FilterField>
       </FilterBar>
 

@@ -3,12 +3,17 @@ import { apiClient } from "@/lib/api-client";
 import type { PosicionDto } from "../types";
 import { posicionKeys } from "./keys";
 
-export function usePosicion(campania: string | undefined, cereal?: string) {
+export function usePosicion(
+  campania: string | undefined,
+  cereal?: string,
+  precioMin = 50,
+  precioMax = 700,
+) {
   return useQuery({
-    queryKey: posicionKeys.list(campania ?? "", cereal),
+    queryKey: posicionKeys.list(campania ?? "", cereal, precioMin, precioMax),
     queryFn: async () => {
       const { data } = await apiClient.get<PosicionDto[]>("/posicion", {
-        params: { campania, cereal: cereal || undefined },
+        params: { campania, cereal: cereal || undefined, precioMin, precioMax },
       });
       return data;
     },
