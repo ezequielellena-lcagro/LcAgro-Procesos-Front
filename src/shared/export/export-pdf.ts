@@ -1,5 +1,48 @@
+import type { jsPDF as JsPdf } from "jspdf";
 import { numero, pct, usd } from "@/shared/format/format";
-import { calcularTotales, esNumerica, type ExportColumn, type ExportSpec } from "./export-types";
+import { calcularTotales, esNumerica, type ExportColumn, type ExportKpi, type ExportSpec } from "./export-types";
+
+// Dibuja las tarjetas de KPI (como en pantalla) en filas. Devuelve la Y debajo de las tarjetas.
+function drawKpiCards(doc: JsPdf, kpis: ExportKpi[], startY: number, margin: number, pageWidth: number): number {
+  const usable = pageWidth - margin * 2;
+  const perRow = Math.min(kpis.length, 4);
+  const gap = 10;
+  const cardW = (usable - gap * (perRow - 1)) / perRow;
+  const maxMetricas = Math.max(...kpis.map((k) => k.metricas.length));
+  const cardH = 34 + maxMetricas * 12 + 6;
+
+  kpis.forEach((k, i) => {
+    const x = margin + (i % perRow) * (cardW + gap);
+    const y = startY + Math.floor(i / perRow) * (cardH + gap);
+
+    doc.setDrawColor(216, 222, 227);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, y, cardW, cardH, 4, 4, "FD");
+
+    const ac: [number, number, number] = k.acento === "rojo" ? [190, 30, 45] : [21, 128, 61];
+    doc.setFillColor(ac[0], ac[1], ac[2]);
+    doc.rect(x, y, 3, cardH, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(33, 48, 58);
+    doc.text(k.titulo, x + 10, y + 18);
+
+    let my = y + 34;
+    for (const m of k.metricas) {
+      doc.setFontSize(m.destacado ? 10 : 8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(120, 130, 138);
+      doc.text(m.label, x + 10, my);
+      doc.setFont("helvetica", m.destacado ? "bold" : "normal");
+      doc.setTextColor(33, 48, 58);
+      doc.text(m.valor, x + cardW - 10, my, { align: "right" });
+      my += 12;
+    }
+  });
+
+  return startY + Math.ceil(kpis.length / perRow) * (cardH + gap);
+}
 
 function comoTexto<T>(col: ExportColumn<T>, v: string | number | null): string {
   if (v == null) return "—";
@@ -35,6 +78,11 @@ export async function exportToPdf<T>(spec: ExportSpec<T>): Promise<void> {
     doc.text(spec.subtitle, margin, 60);
   }
 
+  let tableStartY = spec.subtitle ? 72 : 54;
+  if (spec.kpis?.length) {
+    tableStartY = drawKpiCards(doc, spec.kpis, tableStartY, margin, doc.internal.pageSize.getWidth()) + 4;
+  }
+
   const head = [columns.map((c) => c.header)];
   const body = rows.map((r) => columns.map((c) => comoTexto(c, c.get(r))));
 
@@ -54,7 +102,7 @@ export async function exportToPdf<T>(spec: ExportSpec<T>): Promise<void> {
     head,
     body,
     foot,
-    startY: spec.subtitle ? 76 : 58,
+    startY: tableStartY,
     margin: { left: margin, right: margin },
     theme: "grid",
     styles: { fontSize: 8, cellPadding: 4, lineColor: [216, 222, 227], textColor: [33, 48, 58] },

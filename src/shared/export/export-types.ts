@@ -9,12 +9,29 @@ export interface ExportColumn<T> {
   total?: boolean; // si la columna se suma en la fila de totales
 }
 
+/** Una métrica dentro de una tarjeta de KPI (label + valor ya formateado). */
+export interface ExportKpiMetric {
+  label: string;
+  valor: string;
+  destacado?: boolean; // se resalta (grande/negrita) en la tarjeta del PDF
+}
+
+/** Tarjeta de KPI (p. ej. un cereal): título + métricas. Espeja las tarjetas de la pantalla. */
+export interface ExportKpi {
+  titulo: string;
+  acento?: "verde" | "rojo"; // color del borde/acento (p. ej. signo de la posición)
+  metricas: ExportKpiMetric[];
+}
+
 export interface ExportSpec<T> {
   filename: string; // sin extensión
   title: string;
   subtitle?: string;
   columns: ExportColumn<T>[];
   rows: T[];
+  /** KPIs (tarjetas) que se muestran arriba de la tabla de detalle. */
+  kpis?: ExportKpi[];
+  kpisTitulo?: string; // por defecto "Resumen por cereal"
 }
 
 /** Indica si la columna es numérica (alineada a la derecha en ambos exportadores). */

@@ -11,8 +11,9 @@ import { ExportButtons } from "@/shared/components/export-buttons";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { exportToPdf } from "@/shared/export/export-pdf";
-import type { ExportColumn, ExportSpec } from "@/shared/export/export-types";
+import type { ExportColumn, ExportKpi, ExportSpec } from "@/shared/export/export-types";
 import { exportToXlsx } from "@/shared/export/export-xlsx";
+import { numero, oDash, pct, usd } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionSkeleton } from "../components/posicion-skeleton";
@@ -54,12 +55,28 @@ export function PosicionPage() {
     { header: "Posición tn", get: (r) => r.posicionFinal, format: "number", total: true },
   ];
 
+  // KPIs por cereal (espejan las tarjetas de la pantalla) para el resumen del export.
+  const exportKpis = (filas: PosicionDto[]): ExportKpi[] =>
+    filas.map((f) => ({
+      titulo: f.cereal,
+      acento: f.posicionFinal >= 0 ? "verde" : "rojo",
+      metricas: [
+        { label: "Margen US$/tn", valor: oDash(f.margenUsdTn, usd), destacado: true },
+        { label: "Margen %", valor: oDash(f.margenPct, pct) },
+        { label: "Compra", valor: `${numero(f.tnCompra)} tn` },
+        { label: "Venta", valor: `${numero(f.tnVenta)} tn` },
+        { label: "Resultado", valor: usd(f.resultadoUsd) },
+        { label: "Posición", valor: `${numero(f.posicionFinal)} tn` },
+      ],
+    }));
+
   const exportSpec = (): ExportSpec<PosicionDto> => ({
     filename: `posicion-${campania ?? "campania"}`,
     title: "Posición de Cereal",
     subtitle: `Campaña ${campania ?? "—"} · ${new Date().toLocaleDateString("es-AR")}`,
     columns: exportColumns,
     rows: posicion.data ?? [],
+    kpis: exportKpis(posicion.data ?? []),
   });
 
   const exportarExcel = () => {
