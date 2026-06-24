@@ -44,7 +44,9 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
     <button
       type="button"
       role="tab"
+      id={`tab-${value}`}
       aria-selected={active}
+      aria-controls={`tabpanel-${value}`}
       onClick={() => ctx.onValueChange(value)}
       className={cn(
         "rounded-md border px-4 py-2 text-sm font-semibold transition-colors",
@@ -62,5 +64,9 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
 export function TabsContent({ value, children }: { value: string; children: ReactNode }) {
   const ctx = useTabsContext();
   if (ctx.value !== value) return null;
-  return <div role="tabpanel">{children}</div>;
+  return (
+    <div role="tabpanel" id={`tabpanel-${value}`} aria-labelledby={`tab-${value}`}>
+      {children}
+    </div>
+  );
 }

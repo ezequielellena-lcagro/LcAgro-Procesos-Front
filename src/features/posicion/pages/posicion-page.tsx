@@ -16,8 +16,8 @@ import type { ExportColumn, ExportKpi, ExportSpec } from "@/shared/export/export
 import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { numero, oDash, pct, usd } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
-import { PosicionDetalle } from "../components/posicion-detalle";
 import { PosicionCard } from "../components/posicion-card";
+import { PosicionDetalle } from "../components/posicion-detalle";
 import { PosicionSkeleton } from "../components/posicion-skeleton";
 import { PosicionTable } from "../components/posicion-table";
 import { useCampanias } from "../queries/use-campanias";
