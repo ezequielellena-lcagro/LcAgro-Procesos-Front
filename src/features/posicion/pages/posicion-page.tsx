@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
 import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
@@ -15,11 +16,12 @@ import type { ExportColumn, ExportKpi, ExportSpec } from "@/shared/export/export
 import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { numero, oDash, pct, usd } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
+import { PosicionDetalle } from "../components/posicion-detalle";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionSkeleton } from "../components/posicion-skeleton";
 import { PosicionTable } from "../components/posicion-table";
 import { useCampanias } from "../queries/use-campanias";
-import { usePosicion } from "../queries/use-posicion";
+import { usePosicion, usePosicionDetalle } from "../queries/use-posicion";
 import { CEREALES, type PosicionDto } from "../types";
 
 export function PosicionPage() {
@@ -32,6 +34,7 @@ export function PosicionPage() {
   const [precioMin, setPrecioMin] = useState(50);
   const [precioMax, setPrecioMax] = useState(700);
   const [ajustesOpen, setAjustesOpen] = useState(false);
+  const [tab, setTab] = useState<"resumen" | "detalle">("resumen");
 
   // Campaña por defecto: el año en curso define la campaña (año-1)-(año). Ej.: 2026 → "2025-2026".
   // Si esa campaña no está en la lista, cae a la más reciente (derivado, sin efecto).
@@ -41,6 +44,7 @@ export function PosicionPage() {
     campaniaSel ?? (campanias.data?.includes(campaniaActual) ? campaniaActual : campanias.data?.[0]);
 
   const posicion = usePosicion(campania, cereal || undefined, precioMin, precioMax);
+  const detalle = usePosicionDetalle(cereal || undefined, precioMin, precioMax, tab === "detalle");
 
   const exportColumns: ExportColumn<PosicionDto>[] = [
     { header: "Cereal", get: (r) => r.cereal },
@@ -108,7 +112,7 @@ export function PosicionPage() {
           <Select
             value={campania ?? ""}
             onChange={(e) => setCampaniaSel(e.target.value)}
-            disabled={!campanias.data}
+            disabled={tab === "detalle" || !campanias.data}
           >
             {campanias.data?.map((c) => (
               <option key={c} value={c}>
@@ -149,21 +153,44 @@ export function PosicionPage() {
 
       {campanias.isError ? (
         <ErrorState error={campanias.error} onRetry={() => void campanias.refetch()} />
-      ) : posicion.isError ? (
-        <ErrorState error={posicion.error} onRetry={() => void posicion.refetch()} />
-      ) : posicion.isPending || !campania ? (
-        <PosicionSkeleton />
-      ) : posicion.data.length === 0 ? (
-        <EmptyState mensaje="No hay posición para esta campaña / cereal." />
       ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
-            {posicion.data.map((f) => (
-              <PosicionCard key={`${f.campania}-${f.cereal}`} fila={f} />
-            ))}
-          </div>
-          <PosicionTable filas={posicion.data} />
-        </div>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as "resumen" | "detalle")} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="resumen">Resumen actual</TabsTrigger>
+            <TabsTrigger value="detalle">Detalle campañas</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="resumen">
+            {posicion.isError ? (
+              <ErrorState error={posicion.error} onRetry={() => void posicion.refetch()} />
+            ) : posicion.isPending || !campania ? (
+              <PosicionSkeleton />
+            ) : posicion.data.length === 0 ? (
+              <EmptyState mensaje="No hay posición para esta campaña / cereal." />
+            ) : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+                  {posicion.data.map((f) => (
+                    <PosicionCard key={`${f.campania}-${f.cereal}`} fila={f} />
+                  ))}
+                </div>
+                <PosicionTable filas={posicion.data} />
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="detalle">
+            {detalle.isError ? (
+              <ErrorState error={detalle.error} onRetry={() => void detalle.refetch()} />
+            ) : detalle.isPending ? (
+              <PosicionSkeleton />
+            ) : detalle.data?.length === 0 ? (
+              <EmptyState mensaje="No hay posición para estos filtros." />
+            ) : detalle.data ? (
+              <PosicionDetalle filas={detalle.data} />
+            ) : null}
+          </TabsContent>
+        </Tabs>
       )}
 
       {campania && (
