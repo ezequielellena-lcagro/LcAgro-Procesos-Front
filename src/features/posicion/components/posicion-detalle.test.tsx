@@ -63,4 +63,20 @@ describe("PosicionDetalle", () => {
     render(<PosicionDetalle filas={[fila({ campania: "2023-2024", cereal: "Maíz", tnCompra: 100, tnVenta: 0 })]} />);
     expect(screen.getByText("sin ventas cargadas")).toBeInTheDocument();
   });
+
+  it("calcula la fila Total por campaña (suma compra, venta y posición)", () => {
+    render(
+      <PosicionDetalle
+        filas={[
+          fila({ campania: "2025-2026", cereal: "Soja", tnCompra: 100, tnVenta: 60, posicionFinal: 40 }),
+          fila({ campania: "2025-2026", cereal: "Maíz", tnCompra: 50, tnVenta: 20, posicionFinal: 30 }),
+        ]}
+      />,
+    );
+    const totalRow = screen.getByText("Total").closest("tr");
+    expect(totalRow).not.toBeNull();
+    expect(totalRow).toHaveTextContent("150"); // compra 100 + 50
+    expect(totalRow).toHaveTextContent("80"); //  venta 60 + 20
+    expect(totalRow).toHaveTextContent("70"); //  posición 40 + 30
+  });
 });

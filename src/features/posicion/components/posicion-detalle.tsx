@@ -45,12 +45,12 @@ function CampaniaBloque({ campania, rows }: { campania: string; rows: PosicionDt
       <table className="tabular w-full text-sm">
         <thead>
           <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-soft">
-            <th className="py-1.5 text-left font-semibold">Cereal</th>
-            <th className="py-1.5 text-right font-semibold">Compra tn</th>
-            <th className="py-1.5 text-right font-semibold">P. compra</th>
-            <th className="py-1.5 text-right font-semibold">Venta tn</th>
-            <th className="py-1.5 text-right font-semibold">P. venta</th>
-            <th className="py-1.5 text-right font-semibold">Posición</th>
+            <th scope="col" className="py-1.5 text-left font-semibold">Cereal</th>
+            <th scope="col" className="py-1.5 text-right font-semibold">Compra tn</th>
+            <th scope="col" className="py-1.5 text-right font-semibold">P. compra</th>
+            <th scope="col" className="py-1.5 text-right font-semibold">Venta tn</th>
+            <th scope="col" className="py-1.5 text-right font-semibold">P. venta</th>
+            <th scope="col" className="py-1.5 text-right font-semibold">Posición</th>
           </tr>
         </thead>
         <tbody>
