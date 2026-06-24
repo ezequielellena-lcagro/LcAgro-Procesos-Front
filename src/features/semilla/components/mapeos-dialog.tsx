@@ -1,12 +1,15 @@
-import { useState } from "react";
-import { Pencil, Search } from "lucide-react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Download, Pencil, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { ErrorState } from "@/shared/components/error-state";
+import { Pagination } from "@/shared/components/pagination";
 import { useArticulosMapeo } from "../queries/use-articulos-mapeo";
+import { useExportarMapeos } from "../queries/use-exportar-mapeos";
+import { useImportarMapeos } from "../queries/use-importar-mapeos";
 import { useGuardarMapeo } from "../queries/use-mapeo-mutations";
 import { useVariedades } from "../queries/use-variedades";
 import type { ArticuloMapeoDto, MapeoVariedadInput } from "../types";
@@ -29,11 +32,23 @@ function Filas({ rows = 6 }: { rows?: number }) {
   );
 }
 
+const PAGE_SIZE = 10;
+
 /** Vista de lista: artículos con su estado de mapeo. Al elegir uno, el diálogo pasa al editor. */
 function ListaArticulos({ onSelect }: { onSelect: (a: ArticuloMapeoDto) => void }) {
   const articulos = useArticulosMapeo();
+  const exportar = useExportarMapeos();
+  const importar = useImportarMapeos();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
   const [soloPendientes, setSoloPendientes] = useState(false);
+  const [page, setPage] = useState(1);
+
+  const onArchivo = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-seleccionar el mismo archivo
+    if (file) importar.mutate(file);
+  };
 
   if (articulos.isError)
     return <ErrorState error={articulos.error} onRetry={() => void articulos.refetch()} />;
@@ -45,6 +60,11 @@ function ListaArticulos({ onSelect }: { onSelect: (a: ArticuloMapeoDto) => void 
     if (filtro && !a.nombreArticulo.toLowerCase().includes(filtro)) return false;
     return true;
   });
+
+  const total = filas.length;
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const pageSafe = Math.min(page, totalPages); // tras refetch/filtro la página puede quedar fuera de rango
+  const visibles = filas.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const columns: Column<ArticuloMapeoDto>[] = [
     {
@@ -83,7 +103,10 @@ function ListaArticulos({ onSelect }: { onSelect: (a: ArticuloMapeoDto) => void 
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
           <Input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
             placeholder="Buscar artículo…"
             className="pl-8"
           />
@@ -93,17 +116,51 @@ function ListaArticulos({ onSelect }: { onSelect: (a: ArticuloMapeoDto) => void 
             type="checkbox"
             className="size-4 accent-clementina-deep"
             checked={soloPendientes}
-            onChange={(e) => setSoloPendientes(e.target.checked)}
+            onChange={(e) => {
+              setSoloPendientes(e.target.checked);
+              setPage(1);
+            }}
           />
           Solo sin mapear
         </label>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          className="hidden"
+          onChange={onArchivo}
+        />
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => exportar.mutate()}
+            disabled={exportar.isPending}
+          >
+            <Download className="size-4" /> {exportar.isPending ? "Generando…" : "Plantilla Excel"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileRef.current?.click()}
+            disabled={importar.isPending}
+          >
+            <Upload className="size-4" /> {importar.isPending ? "Importando…" : "Importar"}
+          </Button>
+        </div>
       </div>
       <DataTable
         columns={columns}
-        rows={filas}
+        rows={visibles}
         getRowKey={(a) => a.codigoArticulo}
         empty="No hay artículos con ese filtro."
       />
+      {total > PAGE_SIZE && (
+        <Pagination page={pageSafe} totalPages={totalPages} total={total} onPage={setPage} />
+      )}
     </div>
   );
 }

@@ -92,3 +92,11 @@ export interface MapeoVariedadDto {
   categoria: string;
   fechaActualizacion: string;
 }
+
+/** Resumen del import de la plantilla de mapeo (espeja ImporteMapeoResultado). */
+export interface ImporteMapeoResultado {
+  filasLeidas: number;
+  mapeados: number;
+  omitidos: number;
+  errores: string[];
+}

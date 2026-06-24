@@ -3,6 +3,7 @@ import { Link, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth-context";
 import { env } from "@/lib/env";
 import { EmptyState } from "@/shared/components/empty-state";
@@ -21,6 +22,7 @@ import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
 import { useExportarCuentas } from "../queries/use-exportar-cuentas";
 import { useImportarCuentas } from "../queries/use-importar-cuentas";
+import { useVendedores } from "../queries/use-enviar-link";
 import type { CuentaDto } from "../types";
 
 const PAGE_SIZE = 20;
@@ -34,7 +36,7 @@ export function CuentasPage() {
   const [minUsd, setMinUsd] = useState("");
   const [page, setPage] = useState(1);
   const [editar, setEditar] = useState<CuentaDto | null>(null);
-  const [enviarLink, setEnviarLink] = useState<{ vendNro: number; vendedor: string } | null>(null);
+  const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
 
   const cuentas = useCuentas({
     q: q || undefined,
@@ -46,6 +48,7 @@ export function CuentasPage() {
 
   const exportar = useExportarCuentas();
   const importar = useImportarCuentas();
+  const vendedores = useVendedores(true); // lista de MacroGest para el filtro y el diálogo de envío
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const onArchivo = (e: ChangeEvent<HTMLInputElement>) => {
@@ -113,11 +116,7 @@ export function CuentasPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={!cuentas.data?.items.length}
-                  onClick={() => {
-                    const first = cuentas.data?.items[0];
-                    if (first) setEnviarLink({ vendNro: first.vendNro, vendedor: first.vendedor });
-                  }}
+                  onClick={() => setEnviarLinkOpen(true)}
                 >
                   <Link className="size-4" /> Enviar link
                 </Button>
@@ -146,14 +145,21 @@ export function CuentasPage() {
           />
         </FilterField>
         <FilterField label="Vendedor">
-          <Input
+          <Select
             value={vendedor}
             onChange={(e) => {
               setVendedor(e.target.value);
               setPage(1);
             }}
-            placeholder="Nombre del vendedor"
-          />
+            disabled={vendedores.isPending}
+          >
+            <option value="">Todos los vendedores</option>
+            {vendedores.data?.map((v) => (
+              <option key={v.vendNro} value={v.vendedor}>
+                {v.vendedor}
+              </option>
+            ))}
+          </Select>
         </FilterField>
         <FilterField label="Mín. USD">
           <Input
@@ -194,11 +200,7 @@ export function CuentasPage() {
       )}
 
       <ObservacionDialog cuenta={editar} onClose={() => setEditar(null)} />
-      <EnviarLinkDialog
-        vendNro={enviarLink?.vendNro ?? null}
-        vendedor={enviarLink?.vendedor ?? ""}
-        onClose={() => setEnviarLink(null)}
-      />
+      <EnviarLinkDialog open={enviarLinkOpen} onClose={() => setEnviarLinkOpen(false)} />
     </>
   );
 }

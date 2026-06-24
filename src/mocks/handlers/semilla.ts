@@ -174,4 +174,55 @@ export const semillaHandlers = [
       },
     });
   }),
+
+  // Plantilla de mapeo (demo): la lista de artículos con variedad/categoría (confirmada o sugerida).
+  http.get(`${API}/semilla/mapeos/export`, async () => {
+    const filas = articulosConEstado();
+    const { default: writeXlsxFile } = await import("write-excel-file/browser");
+    const blob = await writeXlsxFile(filas, {
+      sheet: "MAPEO",
+      columns: [
+        { header: "Código", width: 10, cell: (a: ArticuloMapeoDto) => ({ type: Number, value: a.codigoArticulo }) },
+        { header: "Artículo", width: 42, cell: (a: ArticuloMapeoDto) => ({ type: String, value: a.nombreArticulo }) },
+        { header: "Cultivo", width: 12, cell: (a: ArticuloMapeoDto) => ({ type: String, value: a.cultivo }) },
+        { header: "Variedad INASE", width: 22, cell: (a: ArticuloMapeoDto) => ({ type: String, value: a.cultivarInase || undefined }) },
+        { header: "Categoría", width: 22, cell: (a: ArticuloMapeoDto) => ({ type: String, value: a.categoria || undefined }) },
+        {
+          header: "Estado",
+          width: 16,
+          cell: (a: ArticuloMapeoDto) => ({
+            type: String,
+            value: a.mapeado ? "Mapeado" : a.cultivarInase ? "Sugerido" : "Sin sugerencia",
+          }),
+        },
+      ],
+    }).toBlob();
+
+    return new HttpResponse(blob, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": 'attachment; filename="Mapeo_de_variedades_demo.xlsx"',
+      },
+    });
+  }),
+
+  // Import de mapeo (demo): no parsea el .xlsx; confirma las sugerencias disponibles para ver el ida y vuelta.
+  http.post(`${API}/semilla/mapeos/import`, async ({ request }) => {
+    await request.formData(); // consume el archivo subido
+    let mapeados = 0;
+    for (const a of ARTICULOS) {
+      if (MAPEOS[a.codigoArticulo]) continue;
+      const sug = SUGERENCIAS[a.codigoArticulo];
+      const value = CATEGORIAS.find((c) => c.label === sug?.categoria)?.value;
+      if (!sug?.cultivarInase || !value) continue;
+      MAPEOS[a.codigoArticulo] = {
+        cultivo: a.cultivo,
+        nombreArticulo: a.nombreArticulo,
+        cultivarInase: sug.cultivarInase,
+        categoria: value,
+      };
+      mapeados++;
+    }
+    return HttpResponse.json({ filasLeidas: ARTICULOS.length, mapeados, omitidos: 0, errores: [] });
+  }),
 ];

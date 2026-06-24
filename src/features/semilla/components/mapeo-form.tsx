@@ -1,9 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMemo } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Combobox } from "@/components/ui/combobox";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toAppError } from "@/lib/api-error";
@@ -87,18 +87,19 @@ export function MapeoForm({ articulo, variedades, submitting, onSubmit, onCancel
 
       <div className="space-y-1.5">
         <Label htmlFor="cultivarInase">Variedad (cultivar INASE)</Label>
-        <Input
-          id="cultivarInase"
-          list="variedades-inase"
-          autoComplete="off"
-          placeholder="Empezá a escribir para buscar…"
-          {...form.register("cultivarInase")}
+        <Controller
+          control={form.control}
+          name="cultivarInase"
+          render={({ field }) => (
+            <Combobox
+              id="cultivarInase"
+              value={field.value}
+              onChange={field.onChange}
+              options={variedades}
+              placeholder="Empezá a escribir para buscar…"
+            />
+          )}
         />
-        <datalist id="variedades-inase">
-          {variedades.map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
         {errors.cultivarInase && <p className="text-xs text-rojo">{errors.cultivarInase.message}</p>}
       </div>
 

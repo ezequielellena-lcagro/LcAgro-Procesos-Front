@@ -8,6 +8,10 @@ const API = env.apiUrl;
 // Observaciones en memoria (upsert por cuenta) para el demo.
 const OBS: Record<number, { devolucion: string | null; observaciones: string | null }> = {};
 
+// Emails de vendedores: "nuestros" (editables, en memoria) y los que vendrían de MacroGest (solo algunos).
+const CONTACTOS: Record<number, string> = {};
+const EMAIL_MACROGEST: Record<number, string> = { 1: "lcagro@demo.com" };
+
 // Cuentas ficticias (NUNCA PII real). vendedor de ejemplo.
 const CUENTAS: Omit<CuentaDto, "devolucion" | "observaciones">[] = [
   { vendedor: "LC AGRO", vendNro: 1, cuenta: 1024, denominacion: "Estancia La Esperanza S.A.", saldoVencido: 18450.5, saldoAVencer: 5200, saldo: 23650.5 },
@@ -117,9 +121,26 @@ export const cuentasHandlers = [
     });
   }),
 
-  http.get(`${API}/cuentas/vendedores/:vendNro/contacto`, ({ params }) => {
+  // Vendedores con cuentas + email resuelto (nuestro ?? MacroGest).
+  http.get(`${API}/cuentas/vendedores`, () => {
+    const distintos = new Map<number, string>();
+    for (const c of CUENTAS) distintos.set(c.vendNro, c.vendedor);
+    const lista = [...distintos].map(([vendNro, vendedor]) => {
+      const propia = CONTACTOS[vendNro];
+      const macro = EMAIL_MACROGEST[vendNro];
+      const email = propia ?? macro ?? null;
+      const origen = propia ? "propia" : macro ? "macrogest" : "sin";
+      return { vendNro, vendedor, email, origen };
+    });
+    return HttpResponse.json(lista);
+  }),
+
+  http.put(`${API}/cuentas/vendedores/:vendNro/contacto`, async ({ params, request }) => {
     const vendNro = Number(params.vendNro);
-    return HttpResponse.json({ vendNro, vendedor: "ASL", email: "asl@demo.com" });
+    const body = (await request.json()) as { email: string };
+    CONTACTOS[vendNro] = body.email;
+    const vendedor = CUENTAS.find((c) => c.vendNro === vendNro)?.vendedor ?? `Viajante ${vendNro}`;
+    return HttpResponse.json({ vendNro, vendedor, email: body.email, origen: "propia" });
   }),
 
   http.post(`${API}/cuentas/link`, async () => {
