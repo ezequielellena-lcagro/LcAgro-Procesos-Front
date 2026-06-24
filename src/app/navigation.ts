@@ -83,6 +83,13 @@ export const NAV: Area[] = [
     label: "Comercial · Insumos",
     area: "Comercial · Insumos",
     procesos: [
+      {
+        kind: "activo",
+        label: "Semilla Fiscalizada",
+        title: "Semilla Fiscalizada",
+        to: "/semilla-fiscalizada",
+        roles: ["Admin", "Operador", "SoloLectura"],
+      },
       { kind: "futuro", label: "Resumen de cuenta a clientes" },
       { kind: "futuro", label: "Cotizador de presupuestos" },
       { kind: "futuro", label: "Mercadería pendiente de recibir" },
