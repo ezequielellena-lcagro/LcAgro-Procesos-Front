@@ -29,7 +29,7 @@ export function DataTable<T>({ columns, rows, getRowKey, empty, footer }: DataTa
         <thead>
           <tr className="border-b border-line bg-panel-soft text-xs uppercase tracking-wide text-ink-soft">
             {columns.map((c) => (
-              <th key={c.key} className={cn("px-3.5 py-2.5 font-semibold", alignCls(c.align), c.className)}>
+              <th key={c.key} className={cn("px-3 py-2 font-semibold", alignCls(c.align), c.className)}>
                 {c.header}
               </th>
             ))}
@@ -46,7 +46,7 @@ export function DataTable<T>({ columns, rows, getRowKey, empty, footer }: DataTa
             rows.map((row, i) => (
               <tr key={getRowKey(row, i)} className="border-b border-line-soft last:border-0 hover:bg-panel-soft/60">
                 {columns.map((c) => (
-                  <td key={c.key} className={cn("px-3.5 py-2.5 tabular", alignCls(c.align), c.className)}>
+                  <td key={c.key} className={cn("px-3 py-2 tabular", alignCls(c.align), c.className)}>
                     {c.cell(row)}
                   </td>
                 ))}
@@ -58,7 +58,7 @@ export function DataTable<T>({ columns, rows, getRowKey, empty, footer }: DataTa
           <tfoot>
             <tr className="border-t-2 border-line bg-panel-soft font-semibold text-ink">
               {columns.map((c, i) => (
-                <td key={c.key} className={cn("px-3.5 py-2.5 tabular", alignCls(c.align), c.className)}>
+                <td key={c.key} className={cn("px-3 py-2 tabular", alignCls(c.align), c.className)}>
                   {footer[i]}
                 </td>
               ))}

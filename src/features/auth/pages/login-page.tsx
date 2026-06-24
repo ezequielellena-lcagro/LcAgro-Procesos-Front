@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { env } from "@/lib/env";
 import { toAppError } from "@/lib/api-error";
+import logoMark from "@/assets/brand/logo-mark.png";
 import { useAuth } from "../auth-context";
 
 const schema = z.object({
@@ -50,9 +51,7 @@ export function LoginPage() {
     <div className="grid min-h-screen place-items-center bg-gradient-to-br from-slate-brand via-slate-2 to-slate-3 p-6">
       <div className="w-full max-w-sm rounded-card border border-line/20 bg-panel p-8 shadow-float">
         <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-3 grid size-14 place-items-center rounded-card bg-slate-brand font-display text-2xl font-semibold text-clementina">
-            LC
-          </div>
+          <img src={logoMark} alt="La Clementina" className="mb-3 size-14 rounded-card" />
           <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">LcAgro</h1>
           <p className="mt-1 text-sm text-ink-soft">Plataforma de Procesos · La Clementina</p>
         </div>

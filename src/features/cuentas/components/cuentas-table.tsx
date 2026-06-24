@@ -15,19 +15,64 @@ export function CuentasTable({
   onEditar: (c: CuentaDto) => void;
 }) {
   const columns: Column<CuentaDto>[] = [
-    { key: "vendedor", header: "Vendedor", cell: (r) => <span className="text-ink-soft">{r.vendedor}</span> },
+    {
+      key: "vendedor",
+      header: "Vendedor",
+      className: "whitespace-nowrap",
+      cell: (r) => <span className="text-ink-soft">{r.vendedor}</span>,
+    },
     { key: "cuenta", header: "Cuenta", align: "right", cell: (r) => r.cuenta },
-    { key: "denominacion", header: "Cliente", cell: (r) => <span className="font-medium text-ink">{r.denominacion}</span> },
+    {
+      key: "denominacion",
+      header: "Cliente",
+      className: "max-w-[16rem]",
+      cell: (r) => (
+        <span className="block truncate font-medium text-ink" title={r.denominacion}>
+          {r.denominacion}
+        </span>
+      ),
+    },
     {
       key: "saldoVencido",
       header: "Vencido",
       align: "right",
+      className: "whitespace-nowrap",
       cell: (r) => <span className={cn(r.saldoVencido > 0 && "font-medium text-rojo")}>{usd(r.saldoVencido)}</span>,
     },
-    { key: "saldoAVencer", header: "A vencer", align: "right", cell: (r) => usd(r.saldoAVencer) },
-    { key: "saldo", header: "Saldo", align: "right", cell: (r) => <span className="font-semibold text-ink">{usd(r.saldo)}</span> },
-    { key: "devolucion", header: "Devolución", cell: (r) => r.devolucion ?? <span className="text-ink-soft">—</span> },
-    { key: "observaciones", header: "Observaciones", cell: (r) => r.observaciones ?? <span className="text-ink-soft">—</span> },
+    { key: "saldoAVencer", header: "A vencer", align: "right", className: "whitespace-nowrap", cell: (r) => usd(r.saldoAVencer) },
+    {
+      key: "saldo",
+      header: "Saldo",
+      align: "right",
+      className: "whitespace-nowrap",
+      cell: (r) => <span className="font-semibold text-ink">{usd(r.saldo)}</span>,
+    },
+    {
+      key: "devolucion",
+      header: "Devolución",
+      className: "max-w-[14rem]",
+      cell: (r) =>
+        r.devolucion ? (
+          <span className="block truncate" title={r.devolucion}>
+            {r.devolucion}
+          </span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
+    },
+    {
+      key: "observaciones",
+      header: "Observaciones",
+      className: "max-w-[12rem]",
+      cell: (r) =>
+        r.observaciones ? (
+          <span className="block truncate" title={r.observaciones}>
+            {r.observaciones}
+          </span>
+        ) : (
+          <span className="text-ink-soft">—</span>
+        ),
+    },
   ];
 
   if (puedeEditar) {

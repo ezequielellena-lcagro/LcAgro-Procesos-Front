@@ -1,20 +1,12 @@
-// Marca textual (placeholder). Cuando estén los PNG del mockup en src/assets/brand/, se reemplaza
-// por <img> con fallback. Por ahora "LC" + "La Clementina" para no depender de assets faltantes.
+import logoFull from "@/assets/brand/logo-full.png";
+import logoMark from "@/assets/brand/logo-mark.png";
+
+// Logo de marca tomado del mockup (apps/mockup-web del repo backend):
+// expandido → lockup completo "LC · La Clementina"; colapsado → solo la marca "LC".
 export function BrandLogo({ collapsed }: { collapsed: boolean }) {
-  const mark = (
-    <div className="grid size-9 flex-none place-items-center rounded-[9px] bg-clementina font-display text-base font-bold text-slate-brand">
-      LC
-    </div>
-  );
+  if (collapsed) {
+    return <img src={logoMark} alt="La Clementina" className="size-9 flex-none rounded-[9px]" />;
+  }
 
-  if (collapsed) return mark;
-
-  return (
-    <div className="flex items-center gap-2.5">
-      {mark}
-      <span className="font-display text-[15px] font-semibold leading-tight text-white">
-        La Clementina
-      </span>
-    </div>
-  );
+  return <img src={logoFull} alt="La Clementina" className="h-7 w-auto flex-none" />;
 }

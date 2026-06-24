@@ -97,12 +97,18 @@
   * {
     border-color: var(--color-border);
   }
+  /* Raíz tipográfica: 93.75% = 15px (default del navegador 16px). En Tailwind v4 las
+     utilidades de texto y espaciado son rem-based, así que esto compacta toda la UI de
+     forma proporcional (tipografía + paddings + gaps) sin tocar cada componente. */
+  html {
+    font-size: 93.75%;
+  }
   body {
     background-color: var(--color-cream);
     color: var(--color-ink);
     font-family: var(--font-sans);
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 0.875rem;
+    line-height: 1.45;
     -webkit-font-smoothing: antialiased;
   }
   h1,

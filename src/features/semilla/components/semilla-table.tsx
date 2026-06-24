@@ -20,17 +20,28 @@ export function SemillaTable({ filas }: { filas: VentaSemillaDto[] }) {
     {
       key: "cliente",
       header: "Destinatario",
-      cell: (r) => <span className="font-medium text-ink">{r.razonSocialDestinatario || "—"}</span>,
+      className: "max-w-[15rem]",
+      cell: (r) => (
+        <span className="block truncate font-medium text-ink" title={r.razonSocialDestinatario || ""}>
+          {r.razonSocialDestinatario || "—"}
+        </span>
+      ),
     },
     {
       key: "cuit",
       header: "CUIT",
+      className: "whitespace-nowrap",
       cell: (r) => <span className="tabular text-ink-soft">{r.cuitDestinatario || "—"}</span>,
     },
     {
       key: "articulo",
       header: "Artículo (MacroGest)",
-      cell: (r) => <span className="text-ink-soft">{r.nombreArticuloMacroGest}</span>,
+      className: "max-w-[15rem]",
+      cell: (r) => (
+        <span className="block truncate text-ink-soft" title={r.nombreArticuloMacroGest}>
+          {r.nombreArticuloMacroGest}
+        </span>
+      ),
     },
     {
       key: "variedad",
@@ -46,6 +57,7 @@ export function SemillaTable({ filas }: { filas: VentaSemillaDto[] }) {
       key: "kilos",
       header: "Kilos",
       align: "right",
+      className: "whitespace-nowrap",
       cell: (r) => <span className="font-semibold text-ink">{numero(r.kilosTotales)}</span>,
     },
   ];
