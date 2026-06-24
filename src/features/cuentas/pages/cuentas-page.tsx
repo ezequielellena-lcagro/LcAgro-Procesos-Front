@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
+import { Link, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/auth-context";
 import { env } from "@/lib/env";
@@ -11,12 +13,14 @@ import { PageHeader } from "@/shared/components/page-header";
 import { Pagination } from "@/shared/components/pagination";
 import { exportToPdf } from "@/shared/export/export-pdf";
 import type { ExportColumn, ExportSpec } from "@/shared/export/export-types";
-import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { CuentasKpis } from "../components/cuentas-kpis";
 import { CuentasSkeleton } from "../components/cuentas-skeleton";
 import { CuentasTable } from "../components/cuentas-table";
+import { EnviarLinkDialog } from "../components/enviar-link-dialog";
 import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
+import { useExportarCuentas } from "../queries/use-exportar-cuentas";
+import { useImportarCuentas } from "../queries/use-importar-cuentas";
 import type { CuentaDto } from "../types";
 
 const PAGE_SIZE = 20;
@@ -30,6 +34,7 @@ export function CuentasPage() {
   const [minUsd, setMinUsd] = useState("");
   const [page, setPage] = useState(1);
   const [editar, setEditar] = useState<CuentaDto | null>(null);
+  const [enviarLink, setEnviarLink] = useState<{ vendNro: number; vendedor: string } | null>(null);
 
   const cuentas = useCuentas({
     q: q || undefined,
@@ -38,6 +43,16 @@ export function CuentasPage() {
     page,
     pageSize: PAGE_SIZE,
   });
+
+  const exportar = useExportarCuentas();
+  const importar = useImportarCuentas();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const onArchivo = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite re-seleccionar el mismo archivo
+    if (file) importar.mutate(file);
+  };
 
   const exportColumns: ExportColumn<CuentaDto>[] = [
     { header: "Vendedor", get: (r) => r.vendedor },
@@ -59,7 +74,11 @@ export function CuentasPage() {
   });
 
   const exportarExcel = () => {
-    void exportToXlsx(exportSpec()).catch(() => toast.error("No se pudo generar el Excel."));
+    exportar.mutate({
+      q: q || undefined,
+      vendedor: vendedor || undefined,
+      minUsd: minUsd ? Number(minUsd) : undefined,
+    });
   };
   const exportarPdf = () => {
     void exportToPdf(exportSpec()).catch(() => toast.error("No se pudo generar el PDF."));
@@ -70,7 +89,43 @@ export function CuentasPage() {
       <PageHeader
         title="Cuentas Corrientes USD"
         subtitle="Saldos vencidos y a vencer en USD (modelo open-item)."
-        actions={<ExportButtons onExcel={exportarExcel} onPdf={exportarPdf} />}
+        actions={
+          <div className="no-print flex items-center gap-2">
+            {puedeEditar && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={onArchivo}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={importar.isPending}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload className="size-4" /> {importar.isPending ? "Importando…" : "Importar"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!cuentas.data?.items.length}
+                  onClick={() => {
+                    const first = cuentas.data?.items[0];
+                    if (first) setEnviarLink({ vendNro: first.vendNro, vendedor: first.vendedor });
+                  }}
+                >
+                  <Link className="size-4" /> Enviar link
+                </Button>
+              </>
+            )}
+            <ExportButtons onExcel={exportarExcel} onPdf={exportarPdf} excelLoading={exportar.isPending} />
+          </div>
+        }
       />
 
       {env.useMocks && (
@@ -139,6 +194,11 @@ export function CuentasPage() {
       )}
 
       <ObservacionDialog cuenta={editar} onClose={() => setEditar(null)} />
+      <EnviarLinkDialog
+        vendNro={enviarLink?.vendNro ?? null}
+        vendedor={enviarLink?.vendedor ?? ""}
+        onClose={() => setEnviarLink(null)}
+      />
     </>
   );
 }
