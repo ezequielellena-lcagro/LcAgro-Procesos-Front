@@ -47,9 +47,23 @@ function ajusteDe(campania: string, cereal: string) {
 
 function detalleDe(campania: string, cereal: string): AjusteAplicado[] {
   const propios = AJUSTES.filter((a) => norm(a.campania) === norm(campania) && norm(a.cereal) === norm(cereal));
-  const porTipo = new Map<AjusteAplicado["tipo"], number>();
-  for (const a of propios) porTipo.set(a.tipo, (porTipo.get(a.tipo) ?? 0) + a.tnFirmadas);
-  return [...porTipo.entries()].map(([tipo, tn]) => ({ tipo, tn, precioUsd: null }));
+  // Agrupa por tipo: suma tn firmada y promedia el precio ponderado por |tn| (espeja PrecioPonderado del backend).
+  const porTipo = new Map<AjusteAplicado["tipo"], { tn: number; pesoPrecio: number; peso: number }>();
+  for (const a of propios) {
+    const acc = porTipo.get(a.tipo) ?? { tn: 0, pesoPrecio: 0, peso: 0 };
+    acc.tn += a.tnFirmadas;
+    if (a.precioUsd != null) {
+      const peso = Math.abs(a.tn);
+      acc.pesoPrecio += a.precioUsd * peso;
+      acc.peso += peso;
+    }
+    porTipo.set(a.tipo, acc);
+  }
+  return [...porTipo.entries()].map(([tipo, v]) => ({
+    tipo,
+    tn: v.tn,
+    precioUsd: v.peso === 0 ? null : v.pesoPrecio / v.peso,
+  }));
 }
 
 function toDto(b: BaseRow): PosicionDto {
