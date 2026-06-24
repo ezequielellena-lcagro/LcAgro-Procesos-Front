@@ -21,3 +21,18 @@ export function usePosicion(
     placeholderData: (prev) => prev, // al cambiar filtro, mantiene la data previa (sin parpadeo)
   });
 }
+
+/** Trae TODAS las campañas (sin filtro de campaña) para la vista "Detalle campañas". */
+export function usePosicionDetalle(cereal?: string, precioMin = 50, precioMax = 700, enabled = true) {
+  return useQuery({
+    queryKey: posicionKeys.detalle(cereal, precioMin, precioMax),
+    queryFn: async () => {
+      const { data } = await apiClient.get<PosicionDto[]>("/posicion", {
+        params: { cereal: cereal || undefined, precioMin, precioMax },
+      });
+      return data;
+    },
+    enabled,
+    placeholderData: (prev) => prev,
+  });
+}
