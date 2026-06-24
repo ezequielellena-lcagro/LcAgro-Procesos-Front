@@ -3,7 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
 import type { CuentasFiltros } from "../types";
 
-type ExportFiltros = Pick<CuentasFiltros, "q" | "vendedor" | "minUsd">;
+type ExportFiltros = Pick<CuentasFiltros, "q" | "vendNro" | "minUsd">;
 
 function nombrePorDefecto(): string {
   const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -21,7 +21,7 @@ export function useExportarCuentas() {
       const res = await apiClient.get("/cuentas/export", {
         params: {
           q: filtros.q || undefined,
-          vendedor: filtros.vendedor || undefined,
+          vendNro: filtros.vendNro,
           minUsd: filtros.minUsd,
         },
         responseType: "blob",

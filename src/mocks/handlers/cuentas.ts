@@ -40,12 +40,13 @@ function rowsConObs(): CuentaDto[] {
 
 function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
   const q = (u.searchParams.get("q") ?? "").toLowerCase();
-  const vendedor = (u.searchParams.get("vendedor") ?? "").toLowerCase();
-  const minUsd = Number(u.searchParams.get("minUsd") ?? "0");
+  const vendNroParam = u.searchParams.get("vendNro");
+  const vendNro = vendNroParam ? Number(vendNroParam) : null;
+  const umbral = Number(u.searchParams.get("minUsd") ?? "50") || 50;
   let out = rows;
-  if (vendedor) out = out.filter((c) => c.vendedor.toLowerCase().includes(vendedor));
+  if (vendNro !== null) out = out.filter((c) => c.vendNro === vendNro);
   if (q) out = out.filter((c) => c.denominacion.toLowerCase().includes(q) || String(c.cuenta).includes(q));
-  if (minUsd > 0) out = out.filter((c) => Math.abs(c.saldo) >= minUsd);
+  out = out.filter((c) => Math.abs(c.saldo) >= umbral); // umbral siempre (default 50)
   return out;
 }
 

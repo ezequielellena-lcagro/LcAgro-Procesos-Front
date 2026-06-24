@@ -32,15 +32,15 @@ export function CuentasPage() {
   const puedeEditar = hasAnyRole(["Admin", "Cobranzas"]);
 
   const [q, setQ] = useState("");
-  const [vendedor, setVendedor] = useState("");
-  const [minUsd, setMinUsd] = useState("");
+  const [vendNro, setVendNro] = useState<number | "">("");
+  const [minUsd, setMinUsd] = useState("50"); // umbral por defecto del proceso
   const [page, setPage] = useState(1);
   const [editar, setEditar] = useState<CuentaDto | null>(null);
   const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
 
   const cuentas = useCuentas({
     q: q || undefined,
-    vendedor: vendedor || undefined,
+    vendNro: vendNro === "" ? undefined : vendNro,
     minUsd: minUsd ? Number(minUsd) : undefined,
     page,
     pageSize: PAGE_SIZE,
@@ -79,7 +79,7 @@ export function CuentasPage() {
   const exportarExcel = () => {
     exportar.mutate({
       q: q || undefined,
-      vendedor: vendedor || undefined,
+      vendNro: vendNro === "" ? undefined : vendNro,
       minUsd: minUsd ? Number(minUsd) : undefined,
     });
   };
@@ -146,16 +146,16 @@ export function CuentasPage() {
         </FilterField>
         <FilterField label="Vendedor">
           <Select
-            value={vendedor}
+            value={vendNro}
             onChange={(e) => {
-              setVendedor(e.target.value);
+              setVendNro(e.target.value === "" ? "" : Number(e.target.value));
               setPage(1);
             }}
             disabled={vendedores.isPending}
           >
             <option value="">Todos los vendedores</option>
             {vendedores.data?.map((v) => (
-              <option key={v.vendNro} value={v.vendedor}>
+              <option key={v.vendNro} value={v.vendNro}>
                 {v.vendedor}
               </option>
             ))}

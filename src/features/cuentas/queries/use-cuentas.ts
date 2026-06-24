@@ -11,7 +11,7 @@ export function useCuentas(filtros: CuentasFiltros) {
       const { data } = await apiClient.get<PagedResult<CuentaDto>>("/cuentas", {
         params: {
           q: filtros.q || undefined,
-          vendedor: filtros.vendedor || undefined,
+          vendNro: filtros.vendNro,
           minUsd: filtros.minUsd,
           page: filtros.page,
           pageSize: filtros.pageSize,

@@ -13,7 +13,7 @@ export interface CuentaDto {
 
 export interface CuentasFiltros {
   q?: string;
-  vendedor?: string;
+  vendNro?: number;
   minUsd?: number;
   page: number;
   pageSize: number;
