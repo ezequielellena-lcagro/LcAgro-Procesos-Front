@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { AjusteDto, AjusteInput, PosicionDto } from "@/features/posicion/types";
+import type { AjusteAplicado, AjusteDto, AjusteInput, PosicionDto } from "@/features/posicion/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -28,10 +28,12 @@ const BASE: BaseRow[] = [
   { campania: "2024-2025", cereal: "Maíz", tnCompra: 7200, precioCompra: 170, tnVenta: 6800, precioVenta: 174, tnCalzadas: 6800, margenUsdTn: 4, margenPct: 2.35, resultadoUsd: 27200, posicionSinAjustes: 400 },
 ];
 
-let seq = 2;
+let seq = 4;
 const AJUSTES: AjusteDto[] = [
   { id: 1, campania: "2025-2026", cereal: "Soja", tipo: "arrastre", tn: 500, precioUsd: null, signo: "+", nota: "Arrastre 24-25", tnFirmadas: 500, fechaAlta: new Date().toISOString() },
   { id: 2, campania: "2025-2026", cereal: "Girasol", tipo: "produccion_propia", tn: 300, precioUsd: null, signo: "+", nota: null, tnFirmadas: 300, fechaAlta: new Date().toISOString() },
+  { id: 3, campania: "2025-2026", cereal: "Soja", tipo: "semilla", tn: 200, precioUsd: 325, signo: "-", nota: "Semilla estimada", tnFirmadas: -200, fechaAlta: new Date().toISOString() },
+  { id: 4, campania: "2025-2026", cereal: "Trigo", tipo: "semilla", tn: 1600, precioUsd: 200, signo: "-", nota: null, tnFirmadas: -1600, fechaAlta: new Date().toISOString() },
 ];
 
 const norm = (s: string) => s.trim().toLowerCase();
@@ -43,8 +45,19 @@ function ajusteDe(campania: string, cereal: string) {
   );
 }
 
+function detalleDe(campania: string, cereal: string): AjusteAplicado[] {
+  const propios = AJUSTES.filter((a) => norm(a.campania) === norm(campania) && norm(a.cereal) === norm(cereal));
+  const porTipo = new Map<AjusteAplicado["tipo"], number>();
+  for (const a of propios) porTipo.set(a.tipo, (porTipo.get(a.tipo) ?? 0) + a.tnFirmadas);
+  return [...porTipo.entries()].map(([tipo, tn]) => ({ tipo, tn, precioUsd: null }));
+}
+
 function toDto(b: BaseRow): PosicionDto {
-  return { ...b, posicionFinal: b.posicionSinAjustes + ajusteDe(b.campania, b.cereal) };
+  return {
+    ...b,
+    posicionFinal: b.posicionSinAjustes + ajusteDe(b.campania, b.cereal),
+    ajustesDetalle: detalleDe(b.campania, b.cereal),
+  };
 }
 
 export const posicionHandlers = [

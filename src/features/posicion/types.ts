@@ -13,10 +13,18 @@ export interface PosicionDto {
   resultadoUsd: number;
   posicionSinAjustes: number;
   posicionFinal: number;
+  ajustesDetalle: AjusteAplicado[];
 }
 
 export type TipoAjuste = "arrastre" | "semilla" | "canje" | "produccion_propia";
 export type SignoAjuste = "+" | "-";
+
+/** Sub-fila de ajuste agregada por tipo (espeja AjusteAplicadoDto del backend). */
+export interface AjusteAplicado {
+  tipo: TipoAjuste;
+  tn: number;            // firmada (con signo)
+  precioUsd: number | null;
+}
 
 export interface AjusteDto {
   id: number;
