@@ -26,24 +26,32 @@ const CUENTAS: Omit<CuentaDto, "devolucion" | "observaciones">[] = [
   { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2120, denominacion: "Granos del Sur SRL", saldoVencido: 6700.3, saldoAVencer: 0, saldo: 6700.3 },
 ];
 
+function rowsConObs(): CuentaDto[] {
+  return CUENTAS.map((c) => ({
+    ...c,
+    devolucion: OBS[c.cuenta]?.devolucion ?? null,
+    observaciones: OBS[c.cuenta]?.observaciones ?? null,
+  }));
+}
+
+function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
+  const q = (u.searchParams.get("q") ?? "").toLowerCase();
+  const vendedor = (u.searchParams.get("vendedor") ?? "").toLowerCase();
+  const minUsd = Number(u.searchParams.get("minUsd") ?? "0");
+  let out = rows;
+  if (vendedor) out = out.filter((c) => c.vendedor.toLowerCase().includes(vendedor));
+  if (q) out = out.filter((c) => c.denominacion.toLowerCase().includes(q) || String(c.cuenta).includes(q));
+  if (minUsd > 0) out = out.filter((c) => Math.abs(c.saldo) >= minUsd);
+  return out;
+}
+
 export const cuentasHandlers = [
   http.get(`${API}/cuentas`, ({ request }) => {
     const u = new URL(request.url);
-    const q = (u.searchParams.get("q") ?? "").toLowerCase();
-    const vendedor = (u.searchParams.get("vendedor") ?? "").toLowerCase();
-    const minUsd = Number(u.searchParams.get("minUsd") ?? "0");
     const page = Number(u.searchParams.get("page") ?? "1");
     const pageSize = Number(u.searchParams.get("pageSize") ?? "20");
 
-    let rows: CuentaDto[] = CUENTAS.map((c) => ({
-      ...c,
-      devolucion: OBS[c.cuenta]?.devolucion ?? null,
-      observaciones: OBS[c.cuenta]?.observaciones ?? null,
-    }));
-
-    if (vendedor) rows = rows.filter((c) => c.vendedor.toLowerCase().includes(vendedor));
-    if (q) rows = rows.filter((c) => c.denominacion.toLowerCase().includes(q) || String(c.cuenta).includes(q));
-    if (minUsd > 0) rows = rows.filter((c) => Math.abs(c.saldo) >= minUsd);
+    const rows = aplicarFiltros(rowsConObs(), u);
 
     const total = rows.length;
     const totalPages = pageSize <= 0 ? 0 : Math.ceil(total / pageSize);
@@ -60,6 +68,43 @@ export const cuentasHandlers = [
     return HttpResponse.json(paged);
   }),
 
+  // Export .xlsx (demo): el backend real arma el formato fiel; acá generamos un .xlsx válido
+  // con los mismos filtros para que la descarga funcione sin backend.
+  http.get(`${API}/cuentas/export`, async ({ request }) => {
+    const rows = aplicarFiltros(rowsConObs(), new URL(request.url));
+    const { default: writeXlsxFile } = await import("write-excel-file/browser");
+    const FMT = '#,##0.00;(#,##0.00);"-"';
+    const num = (value: number) => ({ type: Number, value, format: FMT });
+    const blob = await writeXlsxFile(rows, {
+      sheet: "Cuentas Clientes",
+      columns: [
+        { header: "Vendedor", width: 16, cell: (r: CuentaDto) => ({ type: String, value: r.vendedor }) },
+        { header: "Cuenta", width: 8, cell: (r: CuentaDto) => ({ type: Number, value: r.cuenta }) },
+        { header: "Denominación", width: 38, cell: (r: CuentaDto) => ({ type: String, value: r.denominacion }) },
+        { header: "Saldo Vencido (USD)", width: 14, cell: (r: CuentaDto) => num(r.saldoVencido) },
+        { header: "Saldo a Vencer (USD)", width: 14, cell: (r: CuentaDto) => num(r.saldoAVencer) },
+        { header: "Saldo (USD)", width: 13, cell: (r: CuentaDto) => num(r.saldo) },
+        { header: "Devolución", width: 40, cell: (r: CuentaDto) => ({ type: String, value: r.devolucion ?? undefined }) },
+        { header: "Observaciones", width: 25, cell: (r: CuentaDto) => ({ type: String, value: r.observaciones ?? undefined }) },
+      ],
+    }).toBlob();
+
+    return new HttpResponse(blob, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": 'attachment; filename="Cuentas_Clientes_demo.xlsx"',
+      },
+    });
+  }),
+
+  // Import (demo): no parseamos el .xlsx (el backend real lo hace). Simulamos una devolución
+  // importada en una cuenta conocida para que se vea el ida y vuelta tras refrescar el listado.
+  http.post(`${API}/cuentas/import`, async ({ request }) => {
+    await request.formData(); // consume el archivo subido
+    OBS[1024] = { devolucion: "Importado desde Excel (demo)", observaciones: OBS[1024]?.observaciones ?? null };
+    return HttpResponse.json({ filasLeidas: 14, cuentasActualizadas: 1, sinCambios: 13, advertencias: [] });
+  }),
+
   http.put(`${API}/cuentas/:cuenta/observacion`, async ({ request, params }) => {
     const cuenta = Number(params.cuenta);
     const body = (await request.json()) as { devolucion?: string | null; observaciones?: string | null };
@@ -69,6 +114,18 @@ export const cuentasHandlers = [
       devolucion: OBS[cuenta].devolucion,
       observaciones: OBS[cuenta].observaciones,
       fechaActualizacion: new Date().toISOString(),
+    });
+  }),
+
+  http.get(`${API}/cuentas/vendedores/:vendNro/contacto`, ({ params }) => {
+    const vendNro = Number(params.vendNro);
+    return HttpResponse.json({ vendNro, vendedor: "ASL", email: "asl@demo.com" });
+  }),
+
+  http.post(`${API}/cuentas/link`, async () => {
+    return HttpResponse.json({
+      url: `${location.origin}/devolucion/demo`,
+      expiraUtc: new Date(Date.now() + 86400000).toISOString(),
     });
   }),
 ];
