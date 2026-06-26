@@ -90,6 +90,13 @@ export const NAV: Area[] = [
         to: "/semilla-fiscalizada",
         roles: ["Admin", "Operador", "SoloLectura"],
       },
+      {
+        kind: "activo",
+        label: "Stock de Insumos",
+        title: "Stock de Insumos",
+        to: "/stock",
+        roles: ["Admin", "Operador", "SoloLectura"],
+      },
       { kind: "futuro", label: "Resumen de cuenta a clientes" },
       { kind: "futuro", label: "Cotizador de presupuestos" },
       { kind: "futuro", label: "Mercadería pendiente de recibir" },
