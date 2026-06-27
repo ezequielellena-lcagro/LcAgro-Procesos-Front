@@ -2,12 +2,15 @@ import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { numero, usd } from "@/shared/format/format";
 import { EstadoBadge } from "./estado-badge";
-import type { StockItem } from "../types";
+import { TipoBadge } from "./tipo-badge";
+import type { StockItem, TipoDeposito } from "../types";
 
 const COLUMNAS = 8;
 
 interface Grupo {
   deposito: number;
+  nombre: string;
+  tipo: TipoDeposito;
   items: StockItem[];
   valorUsd: number;
 }
@@ -18,7 +21,14 @@ function agruparPorDeposito(filas: StockItem[]): Grupo[] {
   for (const fila of filas) {
     let grupo = grupos.at(-1);
     if (!grupo || grupo.deposito !== fila.deposito) {
-      grupo = { deposito: fila.deposito, items: [], valorUsd: 0 };
+      // Nombre y tipo son por depósito: se toman del primer item del grupo.
+      grupo = {
+        deposito: fila.deposito,
+        nombre: fila.depositoNombre,
+        tipo: fila.tipoDeposito,
+        items: [],
+        valorUsd: 0,
+      };
       grupos.push(grupo);
     }
     grupo.items.push(fila);
@@ -68,7 +78,8 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
                       className="flex w-full items-center gap-2 text-left font-semibold text-ink"
                     >
                       {colapsado ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
-                      Depósito {g.deposito}
+                      Depósito {g.deposito} — {g.nombre}
+                      <TipoBadge tipo={g.tipo} />
                       <span className="ml-2 text-xs font-normal text-ink-soft">
                         {g.items.length} art. · {usd(g.valorUsd)}
                       </span>

@@ -5,6 +5,8 @@ import { StockTable } from "./stock-table";
 
 function item(p: Partial<StockItem> & Pick<StockItem, "deposito" | "codigoArticulo">): StockItem {
   return {
+    depositoNombre: "San Jorge",
+    tipoDeposito: "Propio",
     nombreProducto: "PRODUCTO",
     rubro: 200,
     rubroDesc: "HERBICIDAS",
@@ -20,16 +22,22 @@ function item(p: Partial<StockItem> & Pick<StockItem, "deposito" | "codigoArticu
 }
 
 const filas: StockItem[] = [
-  item({ deposito: 0, codigoArticulo: 1, nombreProducto: "GLIFOSATO", valorUsd: 500 }),
-  item({ deposito: 0, codigoArticulo: 2, nombreProducto: "ATRAZINA", valorUsd: 300 }),
-  item({ deposito: 5, codigoArticulo: 3, nombreProducto: "UREA", valorUsd: 1000, estado: "Inmovilizado", diasCobertura: null }),
+  item({ deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 1, nombreProducto: "GLIFOSATO", valorUsd: 500 }),
+  item({ deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 2, nombreProducto: "ATRAZINA", valorUsd: 300 }),
+  item({ deposito: 44, depositoNombre: "Adama", tipoDeposito: "Consignado", codigoArticulo: 3, nombreProducto: "UREA", valorUsd: 1000, estado: "Inmovilizado", diasCobertura: null }),
 ];
 
 describe("StockTable", () => {
-  it("muestra un encabezado de grupo por depósito", () => {
+  it("muestra un encabezado de grupo por depósito con código y nombre", () => {
     render(<StockTable filas={filas} />);
-    expect(screen.getByText("Depósito 0")).toBeInTheDocument();
-    expect(screen.getByText("Depósito 5")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Depósito 0 — San Jorge/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Depósito 44 — Adama/ })).toBeInTheDocument();
+  });
+
+  it("muestra el badge de tipo en el encabezado de grupo", () => {
+    render(<StockTable filas={filas} />);
+    expect(screen.getByText("Propio")).toBeInTheDocument();
+    expect(screen.getByText("Consignado")).toBeInTheDocument();
   });
 
   it("muestra las filas de artículo de cada grupo", () => {

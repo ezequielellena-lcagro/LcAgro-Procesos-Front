@@ -7,7 +7,12 @@ export function StockKpis({ totales }: { totales: TotalesStock }) {
   return (
     <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
       <KpiCard label="Artículos" value={totales.cantidadArticulos} />
-      <KpiCard label="Valor USD" value={usd(totales.valorUsdTotal)} tone="verde" />
+      <KpiCard
+        label="Valor USD"
+        value={usd(totales.valorUsdTotal)}
+        hint={`Propio ${usd(totales.valorUsdPropio)} · Consignado ${usd(totales.valorUsdConsignado)}`}
+        tone="verde"
+      />
       <KpiCard
         label="Inmovilizado"
         value={usd(totales.valorUsdInmovilizado)}
