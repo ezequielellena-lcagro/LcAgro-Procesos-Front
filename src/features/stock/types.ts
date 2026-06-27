@@ -1,9 +1,14 @@
 /** Estado de rotación del artículo (semáforo). Espeja EstadoStock del backend. */
 export type EstadoStock = "Ok" | "RiesgoQuiebre" | "Inmovilizado";
 
+/** Tipo de depósito según el catálogo. Espeja TipoDeposito del backend. */
+export type TipoDeposito = "Propio" | "Consignado";
+
 /** Una fila del listado (espeja StockItemDto). Cobertura/estado son a nivel artículo. */
 export interface StockItem {
   deposito: number;
+  depositoNombre: string;
+  tipoDeposito: TipoDeposito;
   codigoArticulo: number;
   nombreProducto: string;
   rubro: number;
@@ -21,6 +26,8 @@ export interface StockItem {
 export interface TotalesStock {
   cantidadArticulos: number;
   valorUsdTotal: number;
+  valorUsdPropio: number;
+  valorUsdConsignado: number;
   valorUsdInmovilizado: number;
   pctInmovilizado: number;
   cantidadRiesgoQuiebre: number;
@@ -46,9 +53,16 @@ export interface StockListado {
   porRubro: RubroValor[];
 }
 
+/** Un depósito del catálogo, para el filtro (espeja DepositoFiltroDto). */
+export interface DepositoFiltro {
+  codigo: number;
+  nombre: string;
+  tipo: TipoDeposito;
+}
+
 /** Opciones disponibles para los filtros (espeja StockFiltrosDto). */
 export interface StockFiltrosResponse {
-  depositos: number[];
+  depositos: DepositoFiltro[];
   rubros: RubroValor[];
 }
 
@@ -57,6 +71,7 @@ export interface StockFiltros {
   q?: string;
   deposito: number[];
   rubro: number[];
+  tipo?: TipoDeposito;
   ventanaDias?: number;
   page: number;
   pageSize: number;

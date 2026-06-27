@@ -11,6 +11,7 @@ export function useStock(filtros: StockFiltros) {
         params: {
           deposito: filtros.deposito.length ? filtros.deposito : undefined,
           rubro: filtros.rubro.length ? filtros.rubro : undefined,
+          tipo: filtros.tipo,
           q: filtros.q || undefined,
           ventanaDias: filtros.ventanaDias,
           page: filtros.page,

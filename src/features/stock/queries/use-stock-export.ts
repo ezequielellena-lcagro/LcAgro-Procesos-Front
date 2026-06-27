@@ -3,7 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
 import type { StockFiltros } from "../types";
 
-type ExportFiltros = Pick<StockFiltros, "deposito" | "rubro" | "q" | "ventanaDias">;
+type ExportFiltros = Pick<StockFiltros, "deposito" | "rubro" | "tipo" | "q" | "ventanaDias">;
 
 function nombrePorDefecto(): string {
   const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -22,6 +22,7 @@ export function useStockExport() {
         params: {
           deposito: filtros.deposito.length ? filtros.deposito : undefined,
           rubro: filtros.rubro.length ? filtros.rubro : undefined,
+          tipo: filtros.tipo,
           q: filtros.q || undefined,
           ventanaDias: filtros.ventanaDias,
         },
