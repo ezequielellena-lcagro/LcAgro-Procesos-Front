@@ -5,6 +5,7 @@ import { ErrorState } from "@/shared/components/error-state";
 import { ExportButtons } from "@/shared/components/export-buttons";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/shared/components/page-header";
 import { Pagination } from "@/shared/components/pagination";
 import { MultiSelect } from "../components/multi-select";
@@ -15,6 +16,7 @@ import { StockTable } from "../components/stock-table";
 import { useStock } from "../queries/use-stock";
 import { useStockExport } from "../queries/use-stock-export";
 import { useStockFiltros } from "../queries/use-stock-filtros";
+import type { TipoDeposito } from "../types";
 
 const PAGE_SIZE = 50;
 
@@ -22,6 +24,7 @@ export function StockInsumosPage() {
   const [q, setQ] = useState("");
   const [deposito, setDeposito] = useState<number[]>([]);
   const [rubro, setRubro] = useState<number[]>([]);
+  const [tipo, setTipo] = useState<TipoDeposito | "">("");
   const [ventanaDias, setVentanaDias] = useState("90"); // default del backend
   const [page, setPage] = useState(1);
 
@@ -32,6 +35,7 @@ export function StockInsumosPage() {
     q: q || undefined,
     deposito,
     rubro,
+    tipo: tipo || undefined,
     ventanaDias: ventana,
     page,
     pageSize: PAGE_SIZE,
@@ -39,10 +43,10 @@ export function StockInsumosPage() {
   const exportar = useStockExport();
 
   const exportarExcel = () =>
-    exportar.mutate({ q: q || undefined, deposito, rubro, ventanaDias: ventana });
+    exportar.mutate({ q: q || undefined, deposito, rubro, tipo: tipo || undefined, ventanaDias: ventana });
 
   const depositoOpts =
-    filtrosOpts.data?.depositos.map((d) => ({ value: d, label: `Depósito ${d}` })) ?? [];
+    filtrosOpts.data?.depositos.map((d) => ({ value: d.codigo, label: `${d.nombre} (${d.codigo})` })) ?? [];
   const rubroOpts =
     filtrosOpts.data?.rubros.map((r) => ({ value: r.rubro, label: r.rubroDesc })) ?? [];
 
@@ -94,6 +98,19 @@ export function StockInsumosPage() {
             placeholder="Todos los rubros"
             disabled={filtrosOpts.isPending}
           />
+        </FilterField>
+        <FilterField label="Tipo">
+          <Select
+            value={tipo}
+            onChange={(e) => {
+              setTipo(e.target.value as TipoDeposito | "");
+              setPage(1);
+            }}
+          >
+            <option value="">Todos</option>
+            <option value="Propio">Propio</option>
+            <option value="Consignado">Consignado</option>
+          </Select>
         </FilterField>
         <FilterField label="Ventana de venta (días)">
           <Input
