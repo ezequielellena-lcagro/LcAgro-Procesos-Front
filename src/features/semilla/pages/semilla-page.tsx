@@ -9,6 +9,7 @@ import { ErrorState } from "@/shared/components/error-state";
 import { ExportButtons } from "@/shared/components/export-buttons";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
+import { Pagination } from "@/shared/components/pagination";
 import { numero } from "@/shared/format/format";
 import { MapeosDialog } from "../components/mapeos-dialog";
 import { SemillaSkeleton } from "../components/semilla-skeleton";
@@ -19,6 +20,7 @@ import { CULTIVOS, MESES, type CultivoSemilla } from "../types";
 
 const HOY = new Date();
 const ANIOS = Array.from({ length: 4 }, (_, i) => HOY.getFullYear() - i);
+const PAGE_SIZE = 20;
 
 function Stat({ label, value, acento }: { label: string; value: string; acento?: "verde" | "clementina" }) {
   const color = acento === "verde" ? "text-verde" : acento === "clementina" ? "text-clementina-deep" : "text-ink";
@@ -32,12 +34,14 @@ function Stat({ label, value, acento }: { label: string; value: string; acento?:
 
 export function SemillaPage() {
   const { hasAnyRole } = useAuth();
-  const puedeGestionar = hasAnyRole(["Admin", "Operador"]);
+  const puedeGestionar = hasAnyRole(["semilla"]);
 
   const [anio, setAnio] = useState(HOY.getFullYear());
   const [mes, setMes] = useState(HOY.getMonth() + 1);
   const [cultivo, setCultivo] = useState<CultivoSemilla>("Trigo");
   const [mapeosOpen, setMapeosOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [soloSinMapear, setSoloSinMapear] = useState(false);
 
   const filtros = { anio, mes, cultivo };
   const ventas = useVentasSemilla(filtros);
@@ -47,6 +51,16 @@ export function SemillaPage() {
   const pendientes = filas.filter((v) => v.requiereMapeo).length;
   const kilosTotales = filas.reduce((acc, v) => acc + v.kilosTotales, 0);
   const hayDatos = filas.length > 0;
+
+  // Filtro de VISTA solamente: no afecta el export, que siempre baja TODAS las ventas del período
+  // (el Excel se arma en el backend con anio/mes/cultivo, no con este array filtrado).
+  const filasVista = soloSinMapear ? filas.filter((v) => v.requiereMapeo) : filas;
+
+  // Paginación de la grilla (las tarjetas/KPIs se calculan sobre el total del período, no sobre la vista).
+  const total = filasVista.length;
+  const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const pageSafe = Math.min(page, totalPages); // al cambiar de filtro/mes la página puede quedar fuera de rango
+  const visibles = filasVista.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   const exportarExcel = () => exportar.mutate(filtros);
 
@@ -62,11 +76,7 @@ export function SemillaPage() {
                 <Sprout className="size-4" /> Mapeo de variedades
               </Button>
             )}
-            <ExportButtons
-              onExcel={exportarExcel}
-              excelLoading={exportar.isPending}
-              excelDisabled={!hayDatos || pendientes > 0}
-            />
+            <ExportButtons onExcel={exportarExcel} excelLoading={exportar.isPending} excelDisabled={!hayDatos} />
           </div>
         }
       />
@@ -79,7 +89,13 @@ export function SemillaPage() {
 
       <FilterBar>
         <FilterField label="Cultivo">
-          <Select value={cultivo} onChange={(e) => setCultivo(e.target.value as CultivoSemilla)}>
+          <Select
+            value={cultivo}
+            onChange={(e) => {
+              setCultivo(e.target.value as CultivoSemilla);
+              setPage(1);
+            }}
+          >
             {CULTIVOS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -88,7 +104,13 @@ export function SemillaPage() {
           </Select>
         </FilterField>
         <FilterField label="Mes">
-          <Select value={mes} onChange={(e) => setMes(Number(e.target.value))}>
+          <Select
+            value={mes}
+            onChange={(e) => {
+              setMes(Number(e.target.value));
+              setPage(1);
+            }}
+          >
             {MESES.map((m) => (
               <option key={m.value} value={m.value}>
                 {m.label}
@@ -97,7 +119,13 @@ export function SemillaPage() {
           </Select>
         </FilterField>
         <FilterField label="Año">
-          <Select value={anio} onChange={(e) => setAnio(Number(e.target.value))}>
+          <Select
+            value={anio}
+            onChange={(e) => {
+              setAnio(Number(e.target.value));
+              setPage(1);
+            }}
+          >
             {ANIOS.map((a) => (
               <option key={a} value={a}>
                 {a}
@@ -105,6 +133,18 @@ export function SemillaPage() {
             ))}
           </Select>
         </FilterField>
+        <label className="flex items-center gap-2 self-end pb-2.5 text-sm text-ink">
+          <input
+            type="checkbox"
+            className="size-4 accent-clementina-deep"
+            checked={soloSinMapear}
+            onChange={(e) => {
+              setSoloSinMapear(e.target.checked);
+              setPage(1);
+            }}
+          />
+          Solo sin mapear
+        </label>
       </FilterBar>
 
       {ventas.isError ? (
@@ -129,8 +169,8 @@ export function SemillaPage() {
             <div className="flex flex-wrap items-center gap-3 rounded-card border border-clementina/40 bg-clementina/10 px-4 py-3">
               <AlertTriangle className="size-5 shrink-0 text-clementina-deep" />
               <p className="flex-1 text-sm text-ink">
-                Hay <strong>{pendientes}</strong> renglón(es) de artículos sin mapear. Resolvé el mapeo de
-                variedades antes de exportar el Excel.
+                Hay <strong>{pendientes}</strong> renglón(es) de artículos sin mapear. Podés resolverlos acá o
+                completarlos a mano en el Excel descargado (esas filas salen con la variedad/categoría en blanco).
               </p>
               {puedeGestionar && (
                 <Button type="button" size="sm" onClick={() => setMapeosOpen(true)}>
@@ -140,7 +180,16 @@ export function SemillaPage() {
             </div>
           )}
 
-          <SemillaTable filas={filas} />
+          {filasVista.length === 0 ? (
+            <EmptyState mensaje="No quedan renglones sin mapear para este mes y cultivo." />
+          ) : (
+            <>
+              <SemillaTable filas={visibles} />
+              {total > PAGE_SIZE && (
+                <Pagination page={pageSafe} totalPages={totalPages} total={total} onPage={setPage} />
+              )}
+            </>
+          )}
         </div>
       )}
 
