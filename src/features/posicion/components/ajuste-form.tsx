@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
-import { CEREALES, TIPOS_AJUSTE, type AjusteDto, type AjusteInput } from "../types";
+import { CEREALES, TIPOS_AJUSTE_MANUAL, type AjusteDto, type AjusteInput } from "../types";
 
 const schema = z.object({
   cereal: z.enum(CEREALES),
-  tipo: z.enum(["arrastre", "semilla", "canje", "produccion_propia"]),
+  tipo: z.enum(["semilla", "canje", "produccion_propia"]),
   signo: z.enum(["+", "-"]),
   tn: z.string().min(1, "Ingresá las toneladas.").refine((v) => Number(v) > 0, "Las toneladas deben ser mayores a 0."),
   precioUsd: z.string().refine((v) => v.trim() === "" || Number(v) >= 0, "Precio inválido."),
@@ -33,7 +33,7 @@ export function AjusteForm({ campania, edit, submitting, onSubmit, onCancel }: P
     resolver: zodResolver(schema),
     defaultValues: {
       cereal: edit && (CEREALES as readonly string[]).includes(edit.cereal) ? (edit.cereal as Values["cereal"]) : "Soja",
-      tipo: edit?.tipo ?? "arrastre",
+      tipo: edit && edit.tipo !== "arrastre" ? edit.tipo : "semilla",
       signo: edit?.signo ?? "+",
       tn: edit ? String(edit.tn) : "",
       precioUsd: edit?.precioUsd != null ? String(edit.precioUsd) : "",
@@ -90,7 +90,7 @@ export function AjusteForm({ campania, edit, submitting, onSubmit, onCancel }: P
         <div className="space-y-1.5">
           <Label htmlFor="tipo">Tipo</Label>
           <Select id="tipo" className="w-full" {...form.register("tipo")}>
-            {TIPOS_AJUSTE.map((t) => (
+            {TIPOS_AJUSTE_MANUAL.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
               </option>

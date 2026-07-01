@@ -59,3 +59,6 @@ export const TIPOS_AJUSTE: { value: TipoAjuste; label: string }[] = [
   { value: "canje", label: "Canje" },
   { value: "produccion_propia", label: "Producción propia" },
 ];
+
+/** Tipos que se cargan A MANO. El arrastre es automático (lo calcula el sistema), no se carga acá. */
+export const TIPOS_AJUSTE_MANUAL = TIPOS_AJUSTE.filter((t) => t.value !== "arrastre");

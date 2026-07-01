@@ -14,7 +14,7 @@ import { PageHeader } from "@/shared/components/page-header";
 import { exportToPdf } from "@/shared/export/export-pdf";
 import type { ExportColumn, ExportKpi, ExportSpec } from "@/shared/export/export-types";
 import { exportToXlsx } from "@/shared/export/export-xlsx";
-import { numero, oDash, pct, usd } from "@/shared/format/format";
+import { numero } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionDetalle } from "../components/posicion-detalle";
@@ -26,7 +26,7 @@ import { CEREALES, type PosicionDto } from "../types";
 
 export function PosicionPage() {
   const { hasAnyRole } = useAuth();
-  const puedeGestionar = hasAnyRole(["Admin", "Operador"]);
+  const puedeGestionar = hasAnyRole(["posicion"]);
 
   const campanias = useCampanias();
   const [campaniaSel, setCampaniaSel] = useState<string>();
@@ -52,25 +52,18 @@ export function PosicionPage() {
     { header: "P. compra", get: (r) => r.precioCompra, format: "usd" },
     { header: "Venta tn", get: (r) => r.tnVenta, format: "number", total: true },
     { header: "P. venta", get: (r) => r.precioVenta, format: "usd" },
-    { header: "Calzadas", get: (r) => r.tnCalzadas, format: "number", total: true },
-    { header: "Margen US$/tn", get: (r) => r.margenUsdTn, format: "usd" },
-    { header: "Margen %", get: (r) => r.margenPct, format: "percent" },
-    { header: "Resultado US$", get: (r) => r.resultadoUsd, format: "usd", total: true },
     { header: "Posición tn", get: (r) => r.posicionFinal, format: "number", total: true },
   ];
 
-  // KPIs por cereal (espejan las tarjetas de la pantalla) para el resumen del export.
+  // KPIs por cereal (espejan las tarjetas): foco en la posición en toneladas, no en el margen.
   const exportKpis = (filas: PosicionDto[]): ExportKpi[] =>
     filas.map((f) => ({
       titulo: f.cereal,
       acento: f.posicionFinal >= 0 ? "verde" : "rojo",
       metricas: [
-        { label: "Margen US$/tn", valor: oDash(f.margenUsdTn, usd), destacado: true },
-        { label: "Margen %", valor: oDash(f.margenPct, pct) },
+        { label: "Posición", valor: `${numero(f.posicionFinal)} tn`, destacado: true },
         { label: "Compra", valor: `${numero(f.tnCompra)} tn` },
         { label: "Venta", valor: `${numero(f.tnVenta)} tn` },
-        { label: "Resultado", valor: usd(f.resultadoUsd) },
-        { label: "Posición", valor: `${numero(f.posicionFinal)} tn` },
       ],
     }));
 
