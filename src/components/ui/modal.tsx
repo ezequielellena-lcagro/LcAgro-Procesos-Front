@@ -13,9 +13,16 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // a11y: el foco entra al diálogo al abrir. Depende solo de `open` para que un
+  // cambio de identidad de `onClose` (arrow nueva en cada render del padre) no
+  // vuelva a robar el foco a los inputs internos en cada tecla.
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
+
+  // Cerrar con Escape mientras está abierto; se resuscribe si cambia `onClose`.
   useEffect(() => {
     if (!open) return;
-    panelRef.current?.focus(); // a11y: el foco entra al diálogo al abrir
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
