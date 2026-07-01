@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toAppError } from "@/lib/api-error";
+import { ETIQUETA_PANTALLA, type RolNombre } from "@/features/auth/types";
 import type { UsuarioDto } from "../types";
 
 function makeSchema(esNuevo: boolean) {
@@ -19,7 +20,7 @@ function makeSchema(esNuevo: boolean) {
         esNuevo ? "Mínimo 6 caracteres." : "Mínimo 6 caracteres (vacío = no cambiar).",
       ),
     activo: z.boolean(),
-    roles: z.array(z.string()).min(1, "Asigná al menos un rol."),
+    roles: z.array(z.string()).min(1, "Asigná al menos una pantalla."),
   });
 }
 export type UsuarioFormValues = z.infer<ReturnType<typeof makeSchema>>;
@@ -84,12 +85,12 @@ export function UsuarioForm({ edit, rolesDisponibles, submitting, onSubmit, onCa
       </div>
 
       <div className="space-y-1.5">
-        <Label>Roles</Label>
-        <div className="flex flex-wrap gap-3">
+        <Label>Pantallas a las que puede entrar</Label>
+        <div className="grid grid-cols-2 gap-2">
           {rolesDisponibles.map((rol) => (
             <label key={rol} className="flex items-center gap-1.5 text-sm text-ink">
               <input type="checkbox" value={rol} className="size-4 accent-clementina-deep" {...form.register("roles")} />
-              {rol}
+              {ETIQUETA_PANTALLA[rol as RolNombre] ?? rol}
             </label>
           ))}
         </div>

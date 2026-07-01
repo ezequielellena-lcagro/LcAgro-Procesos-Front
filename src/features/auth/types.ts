@@ -1,5 +1,28 @@
-/** Roles del sistema (coinciden con los del backend / claims del JWT). */
-export type RolNombre = "Admin" | "Operador" | "Cobranzas" | "SoloLectura";
+/**
+ * Pantallas del sistema. El "rol" de un usuario es la lista de pantallas a las que puede entrar
+ * (coincide con los claims de rol del JWT del backend: `Pantallas.Todas`). Acceso = uso completo.
+ */
+export type RolNombre =
+  | "dashboard"
+  | "posicion"
+  | "cuentas"
+  | "semilla"
+  | "stock"
+  | "usuarios"
+  | "config"
+  | "auditoria";
+
+/** Etiqueta legible por pantalla (espeja `Pantallas.Etiqueta` del backend). */
+export const ETIQUETA_PANTALLA: Record<RolNombre, string> = {
+  dashboard: "Dashboard",
+  posicion: "Posición de Cereal",
+  cuentas: "Cuentas Corrientes USD",
+  semilla: "Semilla Fiscalizada",
+  stock: "Stock de Insumos",
+  usuarios: "Usuarios",
+  config: "Configuración",
+  auditoria: "Auditoría",
+};
 
 /** Usuario autenticado (espeja UserDto del backend). */
 export interface User {

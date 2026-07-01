@@ -47,28 +47,32 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <DashboardPage /> },
           {
-            element: <ProtectedRoute roles={["Admin", "Operador", "SoloLectura"]} />,
+            element: <ProtectedRoute roles={["posicion"]} />,
             children: [{ path: "posicion", element: <PosicionPage /> }],
           },
           {
-            element: <ProtectedRoute roles={["Admin", "Cobranzas", "SoloLectura"]} />,
+            element: <ProtectedRoute roles={["cuentas"]} />,
             children: [{ path: "cuentas", element: <CuentasPage /> }],
           },
           {
-            element: <ProtectedRoute roles={["Admin", "Operador", "SoloLectura"]} />,
+            element: <ProtectedRoute roles={["semilla"]} />,
             children: [{ path: "semilla-fiscalizada", element: <SemillaPage /> }],
           },
           {
-            element: <ProtectedRoute roles={["Admin", "Operador", "SoloLectura"]} />,
+            element: <ProtectedRoute roles={["stock"]} />,
             children: [{ path: "stock", element: <StockPage /> }],
           },
           {
-            element: <ProtectedRoute roles={["Admin"]} />,
-            children: [
-              { path: "usuarios", element: <UsuariosPage /> },
-              { path: "config", element: <ConfigPage /> },
-              { path: "auditoria", element: <AuditoriaPage /> },
-            ],
+            element: <ProtectedRoute roles={["usuarios"]} />,
+            children: [{ path: "usuarios", element: <UsuariosPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["config"]} />,
+            children: [{ path: "config", element: <ConfigPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["auditoria"]} />,
+            children: [{ path: "auditoria", element: <AuditoriaPage /> }],
           },
         ],
       },

@@ -4,12 +4,24 @@ import { env } from "@/lib/env";
 
 const API = env.apiUrl;
 
-// Usuarios de demo, uno por rol (clave: cualquiera no vacía).
+// Usuarios de demo con distintos juegos de pantallas (clave: cualquiera no vacía).
 const USUARIOS: Record<string, User> = {
-  "admin@lcagro.local": { id: 1, nombre: "Admin Demo", email: "admin@lcagro.local", roles: ["Admin"] },
-  "operador@lcagro.local": { id: 2, nombre: "Operador Acopio", email: "operador@lcagro.local", roles: ["Operador"] },
-  "cobranzas@lcagro.local": { id: 3, nombre: "Cobranzas Demo", email: "cobranzas@lcagro.local", roles: ["Cobranzas"] },
-  "lectura@lcagro.local": { id: 4, nombre: "Solo Lectura", email: "lectura@lcagro.local", roles: ["SoloLectura"] },
+  "admin@lcagro.local": {
+    id: 1, nombre: "Admin Demo", email: "admin@lcagro.local",
+    roles: ["dashboard", "posicion", "cuentas", "semilla", "stock", "usuarios", "config", "auditoria"],
+  },
+  "operador@lcagro.local": {
+    id: 2, nombre: "Operador Acopio", email: "operador@lcagro.local",
+    roles: ["dashboard", "posicion", "semilla", "stock"],
+  },
+  "cobranzas@lcagro.local": {
+    id: 3, nombre: "Cobranzas Demo", email: "cobranzas@lcagro.local",
+    roles: ["dashboard", "cuentas"],
+  },
+  "lectura@lcagro.local": {
+    id: 4, nombre: "Solo Lectura", email: "lectura@lcagro.local",
+    roles: ["dashboard"],
+  },
 };
 
 function sesion(user: User): AuthResponse {
