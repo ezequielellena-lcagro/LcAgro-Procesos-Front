@@ -1,7 +1,6 @@
 import { http, HttpResponse } from "msw";
 import type { CuentaDto } from "@/features/cuentas/types";
 import { env } from "@/lib/env";
-import type { PagedResult } from "@/shared/types/paged";
 
 const API = env.apiUrl;
 
@@ -61,7 +60,29 @@ export const cuentasHandlers = [
     const total = rows.length;
     const totalPages = pageSize <= 0 ? 0 : Math.ceil(total / pageSize);
     const items = rows.slice((page - 1) * pageSize, page * pageSize);
-    const paged: PagedResult<CuentaDto> = {
+
+    // Totales y subtotales por vendedor sobre TODO el set filtrado (como el backend real).
+    const totales = {
+      vencido: rows.reduce((s, c) => s + c.saldoVencido, 0),
+      aVencer: rows.reduce((s, c) => s + c.saldoAVencer, 0),
+      saldo: rows.reduce((s, c) => s + c.saldo, 0),
+      cuentas: total,
+    };
+    const porVend = new Map<
+      number,
+      { vendNro: number; vendedor: string; vencido: number; aVencer: number; saldo: number; cuentas: number }
+    >();
+    for (const c of rows) {
+      const g = porVend.get(c.vendNro) ?? { vendNro: c.vendNro, vendedor: c.vendedor, vencido: 0, aVencer: 0, saldo: 0, cuentas: 0 };
+      g.vencido += c.saldoVencido;
+      g.aVencer += c.saldoAVencer;
+      g.saldo += c.saldo;
+      g.cuentas += 1;
+      porVend.set(c.vendNro, g);
+    }
+    const subtotales = [...porVend.values()].sort((a, b) => a.vendedor.localeCompare(b.vendedor));
+
+    return HttpResponse.json({
       items,
       total,
       page,
@@ -69,8 +90,9 @@ export const cuentasHandlers = [
       totalPages,
       hasNext: page < totalPages,
       hasPrevious: page > 1,
-    };
-    return HttpResponse.json(paged);
+      totales,
+      subtotales,
+    });
   }),
 
   // Export .xlsx (demo): el backend real arma el formato fiel; acá generamos un .xlsx válido

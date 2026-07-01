@@ -16,6 +16,7 @@ import { exportToPdf } from "@/shared/export/export-pdf";
 import type { ExportColumn, ExportSpec } from "@/shared/export/export-types";
 import { CuentasKpis } from "../components/cuentas-kpis";
 import { CuentasSkeleton } from "../components/cuentas-skeleton";
+import { CuentasSubtotales } from "../components/cuentas-subtotales";
 import { CuentasTable } from "../components/cuentas-table";
 import { EnviarLinkDialog } from "../components/enviar-link-dialog";
 import { ObservacionDialog } from "../components/observacion-dialog";
@@ -29,7 +30,7 @@ const PAGE_SIZE = 20;
 
 export function CuentasPage() {
   const { hasAnyRole } = useAuth();
-  const puedeEditar = hasAnyRole(["Admin", "Cobranzas"]);
+  const puedeEditar = hasAnyRole(["cuentas"]);
 
   const [q, setQ] = useState("");
   const [vendNro, setVendNro] = useState<number | "">("");
@@ -182,11 +183,19 @@ export function CuentasPage() {
         <CuentasSkeleton />
       ) : (
         <>
-          <CuentasKpis items={cuentas.data.items} total={cuentas.data.total} />
+          <CuentasKpis totales={cuentas.data.totales} />
           {cuentas.data.items.length === 0 ? (
             <EmptyState mensaje="No hay cuentas con esos filtros." />
           ) : (
-            <>
+            <div className="space-y-4">
+              {vendNro === "" && cuentas.data.subtotales.length > 1 && (
+                <section className="space-y-2">
+                  <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">
+                    Totales por vendedor
+                  </h2>
+                  <CuentasSubtotales subtotales={cuentas.data.subtotales} totales={cuentas.data.totales} />
+                </section>
+              )}
               <CuentasTable filas={cuentas.data.items} puedeEditar={puedeEditar} onEditar={setEditar} />
               <Pagination
                 page={cuentas.data.page}
@@ -194,7 +203,7 @@ export function CuentasPage() {
                 total={cuentas.data.total}
                 onPage={setPage}
               />
-            </>
+            </div>
           )}
         </>
       )}

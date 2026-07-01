@@ -19,6 +19,37 @@ export interface CuentasFiltros {
   pageSize: number;
 }
 
+/** Totales USD del set filtrado completo (no la página). Para los KPIs. */
+export interface TotalesCuentas {
+  vencido: number;
+  aVencer: number;
+  saldo: number;
+  cuentas: number;
+}
+
+/** Subtotal USD de un vendedor sobre el set filtrado. */
+export interface SubtotalVendedor {
+  vendNro: number;
+  vendedor: string;
+  vencido: number;
+  aVencer: number;
+  saldo: number;
+  cuentas: number;
+}
+
+/** Respuesta del listado (espeja CuentasListadoDto): la página + totales/subtotales del filtro completo. */
+export interface CuentasListado {
+  items: CuentaDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  totales: TotalesCuentas;
+  subtotales: SubtotalVendedor[];
+}
+
 /** Payload del upsert de observación por cuenta. */
 export interface ObservacionInput {
   cuenta: number;
