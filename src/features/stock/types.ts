@@ -20,6 +20,10 @@ export interface StockItem {
   ventaDiaria: number;
   diasCobertura: number | null;
   estado: EstadoStock;
+  /** Stock mínimo del artículo (MacroGest, global). 0 = no cargado. */
+  nivelMinimo: number;
+  /** true si hay mínimo cargado y el stock del artículo no lo supera. */
+  bajoMinimo: boolean;
 }
 
 /** KPIs del set filtrado completo (espeja TotalesStock). */
@@ -31,6 +35,7 @@ export interface TotalesStock {
   valorUsdInmovilizado: number;
   pctInmovilizado: number;
   cantidadRiesgoQuiebre: number;
+  cantidadBajoMinimo: number;
 }
 
 /** Valor USD acumulado por rubro (espeja RubroValorDto). */
@@ -73,6 +78,7 @@ export interface StockFiltros {
   rubro: number[];
   tipo?: TipoDeposito;
   ventanaDias?: number;
+  soloBajoMinimo?: boolean;
   page: number;
   pageSize: number;
 }

@@ -11,6 +11,7 @@ const totales: TotalesStock = {
   valorUsdInmovilizado: 1200000,
   pctInmovilizado: 18.2,
   cantidadRiesgoQuiebre: 14,
+  cantidadBajoMinimo: 9,
 };
 
 describe("StockKpis", () => {
@@ -33,5 +34,10 @@ describe("StockKpis", () => {
   it("muestra la cantidad en riesgo de quiebre", () => {
     render(<StockKpis totales={totales} />);
     expect(screen.getByText("14")).toBeInTheDocument();
+  });
+
+  it("muestra la cantidad bajo mínimo", () => {
+    render(<StockKpis totales={totales} />);
+    expect(screen.getByText("9")).toBeInTheDocument();
   });
 });

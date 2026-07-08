@@ -17,6 +17,8 @@ function item(p: Partial<StockItem> & Pick<StockItem, "deposito" | "codigoArticu
     ventaDiaria: 1,
     diasCobertura: 50,
     estado: "Ok",
+    nivelMinimo: 0,
+    bajoMinimo: false,
     ...p,
   };
 }

@@ -3,9 +3,10 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { numero, usd } from "@/shared/format/format";
 import { EstadoBadge } from "./estado-badge";
 import { TipoBadge } from "./tipo-badge";
+import { MinimoBadge } from "./minimo-badge";
 import type { StockItem, TipoDeposito } from "../types";
 
-const COLUMNAS = 8;
+const COLUMNAS = 9;
 
 interface Grupo {
   deposito: number;
@@ -61,6 +62,7 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
             <th className="px-3 py-2 text-right font-semibold">Stock</th>
             <th className="px-3 py-2 text-right font-semibold">Valor USD</th>
             <th className="px-3 py-2 text-right font-semibold">Días cob.</th>
+            <th className="px-3 py-2 text-right font-semibold">Mínimo</th>
             <th className="px-3 py-2 text-center font-semibold">Estado</th>
           </tr>
         </thead>
@@ -103,6 +105,9 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
                       <td className="px-3 py-2 text-right tabular">{numero(r.stockActual)}</td>
                       <td className="px-3 py-2 text-right tabular">{usd(r.valorUsd)}</td>
                       <td className="px-3 py-2 text-right tabular">{r.diasCobertura ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular">
+                        {r.bajoMinimo ? <MinimoBadge /> : r.nivelMinimo > 0 ? numero(r.nivelMinimo) : null}
+                      </td>
                       <td className="px-3 py-2 text-center">
                         <EstadoBadge estado={r.estado} />
                       </td>

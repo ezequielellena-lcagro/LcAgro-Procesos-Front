@@ -26,6 +26,7 @@ export function StockInsumosPage() {
   const [rubro, setRubro] = useState<number[]>([]);
   const [tipo, setTipo] = useState<TipoDeposito | "">("");
   const [ventanaDias, setVentanaDias] = useState("90"); // default del backend
+  const [soloBajoMinimo, setSoloBajoMinimo] = useState(false);
   const [page, setPage] = useState(1);
 
   const filtrosOpts = useStockFiltros();
@@ -37,13 +38,14 @@ export function StockInsumosPage() {
     rubro,
     tipo: tipo || undefined,
     ventanaDias: ventana,
+    soloBajoMinimo,
     page,
     pageSize: PAGE_SIZE,
   });
   const exportar = useStockExport();
 
   const exportarExcel = () =>
-    exportar.mutate({ q: q || undefined, deposito, rubro, tipo: tipo || undefined, ventanaDias: ventana });
+    exportar.mutate({ q: q || undefined, deposito, rubro, tipo: tipo || undefined, ventanaDias: ventana, soloBajoMinimo });
 
   const depositoOpts =
     filtrosOpts.data?.depositos.map((d) => ({ value: d.codigo, label: `${d.nombre} (${d.codigo})` })) ?? [];
@@ -111,6 +113,20 @@ export function StockInsumosPage() {
             <option value="Propio">Propio</option>
             <option value="Consignado">Consignado</option>
           </Select>
+        </FilterField>
+        <FilterField label="Mínimo">
+          <label className="flex h-9 items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              className="size-4 accent-clementina-deep"
+              checked={soloBajoMinimo}
+              onChange={(e) => {
+                setSoloBajoMinimo(e.target.checked);
+                setPage(1);
+              }}
+            />
+            Solo bajo mínimo
+          </label>
         </FilterField>
         <FilterField label="Ventana de venta (días)">
           <Input

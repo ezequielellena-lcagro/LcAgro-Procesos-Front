@@ -17,7 +17,7 @@ const CATALOGO: DepositoFiltro[] = [
 ];
 
 // Stock ficticio (NUNCA datos reales). Cobertura/estado precalculados para el demo.
-const STOCK: StockItem[] = [
+const BASE: Omit<StockItem, "nivelMinimo" | "bajoMinimo">[] = [
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 1200, precioUsd: 4.5, valorUsd: 5400, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10002, nombreProducto: "ATRAZINA 50% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 80, precioUsd: 6.2, valorUsd: 496, ventaDiaria: 9.0, diasCobertura: 9, estado: "RiesgoQuiebre" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10010, nombreProducto: "CIPERMETRINA 25% X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 300, precioUsd: 8.0, valorUsd: 2400, ventaDiaria: 0, diasCobertura: null, estado: "Inmovilizado" },
@@ -33,6 +33,13 @@ const STOCK: StockItem[] = [
   { deposito: 56, depositoNombre: "Bayer", tipoDeposito: "Consignado", codigoArticulo: 10091, nombreProducto: "SEMILLA BAYER MAIZ X BOLSA", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 3000, precioUsd: 2.0, valorUsd: 6000, ventaDiaria: 20, diasCobertura: 150, estado: "Ok" },
 ];
 
+// Mínimos de demo (espeja articulo.nivel_minimo). Los que tienen stock por debajo quedan "bajo mínimo".
+const MINIMOS: Record<number, number> = { 10002: 100, 10030: 100, 10080: 100 };
+const STOCK: StockItem[] = BASE.map((r) => {
+  const nivelMinimo = MINIMOS[r.codigoArticulo] ?? 0;
+  return { ...r, nivelMinimo, bajoMinimo: nivelMinimo > 0 && r.stockActual <= nivelMinimo };
+});
+
 function aplicarFiltros(rows: StockItem[], u: URL): StockItem[] {
   const depositos = u.searchParams.getAll("deposito").map(Number);
   const rubros = u.searchParams.getAll("rubro").map(Number);
@@ -43,6 +50,7 @@ function aplicarFiltros(rows: StockItem[], u: URL): StockItem[] {
   if (rubros.length) out = out.filter((r) => rubros.includes(r.rubro));
   if (tipo) out = out.filter((r) => r.tipoDeposito === tipo);
   if (q) out = out.filter((r) => r.nombreProducto.toLowerCase().includes(q) || String(r.codigoArticulo).includes(q));
+  if (u.searchParams.get("soloBajoMinimo") === "true") out = out.filter((r) => r.bajoMinimo);
   return out;
 }
 
@@ -61,6 +69,7 @@ function totales(rows: StockItem[]) {
     valorUsdInmovilizado,
     pctInmovilizado: valorUsdTotal > 0 ? Math.round((valorUsdInmovilizado / valorUsdTotal) * 1000) / 10 : 0,
     cantidadRiesgoQuiebre: riesgo.size,
+    cantidadBajoMinimo: new Set(rows.filter((r) => r.bajoMinimo).map((r) => r.codigoArticulo)).size,
   };
 }
 

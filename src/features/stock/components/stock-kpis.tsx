@@ -20,6 +20,7 @@ export function StockKpis({ totales }: { totales: TotalesStock }) {
         tone="rojo"
       />
       <KpiCard label="En riesgo de quiebre" value={totales.cantidadRiesgoQuiebre} tone="rojo" />
+      <KpiCard label="Bajo mínimo" value={totales.cantidadBajoMinimo} tone="rojo" />
     </div>
   );
 }
