@@ -53,7 +53,7 @@ export function ConfigPage() {
     <>
       <PageHeader
         title="Configuración"
-        subtitle="Parámetros de negocio: campaña mínima, rango de precio, zona y umbral de saldo."
+        subtitle="Parámetros de negocio del sistema (posición, cuentas y stock: umbrales de cobertura, vencimiento y rotación)."
       />
 
       {config.isError ? (
