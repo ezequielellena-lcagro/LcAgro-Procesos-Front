@@ -1,8 +1,9 @@
 import { fecha, numero, oDash } from "@/shared/format/format";
 import { VencimientoBadge } from "./vencimiento-badge";
+import { RotacionBadge } from "./rotacion-badge";
 import type { StockLote } from "../types";
 
-/** Detalle de los lotes de un artículo (4º nivel): serie, ingreso, vencimiento y estado. */
+/** Detalle de los lotes de un artículo (4º nivel): stock, antigüedad (ingreso) y vencimiento. */
 export function StockLotes({ lotes }: { lotes: StockLote[] }) {
   return (
     <div className="overflow-x-auto rounded-md border border-line-soft bg-panel">
@@ -12,8 +13,8 @@ export function StockLotes({ lotes }: { lotes: StockLote[] }) {
             <th className="px-3 py-1.5 text-left font-semibold">Lote / serie</th>
             <th className="px-3 py-1.5 text-right font-semibold">Stock</th>
             <th className="px-3 py-1.5 text-left font-semibold">Ingreso</th>
+            <th className="px-3 py-1.5 text-left font-semibold">Antigüedad</th>
             <th className="px-3 py-1.5 text-left font-semibold">Vence</th>
-            <th className="px-3 py-1.5 text-right font-semibold">Días</th>
             <th className="px-3 py-1.5 text-center font-semibold">Estado</th>
           </tr>
         </thead>
@@ -23,8 +24,20 @@ export function StockLotes({ lotes }: { lotes: StockLote[] }) {
               <td className="px-3 py-1.5">{l.serie || "—"}</td>
               <td className="px-3 py-1.5 text-right tabular">{numero(l.stockActual)}</td>
               <td className="px-3 py-1.5">{oDash(l.fechaIngreso, fecha)}</td>
-              <td className="px-3 py-1.5">{oDash(l.fechaVencimiento, fecha)}</td>
-              <td className="px-3 py-1.5 text-right tabular">{l.diasParaVencer ?? "—"}</td>
+              <td className="px-3 py-1.5">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="tabular text-ink-soft">{l.diasEnStock !== null ? `${l.diasEnStock} d` : "—"}</span>
+                  <RotacionBadge semaforo={l.semaforoRotacion} />
+                </span>
+              </td>
+              <td className="px-3 py-1.5">
+                <span className="inline-flex items-center gap-1.5">
+                  {oDash(l.fechaVencimiento, fecha)}
+                  {l.diasParaVencer !== null && (
+                    <span className="tabular text-ink-soft">({l.diasParaVencer} d)</span>
+                  )}
+                </span>
+              </td>
               <td className="px-3 py-1.5 text-center">
                 <VencimientoBadge estado={l.estadoVenc} />
               </td>

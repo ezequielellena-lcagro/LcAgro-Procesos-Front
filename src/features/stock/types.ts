@@ -7,6 +7,9 @@ export type TipoDeposito = "Propio" | "Consignado";
 /** Estado de vencimiento de un lote/artículo. Espeja EstadoVencimiento del backend. */
 export type EstadoVencimiento = "SinFecha" | "Vencido" | "Critico" | "Alerta" | "Normal";
 
+/** Semáforo de rotación por días en stock. Espeja SemaforoRotacion del backend. */
+export type SemaforoRotacion = "SinDato" | "Verde" | "Amarillo" | "Rojo";
+
 /** Un lote del artículo en un depósito (espeja StockLoteDto). */
 export interface StockLote {
   serie: string;
@@ -15,6 +18,8 @@ export interface StockLote {
   fechaVencimiento: string | null;
   diasParaVencer: number | null;
   estadoVenc: EstadoVencimiento;
+  diasEnStock: number | null;
+  semaforoRotacion: SemaforoRotacion;
 }
 
 /** Una fila del listado (espeja StockItemDto). Cobertura/estado son a nivel artículo. */
@@ -44,6 +49,9 @@ export interface StockItem {
   unidadesVencidas: number;
   unidadesCriticas: number;
   valorUsdVencido: number;
+  diasEnStockMax: number | null;
+  diasEnStockPromedio: number | null;
+  semaforoRotacion: SemaforoRotacion;
   lotes: StockLote[];
 }
 
@@ -60,6 +68,7 @@ export interface TotalesStock {
   valorUsdVencido: number;
   valorUsdPorVencer: number;
   cantidadPorVencer: number;
+  antiguedadPromedioDias: number | null;
 }
 
 /** Valor USD acumulado por rubro (espeja RubroValorDto). */

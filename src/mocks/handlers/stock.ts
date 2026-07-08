@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { DepositoFiltro, EstadoVencimiento, StockItem, StockLote, TipoDeposito } from "@/features/stock/types";
+import type { DepositoFiltro, EstadoVencimiento, SemaforoRotacion, StockItem, StockLote, TipoDeposito } from "@/features/stock/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -19,7 +19,9 @@ const CATALOGO: DepositoFiltro[] = [
 // Stock ficticio (NUNCA datos reales). Cobertura/estado precalculados para el demo.
 const BASE: Omit<
   StockItem,
-  "nivelMinimo" | "bajoMinimo" | "estadoVenc" | "proximoVencimiento" | "unidadesVencidas" | "unidadesCriticas" | "valorUsdVencido" | "lotes"
+  | "nivelMinimo" | "bajoMinimo"
+  | "estadoVenc" | "proximoVencimiento" | "unidadesVencidas" | "unidadesCriticas" | "valorUsdVencido"
+  | "diasEnStockMax" | "diasEnStockPromedio" | "semaforoRotacion" | "lotes"
 >[] = [
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 1200, precioUsd: 4.5, valorUsd: 5400, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10002, nombreProducto: "ATRAZINA 50% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 80, precioUsd: 6.2, valorUsd: 496, ventaDiaria: 9.0, diasCobertura: 9, estado: "RiesgoQuiebre" },
@@ -52,19 +54,27 @@ function estadoVencDe(dias: number): EstadoVencimiento {
   if (dias <= 360) return "Alerta";
   return "Normal";
 }
+function semaforoRotDe(dias: number): SemaforoRotacion {
+  if (dias <= 90) return "Verde";
+  if (dias <= 180) return "Amarillo";
+  return "Rojo";
+}
 
 const STOCK: StockItem[] = BASE.map((r) => {
   const nivelMinimo = MINIMOS[r.codigoArticulo] ?? 0;
   const dias = VENC_DEMO[r.codigoArticulo] ?? 500;
   const estadoVenc = estadoVencDe(dias);
   const proximoVencimiento = hoyMas(dias);
+  const diasEnStock = 120; // demo: ingresó hace 120 días
   const lote: StockLote = {
     serie: `L-${r.codigoArticulo}`,
     stockActual: r.stockActual,
-    fechaIngreso: hoyMas(-120),
+    fechaIngreso: hoyMas(-diasEnStock),
     fechaVencimiento: proximoVencimiento,
     diasParaVencer: dias,
     estadoVenc,
+    diasEnStock,
+    semaforoRotacion: semaforoRotDe(diasEnStock),
   };
   const unidadesVencidas = estadoVenc === "Vencido" ? r.stockActual : 0;
   const unidadesCriticas = estadoVenc === "Critico" ? r.stockActual : 0;
@@ -77,6 +87,9 @@ const STOCK: StockItem[] = BASE.map((r) => {
     unidadesVencidas,
     unidadesCriticas,
     valorUsdVencido: Math.round(unidadesVencidas * r.precioUsd * 100) / 100,
+    diasEnStockMax: diasEnStock,
+    diasEnStockPromedio: diasEnStock,
+    semaforoRotacion: semaforoRotDe(diasEnStock),
     lotes: [lote],
   };
 });
@@ -118,6 +131,14 @@ function totales(rows: StockItem[]) {
     cantidadPorVencer: new Set(
       rows.filter((r) => r.estadoVenc === "Vencido" || r.estadoVenc === "Critico").map((r) => r.codigoArticulo),
     ).size,
+    antiguedadPromedioDias: (() => {
+      const ls = rows.flatMap((r) => r.lotes).filter((l) => l.diasEnStock !== null);
+      if (!ls.length) return null;
+      const peso = ls.reduce((s, l) => s + l.stockActual, 0);
+      return peso > 0
+        ? Math.round(ls.reduce((s, l) => s + (l.diasEnStock as number) * l.stockActual, 0) / peso)
+        : null;
+    })(),
   };
 }
 

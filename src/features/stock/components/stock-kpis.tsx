@@ -28,6 +28,10 @@ export function StockKpis({ totales }: { totales: TotalesStock }) {
         hint={`${totales.cantidadPorVencer} art. (vencido + crítico)`}
         tone="rojo"
       />
+      <KpiCard
+        label="Antigüedad prom."
+        value={totales.antiguedadPromedioDias !== null ? `${totales.antiguedadPromedioDias} días` : "—"}
+      />
     </div>
   );
 }

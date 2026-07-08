@@ -15,6 +15,7 @@ const totales: TotalesStock = {
   valorUsdVencido: 24218,
   valorUsdPorVencer: 56344,
   cantidadPorVencer: 31,
+  antiguedadPromedioDias: 145,
 };
 
 describe("StockKpis", () => {
