@@ -15,6 +15,7 @@ export function useStock(filtros: StockFiltros) {
           q: filtros.q || undefined,
           ventanaDias: filtros.ventanaDias,
           soloBajoMinimo: filtros.soloBajoMinimo || undefined,
+          estadoVenc: filtros.estadoVenc,
           page: filtros.page,
           pageSize: filtros.pageSize,
         },

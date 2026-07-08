@@ -1,12 +1,14 @@
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { numero, usd } from "@/shared/format/format";
+import { fecha, numero, usd } from "@/shared/format/format";
 import { EstadoBadge } from "./estado-badge";
 import { TipoBadge } from "./tipo-badge";
 import { MinimoBadge } from "./minimo-badge";
+import { VencimientoBadge } from "./vencimiento-badge";
+import { StockLotes } from "./stock-lotes";
 import type { StockItem, TipoDeposito } from "../types";
 
-const COLUMNAS = 9;
+const COLUMNAS = 10;
 
 interface Grupo {
   deposito: number;
@@ -48,6 +50,15 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
       return next;
     });
 
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const toggleFila = (key: string) =>
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const grupos = agruparPorDeposito(filas);
 
   return (
@@ -63,6 +74,7 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
             <th className="px-3 py-2 text-right font-semibold">Valor USD</th>
             <th className="px-3 py-2 text-right font-semibold">Días cob.</th>
             <th className="px-3 py-2 text-right font-semibold">Mínimo</th>
+            <th className="px-3 py-2 text-center font-semibold">Vence</th>
             <th className="px-3 py-2 text-center font-semibold">Estado</th>
           </tr>
         </thead>
@@ -89,30 +101,62 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
                   </td>
                 </tr>
                 {!colapsado &&
-                  g.items.map((r) => (
-                    <tr
-                      key={`${g.deposito}-${r.codigoArticulo}`}
-                      className="border-b border-line-soft hover:bg-panel-soft/60"
-                    >
-                      <td className="whitespace-nowrap px-3 py-2 tabular">{r.codigoArticulo}</td>
-                      <td className="max-w-[18rem] px-3 py-2">
-                        <span className="block truncate font-medium text-ink" title={r.nombreProducto}>
-                          {r.nombreProducto}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2">{r.rubroDesc}</td>
-                      <td className="px-3 py-2">{r.unidad}</td>
-                      <td className="px-3 py-2 text-right tabular">{numero(r.stockActual)}</td>
-                      <td className="px-3 py-2 text-right tabular">{usd(r.valorUsd)}</td>
-                      <td className="px-3 py-2 text-right tabular">{r.diasCobertura ?? "—"}</td>
-                      <td className="px-3 py-2 text-right tabular">
-                        {r.bajoMinimo ? <MinimoBadge /> : r.nivelMinimo > 0 ? numero(r.nivelMinimo) : null}
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <EstadoBadge estado={r.estado} />
-                      </td>
-                    </tr>
-                  ))}
+                  g.items.map((r) => {
+                    const key = `${g.deposito}-${r.codigoArticulo}`;
+                    const expandido = expandidos.has(key);
+                    return (
+                      <Fragment key={key}>
+                        <tr className="border-b border-line-soft hover:bg-panel-soft/60">
+                          <td className="whitespace-nowrap px-3 py-2 tabular">
+                            {r.lotes.length > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleFila(key)}
+                                aria-expanded={expandido}
+                                className="inline-flex items-center gap-1 text-ink"
+                              >
+                                {expandido ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                                {r.codigoArticulo}
+                              </button>
+                            ) : (
+                              r.codigoArticulo
+                            )}
+                          </td>
+                          <td className="max-w-[18rem] px-3 py-2">
+                            <span className="block truncate font-medium text-ink" title={r.nombreProducto}>
+                              {r.nombreProducto}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{r.rubroDesc}</td>
+                          <td className="px-3 py-2">{r.unidad}</td>
+                          <td className="px-3 py-2 text-right tabular">{numero(r.stockActual)}</td>
+                          <td className="px-3 py-2 text-right tabular">{usd(r.valorUsd)}</td>
+                          <td className="px-3 py-2 text-right tabular">{r.diasCobertura ?? "—"}</td>
+                          <td className="px-3 py-2 text-right tabular">
+                            {r.bajoMinimo ? <MinimoBadge /> : r.nivelMinimo > 0 ? numero(r.nivelMinimo) : null}
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <VencimientoBadge estado={r.estadoVenc} />
+                              {r.proximoVencimiento && (
+                                <span className="text-xs text-ink-soft">{fecha(r.proximoVencimiento)}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <EstadoBadge estado={r.estado} />
+                          </td>
+                        </tr>
+                        {expandido && r.lotes.length > 0 && (
+                          <tr className="bg-panel-soft/40">
+                            <td colSpan={COLUMNAS} className="px-3 pb-3 pt-1">
+                              <StockLotes lotes={r.lotes} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
               </Fragment>
             );
           })}

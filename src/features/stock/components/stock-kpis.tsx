@@ -21,6 +21,13 @@ export function StockKpis({ totales }: { totales: TotalesStock }) {
       />
       <KpiCard label="En riesgo de quiebre" value={totales.cantidadRiesgoQuiebre} tone="rojo" />
       <KpiCard label="Bajo mínimo" value={totales.cantidadBajoMinimo} tone="rojo" />
+      <KpiCard label="USD vencido" value={usd(totales.valorUsdVencido)} tone="rojo" />
+      <KpiCard
+        label="Por vencer"
+        value={usd(totales.valorUsdPorVencer)}
+        hint={`${totales.cantidadPorVencer} art. (vencido + crítico)`}
+        tone="rojo"
+      />
     </div>
   );
 }

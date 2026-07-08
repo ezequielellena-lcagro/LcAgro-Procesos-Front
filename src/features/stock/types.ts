@@ -4,6 +4,19 @@ export type EstadoStock = "Ok" | "RiesgoQuiebre" | "Inmovilizado";
 /** Tipo de depósito según el catálogo. Espeja TipoDeposito del backend. */
 export type TipoDeposito = "Propio" | "Consignado";
 
+/** Estado de vencimiento de un lote/artículo. Espeja EstadoVencimiento del backend. */
+export type EstadoVencimiento = "SinFecha" | "Vencido" | "Critico" | "Alerta" | "Normal";
+
+/** Un lote del artículo en un depósito (espeja StockLoteDto). */
+export interface StockLote {
+  serie: string;
+  stockActual: number;
+  fechaIngreso: string | null;
+  fechaVencimiento: string | null;
+  diasParaVencer: number | null;
+  estadoVenc: EstadoVencimiento;
+}
+
 /** Una fila del listado (espeja StockItemDto). Cobertura/estado son a nivel artículo. */
 export interface StockItem {
   deposito: number;
@@ -24,6 +37,14 @@ export interface StockItem {
   nivelMinimo: number;
   /** true si hay mínimo cargado y el stock del artículo no lo supera. */
   bajoMinimo: boolean;
+  /** Peor estado de vencimiento entre los lotes del artículo en este depósito. */
+  estadoVenc: EstadoVencimiento;
+  /** Fecha de vencimiento más temprana entre los lotes (ISO), o null. */
+  proximoVencimiento: string | null;
+  unidadesVencidas: number;
+  unidadesCriticas: number;
+  valorUsdVencido: number;
+  lotes: StockLote[];
 }
 
 /** KPIs del set filtrado completo (espeja TotalesStock). */
@@ -36,6 +57,9 @@ export interface TotalesStock {
   pctInmovilizado: number;
   cantidadRiesgoQuiebre: number;
   cantidadBajoMinimo: number;
+  valorUsdVencido: number;
+  valorUsdPorVencer: number;
+  cantidadPorVencer: number;
 }
 
 /** Valor USD acumulado por rubro (espeja RubroValorDto). */
@@ -79,6 +103,7 @@ export interface StockFiltros {
   tipo?: TipoDeposito;
   ventanaDias?: number;
   soloBajoMinimo?: boolean;
+  estadoVenc?: EstadoVencimiento;
   page: number;
   pageSize: number;
 }

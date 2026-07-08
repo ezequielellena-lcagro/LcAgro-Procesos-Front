@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { DepositoFiltro, StockItem, TipoDeposito } from "@/features/stock/types";
+import type { DepositoFiltro, EstadoVencimiento, StockItem, StockLote, TipoDeposito } from "@/features/stock/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -17,7 +17,10 @@ const CATALOGO: DepositoFiltro[] = [
 ];
 
 // Stock ficticio (NUNCA datos reales). Cobertura/estado precalculados para el demo.
-const BASE: Omit<StockItem, "nivelMinimo" | "bajoMinimo">[] = [
+const BASE: Omit<
+  StockItem,
+  "nivelMinimo" | "bajoMinimo" | "estadoVenc" | "proximoVencimiento" | "unidadesVencidas" | "unidadesCriticas" | "valorUsdVencido" | "lotes"
+>[] = [
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 1200, precioUsd: 4.5, valorUsd: 5400, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10002, nombreProducto: "ATRAZINA 50% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 80, precioUsd: 6.2, valorUsd: 496, ventaDiaria: 9.0, diasCobertura: 9, estado: "RiesgoQuiebre" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10010, nombreProducto: "CIPERMETRINA 25% X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 300, precioUsd: 8.0, valorUsd: 2400, ventaDiaria: 0, diasCobertura: null, estado: "Inmovilizado" },
@@ -35,9 +38,47 @@ const BASE: Omit<StockItem, "nivelMinimo" | "bajoMinimo">[] = [
 
 // Mínimos de demo (espeja articulo.nivel_minimo). Los que tienen stock por debajo quedan "bajo mínimo".
 const MINIMOS: Record<number, number> = { 10002: 100, 10030: 100, 10080: 100 };
+// Días hasta vencer de demo por artículo; el resto vence lejos (Normal).
+const VENC_DEMO: Record<number, number> = { 10002: -20, 10030: 60, 10010: 150, 10090: 250 };
+
+function hoyMas(dias: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+function estadoVencDe(dias: number): EstadoVencimiento {
+  if (dias < 0) return "Vencido";
+  if (dias <= 180) return "Critico";
+  if (dias <= 360) return "Alerta";
+  return "Normal";
+}
+
 const STOCK: StockItem[] = BASE.map((r) => {
   const nivelMinimo = MINIMOS[r.codigoArticulo] ?? 0;
-  return { ...r, nivelMinimo, bajoMinimo: nivelMinimo > 0 && r.stockActual <= nivelMinimo };
+  const dias = VENC_DEMO[r.codigoArticulo] ?? 500;
+  const estadoVenc = estadoVencDe(dias);
+  const proximoVencimiento = hoyMas(dias);
+  const lote: StockLote = {
+    serie: `L-${r.codigoArticulo}`,
+    stockActual: r.stockActual,
+    fechaIngreso: hoyMas(-120),
+    fechaVencimiento: proximoVencimiento,
+    diasParaVencer: dias,
+    estadoVenc,
+  };
+  const unidadesVencidas = estadoVenc === "Vencido" ? r.stockActual : 0;
+  const unidadesCriticas = estadoVenc === "Critico" ? r.stockActual : 0;
+  return {
+    ...r,
+    nivelMinimo,
+    bajoMinimo: nivelMinimo > 0 && r.stockActual <= nivelMinimo,
+    estadoVenc,
+    proximoVencimiento,
+    unidadesVencidas,
+    unidadesCriticas,
+    valorUsdVencido: Math.round(unidadesVencidas * r.precioUsd * 100) / 100,
+    lotes: [lote],
+  };
 });
 
 function aplicarFiltros(rows: StockItem[], u: URL): StockItem[] {
@@ -51,6 +92,8 @@ function aplicarFiltros(rows: StockItem[], u: URL): StockItem[] {
   if (tipo) out = out.filter((r) => r.tipoDeposito === tipo);
   if (q) out = out.filter((r) => r.nombreProducto.toLowerCase().includes(q) || String(r.codigoArticulo).includes(q));
   if (u.searchParams.get("soloBajoMinimo") === "true") out = out.filter((r) => r.bajoMinimo);
+  const estadoVenc = u.searchParams.get("estadoVenc");
+  if (estadoVenc) out = out.filter((r) => r.estadoVenc === estadoVenc);
   return out;
 }
 
@@ -70,6 +113,11 @@ function totales(rows: StockItem[]) {
     pctInmovilizado: valorUsdTotal > 0 ? Math.round((valorUsdInmovilizado / valorUsdTotal) * 1000) / 10 : 0,
     cantidadRiesgoQuiebre: riesgo.size,
     cantidadBajoMinimo: new Set(rows.filter((r) => r.bajoMinimo).map((r) => r.codigoArticulo)).size,
+    valorUsdVencido: rows.reduce((s, r) => s + r.valorUsdVencido, 0),
+    valorUsdPorVencer: rows.reduce((s, r) => s + r.valorUsdVencido + r.unidadesCriticas * r.precioUsd, 0),
+    cantidadPorVencer: new Set(
+      rows.filter((r) => r.estadoVenc === "Vencido" || r.estadoVenc === "Critico").map((r) => r.codigoArticulo),
+    ).size,
   };
 }
 

@@ -19,6 +19,12 @@ function item(p: Partial<StockItem> & Pick<StockItem, "deposito" | "codigoArticu
     estado: "Ok",
     nivelMinimo: 0,
     bajoMinimo: false,
+    estadoVenc: "SinFecha",
+    proximoVencimiento: null,
+    unidadesVencidas: 0,
+    unidadesCriticas: 0,
+    valorUsdVencido: 0,
+    lotes: [],
     ...p,
   };
 }

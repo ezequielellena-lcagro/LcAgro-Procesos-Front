@@ -16,7 +16,7 @@ import { StockTable } from "../components/stock-table";
 import { useStock } from "../queries/use-stock";
 import { useStockExport } from "../queries/use-stock-export";
 import { useStockFiltros } from "../queries/use-stock-filtros";
-import type { TipoDeposito } from "../types";
+import type { EstadoVencimiento, TipoDeposito } from "../types";
 
 const PAGE_SIZE = 50;
 
@@ -27,6 +27,7 @@ export function StockInsumosPage() {
   const [tipo, setTipo] = useState<TipoDeposito | "">("");
   const [ventanaDias, setVentanaDias] = useState("90"); // default del backend
   const [soloBajoMinimo, setSoloBajoMinimo] = useState(false);
+  const [estadoVenc, setEstadoVenc] = useState<EstadoVencimiento | "">("");
   const [page, setPage] = useState(1);
 
   const filtrosOpts = useStockFiltros();
@@ -39,13 +40,14 @@ export function StockInsumosPage() {
     tipo: tipo || undefined,
     ventanaDias: ventana,
     soloBajoMinimo,
+    estadoVenc: estadoVenc || undefined,
     page,
     pageSize: PAGE_SIZE,
   });
   const exportar = useStockExport();
 
   const exportarExcel = () =>
-    exportar.mutate({ q: q || undefined, deposito, rubro, tipo: tipo || undefined, ventanaDias: ventana, soloBajoMinimo });
+    exportar.mutate({ q: q || undefined, deposito, rubro, tipo: tipo || undefined, ventanaDias: ventana, soloBajoMinimo, estadoVenc: estadoVenc || undefined });
 
   const depositoOpts =
     filtrosOpts.data?.depositos.map((d) => ({ value: d.codigo, label: `${d.nombre} (${d.codigo})` })) ?? [];
@@ -127,6 +129,22 @@ export function StockInsumosPage() {
             />
             Solo bajo mínimo
           </label>
+        </FilterField>
+        <FilterField label="Vencimiento">
+          <Select
+            value={estadoVenc}
+            onChange={(e) => {
+              setEstadoVenc(e.target.value as EstadoVencimiento | "");
+              setPage(1);
+            }}
+          >
+            <option value="">Todos</option>
+            <option value="Vencido">Vencido</option>
+            <option value="Critico">Crítico</option>
+            <option value="Alerta">Alerta</option>
+            <option value="Normal">Normal</option>
+            <option value="SinFecha">Sin fecha</option>
+          </Select>
         </FilterField>
         <FilterField label="Ventana de venta (días)">
           <Input
