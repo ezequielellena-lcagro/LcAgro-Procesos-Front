@@ -16,6 +16,7 @@ import type { ExportColumn, ExportKpi, ExportSpec } from "@/shared/export/export
 import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { numero } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
+import { ArrastreTab } from "../components/arrastre-tab";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionDetalle } from "../components/posicion-detalle";
 import { PosicionSkeleton } from "../components/posicion-skeleton";
@@ -27,6 +28,7 @@ import { CEREALES, type PosicionDto } from "../types";
 export function PosicionPage() {
   const { hasAnyRole } = useAuth();
   const puedeGestionar = hasAnyRole(["posicion"]);
+  const puedeConfig = hasAnyRole(["config"]);
 
   const campanias = useCampanias();
   const [campaniaSel, setCampaniaSel] = useState<string>();
@@ -34,7 +36,7 @@ export function PosicionPage() {
   const [precioMin, setPrecioMin] = useState(50);
   const [precioMax, setPrecioMax] = useState(700);
   const [ajustesOpen, setAjustesOpen] = useState(false);
-  const [tab, setTab] = useState<"resumen" | "detalle">("resumen");
+  const [tab, setTab] = useState<"resumen" | "detalle" | "arrastre">("resumen");
 
   // Campaña por defecto: el año en curso define la campaña (año-1)-(año). Ej.: 2026 → "2025-2026".
   // Si esa campaña no está en la lista, cae a la más reciente (derivado, sin efecto).
@@ -105,7 +107,7 @@ export function PosicionPage() {
           <Select
             value={campania ?? ""}
             onChange={(e) => setCampaniaSel(e.target.value)}
-            disabled={tab === "detalle" || !campanias.data}
+            disabled={tab !== "resumen" || !campanias.data}
           >
             {campanias.data?.map((c) => (
               <option key={c} value={c}>
@@ -147,10 +149,15 @@ export function PosicionPage() {
       {campanias.isError ? (
         <ErrorState error={campanias.error} onRetry={() => void campanias.refetch()} />
       ) : (
-        <Tabs value={tab} onValueChange={(v) => setTab(v as "resumen" | "detalle")} className="space-y-4">
+        <Tabs
+          value={tab}
+          onValueChange={(v) => setTab(v as "resumen" | "detalle" | "arrastre")}
+          className="space-y-4"
+        >
           <TabsList>
             <TabsTrigger value="resumen">Resumen actual</TabsTrigger>
             <TabsTrigger value="detalle">Detalle campañas</TabsTrigger>
+            <TabsTrigger value="arrastre">Arrastre</TabsTrigger>
           </TabsList>
 
           <TabsContent value="resumen">
@@ -182,6 +189,14 @@ export function PosicionPage() {
             ) : detalle.data ? (
               <PosicionDetalle filas={detalle.data} />
             ) : null}
+          </TabsContent>
+
+          <TabsContent value="arrastre">
+            <ArrastreTab
+              puedeGestionar={puedeGestionar}
+              puedeConfig={puedeConfig}
+              campanias={campanias.data ?? []}
+            />
           </TabsContent>
         </Tabs>
       )}

@@ -10,4 +10,5 @@ export const posicionKeys = {
 export const ajustesKeys = {
   all: ["ajustes"] as const,
   list: (campania: string) => [...ajustesKeys.all, "list", campania] as const,
+  arrastres: () => [...ajustesKeys.all, "arrastre-inicial"] as const,
 };

@@ -33,7 +33,7 @@ export function AjusteForm({ campania, edit, submitting, onSubmit, onCancel }: P
     resolver: zodResolver(schema),
     defaultValues: {
       cereal: edit && (CEREALES as readonly string[]).includes(edit.cereal) ? (edit.cereal as Values["cereal"]) : "Soja",
-      tipo: edit && edit.tipo !== "arrastre" ? edit.tipo : "semilla",
+      tipo: edit && edit.tipo !== "arrastre" && edit.tipo !== "arrastre_inicial" ? edit.tipo : "semilla",
       signo: edit?.signo ?? "+",
       tn: edit ? String(edit.tn) : "",
       precioUsd: edit?.precioUsd != null ? String(edit.precioUsd) : "",

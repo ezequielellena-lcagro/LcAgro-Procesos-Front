@@ -25,6 +25,9 @@ export function AjustesDialog({
 
   const [editing, setEditing] = useState<AjusteDto | "new" | null>(null);
 
+  // El arrastre (calculado) y el arrastre_inicial (semilla/override) NO se editan acá: van en la pestaña Arrastre.
+  const manuales = ajustes?.filter((a) => a.tipo !== "arrastre" && a.tipo !== "arrastre_inicial");
+
   const onSubmit = async (input: AjusteInput) => {
     if (editing === "new") await crear.mutateAsync(input);
     else if (editing) await editar.mutateAsync({ id: editing.id, input });
@@ -55,7 +58,7 @@ export function AjustesDialog({
       ) : (
         <>
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-sm text-ink-soft">Arrastre, semilla, canje y producción propia de la campaña.</p>
+            <p className="text-sm text-ink-soft">Semilla, canje y producción propia. El arrastre se carga en su pestaña.</p>
             <Button type="button" variant="accent" size="sm" onClick={() => setEditing("new")}>
               <Plus className="size-4" /> Nuevo ajuste
             </Button>
@@ -65,7 +68,7 @@ export function AjustesDialog({
             <p className="py-6 text-center text-sm text-ink-soft">Cargando ajustes…</p>
           ) : isError ? (
             <ErrorState error={error} onRetry={refetch} />
-          ) : ajustes && ajustes.length > 0 ? (
+          ) : manuales && manuales.length > 0 ? (
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-soft">
@@ -76,7 +79,7 @@ export function AjustesDialog({
                 </tr>
               </thead>
               <tbody>
-                {ajustes.map((a) => (
+                {manuales.map((a) => (
                   <tr key={a.id} className="border-b border-line-soft last:border-0">
                     <td className="py-2 pr-2 font-medium text-ink">{a.cereal}</td>
                     <td className="py-2 pr-2 text-ink-soft">{a.tipo.replace("_", " ")}</td>

@@ -16,7 +16,7 @@ export interface PosicionDto {
   ajustesDetalle: AjusteAplicado[];
 }
 
-export type TipoAjuste = "arrastre" | "semilla" | "canje" | "produccion_propia";
+export type TipoAjuste = "arrastre" | "arrastre_inicial" | "semilla" | "canje" | "produccion_propia";
 export type SignoAjuste = "+" | "-";
 
 /** Sub-fila de ajuste agregada por tipo (espeja AjusteAplicadoDto del backend). */
@@ -55,10 +55,14 @@ export const CEREALES = ["Maíz", "Trigo", "Sorgo", "Soja", "Girasol", "Colza"] 
 
 export const TIPOS_AJUSTE: { value: TipoAjuste; label: string }[] = [
   { value: "arrastre", label: "Arrastre" },
+  { value: "arrastre_inicial", label: "Arrastre inicial" },
   { value: "semilla", label: "Semilla" },
   { value: "canje", label: "Canje" },
   { value: "produccion_propia", label: "Producción propia" },
 ];
 
-/** Tipos que se cargan A MANO. El arrastre es automático (lo calcula el sistema), no se carga acá. */
-export const TIPOS_AJUSTE_MANUAL = TIPOS_AJUSTE.filter((t) => t.value !== "arrastre");
+/** Tipos que se cargan en el diálogo de ajustes manuales. El `arrastre` es automático (lo calcula el
+ * sistema) y el `arrastre_inicial` (semilla/override del encadenado) se gestiona en su propia pestaña. */
+export const TIPOS_AJUSTE_MANUAL = TIPOS_AJUSTE.filter(
+  (t) => t.value !== "arrastre" && t.value !== "arrastre_inicial",
+);
