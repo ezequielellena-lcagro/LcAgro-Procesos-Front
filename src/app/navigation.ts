@@ -97,6 +97,13 @@ export const NAV: Area[] = [
         to: "/stock",
         roles: ["stock"],
       },
+      {
+        kind: "activo",
+        label: "Liquidación de Comisiones",
+        title: "Liquidación de Comisiones",
+        to: "/comisiones",
+        roles: ["comisiones"],
+      },
       { kind: "futuro", label: "Resumen de cuenta a clientes" },
       { kind: "futuro", label: "Cotizador de presupuestos" },
       { kind: "futuro", label: "Mercadería pendiente de recibir" },

@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,8 +31,9 @@ interface ComboboxProps {
 
 /**
  * Combo buscable: input de texto que filtra una lista (potencialmente de miles) y commitea solo al
- * elegir una opción (click o Enter). Pensado para ir adentro de un Modal: Escape cierra el combo sin
- * cerrar el diálogo. Reemplaza al &lt;datalist&gt; nativo (feo y sin paginar).
+ * elegir una opción (click o Enter). El panel de opciones se renderiza por PORTAL en <body> con
+ * posición fija, así no queda recortado por contenedores con overflow (p. ej. una tabla con scroll).
+ * Escape cierra el combo sin propagar (para no cerrar un editor/diálogo contenedor).
  */
 export function Combobox({
   value,
@@ -39,12 +48,42 @@ export function Combobox({
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number; arriba: boolean } | null>(
+    null,
+  );
 
-  // Cierre al hacer click afuera. (setState en el callback del listener es válido; no en el cuerpo del effect.)
+  // Mide el trigger y ubica el panel (fixed); decide abrir hacia arriba si no entra abajo. Se llama
+  // desde el handler de apertura y desde los listeners (nunca en el cuerpo de un effect).
+  const medir = useCallback(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const alto = 288; // max-h-60 (240) + padding/pie
+    const espacioAbajo = window.innerHeight - r.bottom;
+    const arriba = espacioAbajo < alto && r.top > espacioAbajo;
+    setPos({ top: arriba ? r.top - 4 : r.bottom + 4, left: r.left, width: r.width, arriba });
+  }, []);
+
+  // Mientras está abierto, seguí al trigger ante scroll/resize (setState en callback, no en el cuerpo).
+  useEffect(() => {
+    if (!open) return;
+    window.addEventListener("scroll", medir, true);
+    window.addEventListener("resize", medir);
+    return () => {
+      window.removeEventListener("scroll", medir, true);
+      window.removeEventListener("resize", medir);
+    };
+  }, [open, medir]);
+
+  // Cierre al hacer click afuera (considera también el panel, que vive en un portal fuera de rootRef).
   useEffect(() => {
     if (!open) return;
     const onDocMouseDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (rootRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDocMouseDown);
     return () => document.removeEventListener("mousedown", onDocMouseDown);
@@ -62,6 +101,7 @@ export function Combobox({
     if (disabled) return;
     setQuery("");
     setActiveIndex(0);
+    medir();
     setOpen(true);
   };
 
@@ -72,7 +112,7 @@ export function Combobox({
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape" && open) {
-      e.stopPropagation(); // no dejar que el Modal lo capture y se cierre
+      e.stopPropagation(); // no dejar que un contenedor lo capture y se cierre
       setOpen(false);
       return;
     }
@@ -109,7 +149,10 @@ export function Combobox({
           onChange={(e) => {
             setQuery(e.target.value);
             setActiveIndex(0);
-            if (!open) setOpen(true);
+            if (!open) {
+              medir();
+              setOpen(true);
+            }
           }}
           onKeyDown={onKeyDown}
           className={cn(
@@ -121,41 +164,54 @@ export function Combobox({
         <ChevronsUpDown className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-ink-soft" />
       </div>
 
-      {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-line bg-panel shadow-float">
-          <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
-            {visibles.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-ink-soft">Sin coincidencias.</li>
-            ) : (
-              visibles.map((opt, i) => (
-                <li key={opt} role="option" aria-selected={opt === value}>
-                  <button
-                    type="button"
-                    // onMouseDown (no onClick): selecciona antes de que el input pierda foco.
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      elegir(opt);
-                    }}
-                    onMouseEnter={() => setActiveIndex(i)}
-                    className={cn(
-                      "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm text-ink",
-                      i === active && "bg-panel-soft",
-                    )}
-                  >
-                    <span className="truncate">{opt}</span>
-                    {opt === value && <Check className="size-4 shrink-0 text-clementina-deep" />}
-                  </button>
-                </li>
-              ))
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={panelRef}
+            style={{
+              position: "fixed",
+              top: pos.top,
+              left: pos.left,
+              width: pos.width,
+              transform: pos.arriba ? "translateY(-100%)" : undefined,
+            }}
+            className="z-50 overflow-hidden rounded-md border border-line bg-panel shadow-float"
+          >
+            <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
+              {visibles.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-ink-soft">Sin coincidencias.</li>
+              ) : (
+                visibles.map((opt, i) => (
+                  <li key={opt} role="option" aria-selected={opt === value}>
+                    <button
+                      type="button"
+                      // onMouseDown (no onClick): selecciona antes de que el input pierda foco.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        elegir(opt);
+                      }}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      className={cn(
+                        "flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm text-ink",
+                        i === active && "bg-panel-soft",
+                      )}
+                    >
+                      <span className="truncate">{opt}</span>
+                      {opt === value && <Check className="size-4 shrink-0 text-clementina-deep" />}
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+            {coincidencias.length > maxVisible && (
+              <div className="border-t border-line-soft px-3 py-1.5 text-xs text-ink-soft">
+                Mostrando {maxVisible} de {coincidencias.length}. Seguí escribiendo para afinar.
+              </div>
             )}
-          </ul>
-          {coincidencias.length > maxVisible && (
-            <div className="border-t border-line-soft px-3 py-1.5 text-xs text-ink-soft">
-              Mostrando {maxVisible} de {coincidencias.length}. Seguí escribiendo para afinar.
-            </div>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

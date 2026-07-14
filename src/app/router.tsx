@@ -14,6 +14,7 @@ const PosicionPage = lazy(() => import("@/features/posicion/pages/posicion-page"
 const CuentasPage = lazy(() => import("@/features/cuentas/pages/cuentas-page").then((m) => ({ default: m.CuentasPage })));
 const SemillaPage = lazy(() => import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })));
 const StockPage = lazy(() => import("@/features/stock/pages/stock-insumos-page").then((m) => ({ default: m.StockInsumosPage })));
+const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })));
 const ConfigPage = lazy(() => import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })));
 const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/auditoria-page").then((m) => ({ default: m.AuditoriaPage })));
@@ -61,6 +62,10 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={["stock"]} />,
             children: [{ path: "stock", element: <StockPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["comisiones"]} />,
+            children: [{ path: "comisiones", element: <ComisionesPage /> }],
           },
           {
             element: <ProtectedRoute roles={["usuarios"]} />,

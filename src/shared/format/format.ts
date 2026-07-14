@@ -7,7 +7,14 @@ export const usd = (n: number) => `US$ ${usdFmt.format(n)}`;
 export const tn = (n: number) => `${tnFmt.format(n)} tn`;
 export const pct = (n: number) => `${pctFmt.format(n)} %`;
 export const numero = (n: number) => tnFmt.format(n);
-export const fecha = (iso: string) => new Date(iso).toLocaleDateString("es-AR");
+export const fecha = (iso: string) => {
+  // Una fecha "sola" (YYYY-MM-DD) se parsea como LOCAL para no correrla un día por timezone
+  // (new Date("2026-07-05") sería UTC medianoche → un día antes en husos negativos). Los datetime
+  // con hora/zona siguen el parseo normal.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(iso);
+  return d.toLocaleDateString("es-AR");
+};
 
 /** Aplica el formateador, o devuelve "—" si el valor es null/undefined. */
 export function oDash<T>(value: T | null | undefined, fmt: (v: T) => string): string {

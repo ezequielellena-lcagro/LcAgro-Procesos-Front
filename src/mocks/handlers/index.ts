@@ -1,5 +1,6 @@
 import { authHandlers } from "./auth";
 import { auditoriaHandlers } from "./auditoria";
+import { comisionesHandlers } from "./comisiones";
 import { configHandlers } from "./config";
 import { cuentasHandlers } from "./cuentas";
 import { dashboardHandlers } from "./dashboard";
@@ -17,6 +18,7 @@ export const handlers = [
   ...devolucionHandlers,
   ...semillaHandlers,
   ...stockHandlers,
+  ...comisionesHandlers,
   ...usuariosHandlers,
   ...configHandlers,
   ...auditoriaHandlers,
