@@ -19,6 +19,7 @@ import { CuentasSkeleton } from "../components/cuentas-skeleton";
 import { CuentasSubtotales } from "../components/cuentas-subtotales";
 import { CuentasTable } from "../components/cuentas-table";
 import { EnviarLinkDialog } from "../components/enviar-link-dialog";
+import { FacturasContadoDialog } from "../components/facturas-contado-dialog";
 import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
 import { useExportarCuentas } from "../queries/use-exportar-cuentas";
@@ -35,14 +36,17 @@ export function CuentasPage() {
   const [q, setQ] = useState("");
   const [vendNro, setVendNro] = useState<number | "">("");
   const [minUsd, setMinUsd] = useState("50"); // umbral por defecto del proceso
+  const [umbralAvencer, setUmbralAvencer] = useState(7); // días para el semáforo "a vencer" (amarillo)
   const [page, setPage] = useState(1);
   const [editar, setEditar] = useState<CuentaDto | null>(null);
+  const [verFacturas, setVerFacturas] = useState<CuentaDto | null>(null);
   const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
 
   const cuentas = useCuentas({
     q: q || undefined,
     vendNro: vendNro === "" ? undefined : vendNro,
     minUsd: minUsd ? Number(minUsd) : undefined,
+    umbralAvencer,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -175,6 +179,18 @@ export function CuentasPage() {
             placeholder="0"
           />
         </FilterField>
+        <FilterField label="A vencer (días)">
+          <Input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            max={90}
+            className="w-24"
+            value={umbralAvencer}
+            onChange={(e) => setUmbralAvencer(Math.max(0, Number(e.target.value) || 0))}
+            placeholder="7"
+          />
+        </FilterField>
       </FilterBar>
 
       {cuentas.isError ? (
@@ -196,7 +212,12 @@ export function CuentasPage() {
                   <CuentasSubtotales subtotales={cuentas.data.subtotales} totales={cuentas.data.totales} />
                 </section>
               )}
-              <CuentasTable filas={cuentas.data.items} puedeEditar={puedeEditar} onEditar={setEditar} />
+              <CuentasTable
+                filas={cuentas.data.items}
+                puedeEditar={puedeEditar}
+                onEditar={setEditar}
+                onVerFacturas={setVerFacturas}
+              />
               <Pagination
                 page={cuentas.data.page}
                 totalPages={cuentas.data.totalPages}
@@ -209,6 +230,12 @@ export function CuentasPage() {
       )}
 
       <ObservacionDialog cuenta={editar} onClose={() => setEditar(null)} />
+      <FacturasContadoDialog
+        cuenta={verFacturas}
+        umbralAvencer={umbralAvencer}
+        onUmbralAvencer={setUmbralAvencer}
+        onClose={() => setVerFacturas(null)}
+      />
       <EnviarLinkDialog open={enviarLinkOpen} onClose={() => setEnviarLinkOpen(false)} />
     </>
   );

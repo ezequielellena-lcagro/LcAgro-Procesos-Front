@@ -12,6 +12,7 @@ export function useCuentas(filtros: CuentasFiltros) {
           q: filtros.q || undefined,
           vendNro: filtros.vendNro,
           minUsd: filtros.minUsd,
+          umbralAvencer: filtros.umbralAvencer,
           page: filtros.page,
           pageSize: filtros.pageSize,
         },

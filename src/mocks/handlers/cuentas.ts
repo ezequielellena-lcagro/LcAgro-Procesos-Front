@@ -1,8 +1,11 @@
 import { http, HttpResponse } from "msw";
-import type { CuentaDto } from "@/features/cuentas/types";
+import { ORDEN_CONTADO } from "@/features/cuentas/estado-contado";
+import type { CuentaDto, EstadoContado, FacturaContado } from "@/features/cuentas/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
+
+type CuentaBase = Omit<CuentaDto, "devolucion" | "observaciones" | "estadoContado">;
 
 // Observaciones en memoria (upsert por cuenta) para el demo.
 const OBS: Record<number, { devolucion: string | null; observaciones: string | null }> = {};
@@ -12,7 +15,7 @@ const CONTACTOS: Record<number, string> = {};
 const EMAIL_MACROGEST: Record<number, string> = { 1: "lcagro@demo.com" };
 
 // Cuentas ficticias (NUNCA PII real). vendedor de ejemplo.
-const CUENTAS: Omit<CuentaDto, "devolucion" | "observaciones">[] = [
+const CUENTAS: CuentaBase[] = [
   { vendedor: "LC AGRO", vendNro: 1, cuenta: 1024, denominacion: "Estancia La Esperanza S.A.", saldoVencido: 18450.5, saldoAVencer: 5200, saldo: 23650.5 },
   { vendedor: "LC AGRO", vendNro: 1, cuenta: 1057, denominacion: "Agropecuaria El Trébol SRL", saldoVencido: 0, saldoAVencer: 9800, saldo: 9800 },
   { vendedor: "LC AGRO", vendNro: 1, cuenta: 1090, denominacion: "Don Ramón e Hijos", saldoVencido: 3120.75, saldoAVencer: 0, saldo: 3120.75 },
@@ -29,9 +32,67 @@ const CUENTAS: Omit<CuentaDto, "devolucion" | "observaciones">[] = [
   { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2120, denominacion: "Granos del Sur SRL", saldoVencido: 6700.3, saldoAVencer: 0, saldo: 6700.3 },
 ];
 
-function rowsConObs(): CuentaDto[] {
+// Fecha ISO (yyyy-MM-dd) a `days` de hoy (negativo = pasado).
+function isoOffset(days: number): string {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+// Clasifica una factura demo igual que EstadoContadoCalculator del backend (para que el umbral y las
+// fechas tengan efecto real en el mock).
+function clasificar(pendiente: number, vencimiento: string, fechaPago: string | null, umbralAvencer: number): EstadoContado {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const venc = new Date(`${vencimiento}T00:00:00`);
+  if (pendiente > 0.01) {
+    if (venc < hoy) return "Mora";
+    const limite = new Date(hoy);
+    limite.setDate(limite.getDate() + umbralAvencer);
+    return venc <= limite ? "AVencer" : "AlDia";
+  }
+  if (!fechaPago) return "SaldadaPorCanje";
+  return new Date(`${fechaPago}T00:00:00`) <= venc ? "PagadaEnPlazo" : "PagoTarde";
+}
+
+// Facturas de contado demo de una cuenta, derivadas de sus saldos (para que el detalle sea coherente
+// con el semáforo del listado). Incluye un ejemplo de cada estado "cerrado".
+function facturasDe(c: CuentaBase, umbralAvencer: number): FacturaContado[] {
+  let n = c.cuenta * 100 + 1;
+  const raw: Omit<FacturaContado, "comprobante" | "estado">[] = [];
+  const push = (vencOff: number, plazo: number, importe: number, pendiente: number, pagoOff: number | null) =>
+    raw.push({
+      emision: isoOffset(vencOff - plazo),
+      vencimiento: isoOffset(vencOff),
+      plazoDias: plazo,
+      importe,
+      pendiente,
+      fechaPago: pagoOff === null ? null : isoOffset(pagoOff),
+    });
+
+  push(-20, 15, 1200, 0, -25); // pagada en plazo (pagó antes de vencer)
+  push(-40, 20, 800, 0, -30); // pagó tarde (pagó después de vencer)
+  push(-35, 10, 500, 0, null); // saldada por canje (sin recibo)
+  if (c.saldoVencido > 0) push(-6, 20, c.saldoVencido, c.saldoVencido, null); // mora
+  if (c.saldoAVencer > 0) push(3, 25, c.saldoAVencer, c.saldoAVencer, null); // a vencer / al día según umbral
+
+  return raw
+    .map((f) => ({ ...f, comprobante: `A-${n++}`, estado: clasificar(f.pendiente, f.vencimiento, f.fechaPago, umbralAvencer) }))
+    .sort((a, b) => ORDEN_CONTADO[b.estado] - ORDEN_CONTADO[a.estado] || a.vencimiento.localeCompare(b.vencimiento));
+}
+
+// Peor estado de las facturas ABIERTAS de la cuenta (o "al día" si no hay ninguna abierta).
+function estadoContadoDe(c: CuentaBase, umbralAvencer: number): EstadoContado {
+  return facturasDe(c, umbralAvencer)
+    .filter((f) => f.pendiente > 0.01)
+    .reduce<EstadoContado>((peor, f) => (ORDEN_CONTADO[f.estado] > ORDEN_CONTADO[peor] ? f.estado : peor), "AlDia");
+}
+
+function rowsConObs(umbralAvencer: number): CuentaDto[] {
   return CUENTAS.map((c) => ({
     ...c,
+    estadoContado: estadoContadoDe(c, umbralAvencer),
     devolucion: OBS[c.cuenta]?.devolucion ?? null,
     observaciones: OBS[c.cuenta]?.observaciones ?? null,
   }));
@@ -54,8 +115,9 @@ export const cuentasHandlers = [
     const u = new URL(request.url);
     const page = Number(u.searchParams.get("page") ?? "1");
     const pageSize = Number(u.searchParams.get("pageSize") ?? "20");
+    const umbralAvencer = Number(u.searchParams.get("umbralAvencer") ?? "7") || 7;
 
-    const rows = aplicarFiltros(rowsConObs(), u);
+    const rows = aplicarFiltros(rowsConObs(umbralAvencer), u);
 
     const total = rows.length;
     const totalPages = pageSize <= 0 ? 0 : Math.ceil(total / pageSize);
@@ -95,10 +157,18 @@ export const cuentasHandlers = [
     });
   }),
 
+  // Detalle de facturas de contado de una cuenta (ya clasificadas y ordenadas por importancia).
+  http.get(`${API}/cuentas/:cuenta/facturas-contado`, ({ params, request }) => {
+    const cuenta = Number(params.cuenta);
+    const umbralAvencer = Number(new URL(request.url).searchParams.get("umbralAvencer") ?? "7") || 7;
+    const c = CUENTAS.find((x) => x.cuenta === cuenta);
+    return HttpResponse.json(c ? facturasDe(c, umbralAvencer) : []);
+  }),
+
   // Export .xlsx (demo): el backend real arma el formato fiel; acá generamos un .xlsx válido
   // con los mismos filtros para que la descarga funcione sin backend.
   http.get(`${API}/cuentas/export`, async ({ request }) => {
-    const rows = aplicarFiltros(rowsConObs(), new URL(request.url));
+    const rows = aplicarFiltros(rowsConObs(7), new URL(request.url));
     const { default: writeXlsxFile } = await import("write-excel-file/browser");
     const FMT = '#,##0.00;(#,##0.00);"-"';
     const num = (value: number) => ({ type: Number, value, format: FMT });
