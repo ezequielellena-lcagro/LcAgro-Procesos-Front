@@ -1,9 +1,11 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { Link, Upload } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
 import { env } from "@/lib/env";
 import { EmptyState } from "@/shared/components/empty-state";
@@ -19,7 +21,6 @@ import { CuentasSkeleton } from "../components/cuentas-skeleton";
 import { CuentasSubtotales } from "../components/cuentas-subtotales";
 import { CuentasTable } from "../components/cuentas-table";
 import { EnviarLinkDialog } from "../components/enviar-link-dialog";
-import { FacturasContadoDialog } from "../components/facturas-contado-dialog";
 import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
 import { useExportarCuentas } from "../queries/use-exportar-cuentas";
@@ -38,9 +39,10 @@ export function CuentasPage() {
   const [minUsd, setMinUsd] = useState("50"); // umbral por defecto del proceso
   const [umbralAvencer, setUmbralAvencer] = useState(7); // días para el semáforo "a vencer" (amarillo)
   const [page, setPage] = useState(1);
+  const [tab, setTab] = useState<"lista" | "vendedores">("lista");
   const [editar, setEditar] = useState<CuentaDto | null>(null);
-  const [verFacturas, setVerFacturas] = useState<CuentaDto | null>(null);
   const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
+  const navigate = useNavigate();
 
   const cuentas = useCuentas({
     q: q || undefined,
@@ -61,6 +63,11 @@ export function CuentasPage() {
     e.target.value = ""; // permite re-seleccionar el mismo archivo
     if (file) importar.mutate(file);
   };
+
+  // El detalle de contado es una página propia (no modal). Llevamos la cuenta por router state
+  // (denominación + saldos) y el umbral por query (?av=) para que el link sea compartible.
+  const abrirContado = (c: CuentaDto) =>
+    navigate(`/cuentas/${c.cuenta}/contado?av=${umbralAvencer}`, { state: { cuenta: c } });
 
   const exportColumns: ExportColumn<CuentaDto>[] = [
     { header: "Vendedor", get: (r) => r.vendedor },
@@ -198,44 +205,48 @@ export function CuentasPage() {
       ) : cuentas.isPending ? (
         <CuentasSkeleton />
       ) : (
-        <>
+        <div className="space-y-4">
           <CuentasKpis totales={cuentas.data.totales} />
-          {cuentas.data.items.length === 0 ? (
-            <EmptyState mensaje="No hay cuentas con esos filtros." />
-          ) : (
-            <div className="space-y-4">
-              {vendNro === "" && cuentas.data.subtotales.length > 1 && (
-                <section className="space-y-2">
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">
-                    Totales por vendedor
-                  </h2>
-                  <CuentasSubtotales subtotales={cuentas.data.subtotales} totales={cuentas.data.totales} />
-                </section>
+          <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="lista">Lista completa</TabsTrigger>
+              <TabsTrigger value="vendedores">Total por vendedor</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="lista">
+              {cuentas.data.items.length === 0 ? (
+                <EmptyState mensaje="No hay cuentas con esos filtros." />
+              ) : (
+                <div className="space-y-4">
+                  <CuentasTable
+                    filas={cuentas.data.items}
+                    puedeEditar={puedeEditar}
+                    vendedorFiltrado={vendNro !== ""}
+                    onEditar={setEditar}
+                    onVerFacturas={abrirContado}
+                  />
+                  <Pagination
+                    page={cuentas.data.page}
+                    totalPages={cuentas.data.totalPages}
+                    total={cuentas.data.total}
+                    onPage={setPage}
+                  />
+                </div>
               )}
-              <CuentasTable
-                filas={cuentas.data.items}
-                puedeEditar={puedeEditar}
-                onEditar={setEditar}
-                onVerFacturas={setVerFacturas}
-              />
-              <Pagination
-                page={cuentas.data.page}
-                totalPages={cuentas.data.totalPages}
-                total={cuentas.data.total}
-                onPage={setPage}
-              />
-            </div>
-          )}
-        </>
+            </TabsContent>
+
+            <TabsContent value="vendedores">
+              {cuentas.data.subtotales.length === 0 ? (
+                <EmptyState mensaje="No hay cuentas con esos filtros." />
+              ) : (
+                <CuentasSubtotales subtotales={cuentas.data.subtotales} totales={cuentas.data.totales} />
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       )}
 
       <ObservacionDialog cuenta={editar} onClose={() => setEditar(null)} />
-      <FacturasContadoDialog
-        cuenta={verFacturas}
-        umbralAvencer={umbralAvencer}
-        onUmbralAvencer={setUmbralAvencer}
-        onClose={() => setVerFacturas(null)}
-      />
       <EnviarLinkDialog open={enviarLinkOpen} onClose={() => setEnviarLinkOpen(false)} />
     </>
   );

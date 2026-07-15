@@ -9,15 +9,36 @@ import { EstadoContadoSemaforo } from "./estado-contado-badge";
 export function CuentasTable({
   filas,
   puedeEditar,
+  vendedorFiltrado,
   onEditar,
   onVerFacturas,
 }: {
   filas: CuentaDto[];
   puedeEditar: boolean;
+  /** Con un vendedor filtrado, la columna "Contado" se corre al final. */
+  vendedorFiltrado: boolean;
   onEditar: (c: CuentaDto) => void;
   onVerFacturas: (c: CuentaDto) => void;
 }) {
-  const columns: Column<CuentaDto>[] = [
+  const contadoColumn: Column<CuentaDto> = {
+    key: "contado",
+    header: "Contado",
+    align: "center",
+    cell: (r) => (
+      <button
+        type="button"
+        onClick={() => onVerFacturas(r)}
+        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-ink-soft hover:bg-panel-soft hover:text-ink"
+        aria-label={`Ver facturas de contado de la cuenta ${r.cuenta}`}
+        title="Ver facturas de contado"
+      >
+        <EstadoContadoSemaforo estado={r.estadoContado} />
+        <ChevronRight className="size-3.5" />
+      </button>
+    ),
+  };
+
+  const base: Column<CuentaDto>[] = [
     {
       key: "vendedor",
       header: "Vendedor",
@@ -33,23 +54,6 @@ export function CuentasTable({
         <span className="block truncate font-medium text-ink" title={r.denominacion}>
           {r.denominacion}
         </span>
-      ),
-    },
-    {
-      key: "contado",
-      header: "Contado",
-      align: "center",
-      cell: (r) => (
-        <button
-          type="button"
-          onClick={() => onVerFacturas(r)}
-          className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-ink-soft hover:bg-panel-soft hover:text-ink"
-          aria-label={`Ver facturas de contado de la cuenta ${r.cuenta}`}
-          title="Ver facturas de contado"
-        >
-          <EstadoContadoSemaforo estado={r.estadoContado} />
-          <ChevronRight className="size-3.5" />
-        </button>
       ),
     },
     {
@@ -94,6 +98,11 @@ export function CuentasTable({
         ),
     },
   ];
+
+  // "Contado": junto al cliente en la lista completa; al final cuando se filtra por vendedor.
+  const columns: Column<CuentaDto>[] = vendedorFiltrado
+    ? [...base, contadoColumn]
+    : [...base.slice(0, 3), contadoColumn, ...base.slice(3)];
 
   if (puedeEditar) {
     columns.push({
