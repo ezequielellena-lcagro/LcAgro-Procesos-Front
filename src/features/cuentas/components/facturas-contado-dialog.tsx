@@ -68,7 +68,8 @@ export function FacturasContadoDialog({
             <div>
               <p className="font-medium text-ink">{cuenta.denominacion}</p>
               <p className="text-xs text-ink-soft">
-                "De contado" = plazo emisión→vencimiento ≤ 30 días. El estado surge del pago real (o del vencimiento si sigue abierta).
+                "De contado" = plazo emisión→vencimiento ≤ 30 días. Se listan como llamado; la referencia real
+                de deuda es el <strong className="font-semibold text-ink">saldo total</strong> de la cuenta.
               </p>
             </div>
             <label className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
@@ -85,6 +86,19 @@ export function FacturasContadoDialog({
             </label>
           </div>
 
+          {/* Ancla de conciliación: la verdad es el saldo global (validado), no el pendiente por factura. */}
+          <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-md bg-panel-soft px-3 py-2 text-xs text-ink-soft">
+            <span>
+              Vencido: <span className="tabular font-medium text-rojo">{usd(cuenta.saldoVencido)}</span>
+            </span>
+            <span>
+              A vencer: <span className="tabular font-medium text-ink">{usd(cuenta.saldoAVencer)}</span>
+            </span>
+            <span>
+              Saldo total: <span className="tabular font-semibold text-ink">{usd(cuenta.saldo)}</span>
+            </span>
+          </div>
+
           {tally.length > 0 && (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               {tally.map(({ estado, n }) => (
@@ -95,6 +109,15 @@ export function FacturasContadoDialog({
               ))}
             </div>
           )}
+
+          {/* La imputación por factura es informativa: canje/LSG y pagos a cuenta bajan el saldo global
+              sin aplicarse a una factura puntual, así que una factura puede figurar pendiente o "en mora"
+              aunque la cuenta ya esté saldada. El saldo total manda. */}
+          <p className="text-xs text-ink-soft">
+            <strong className="font-semibold text-ink">Pendiente</strong> y <strong className="font-semibold text-ink">Pago</strong> por
+            factura son informativos: los pagos por canje/LSG o a cuenta bajan el saldo global sin imputarse a una
+            factura, así que una factura puede figurar pendiente aunque la cuenta ya esté saldada.
+          </p>
 
           {q.isError ? (
             <ErrorState error={q.error} onRetry={() => void q.refetch()} />
