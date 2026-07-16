@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { DepositoFiltro, EstadoVencimiento, SemaforoRotacion, StockItem, StockLote, TipoDeposito } from "@/features/stock/types";
+import type { DepositoFiltro, EstadoStock, EstadoVencimiento, SemaforoRotacion, StockItem, StockLote, TipoDeposito } from "@/features/stock/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -40,8 +40,21 @@ const BASE: Omit<
 
 // Mínimos de demo (espeja articulo.nivel_minimo). Los que tienen stock por debajo quedan "bajo mínimo".
 const MINIMOS: Record<number, number> = { 10002: 100, 10030: 100, 10080: 100 };
-// Días hasta vencer de demo por artículo; el resto vence lejos (Normal).
-const VENC_DEMO: Record<number, number> = { 10002: -20, 10030: 60, 10010: 150, 10090: 250 };
+// Días hasta vencer de CADA lote del artículo. Sin entrada → un solo lote que vence lejos (Normal).
+// Cubre las 4 solapas del demo: 10001 tiene dos lotes (uno vencido, uno normal) para que la solapa
+// Vencimientos muestre solo el problemático; 10002 Vencido, 10030/10010 Crítico, 10090 Alerta.
+const LOTES_DEMO: Record<number, number[]> = {
+  10001: [-5, 500],
+  10002: [-20],
+  10030: [60],
+  10010: [150],
+  10090: [250],
+};
+// Antigüedad de demo: los inmovilizados son los más viejos (semáforo Rojo).
+const ANTIGUEDAD_DEMO: Record<number, number> = { 10010: 300, 10040: 300, 10090: 300 };
+
+// Severidad de peor a mejor: el estado del artículo es el peor de sus lotes.
+const SEVERIDAD: EstadoVencimiento[] = ["Vencido", "Critico", "Alerta", "Normal", "SinFecha"];
 
 function hoyMas(dias: number): string {
   const d = new Date();
@@ -59,42 +72,56 @@ function semaforoRotDe(dias: number): SemaforoRotacion {
   if (dias <= 180) return "Amarillo";
   return "Rojo";
 }
+function peorEstadoVenc(lotes: StockLote[]): EstadoVencimiento {
+  return lotes.reduce<EstadoVencimiento>(
+    (peor, l) => (SEVERIDAD.indexOf(l.estadoVenc) < SEVERIDAD.indexOf(peor) ? l.estadoVenc : peor),
+    "SinFecha",
+  );
+}
+function unidadesEn(lotes: StockLote[], estado: EstadoVencimiento): number {
+  return lotes.filter((l) => l.estadoVenc === estado).reduce((s, l) => s + l.stockActual, 0);
+}
 
 const STOCK: StockItem[] = BASE.map((r) => {
   const nivelMinimo = MINIMOS[r.codigoArticulo] ?? 0;
-  const dias = VENC_DEMO[r.codigoArticulo] ?? 500;
-  const estadoVenc = estadoVencDe(dias);
-  const proximoVencimiento = hoyMas(dias);
-  const diasEnStock = 120; // demo: ingresó hace 120 días
-  const lote: StockLote = {
-    serie: `L-${r.codigoArticulo}`,
-    stockActual: r.stockActual,
+  const diasEnStock = ANTIGUEDAD_DEMO[r.codigoArticulo] ?? 120;
+  const diasVenc = LOTES_DEMO[r.codigoArticulo] ?? [500];
+  // El stock del artículo se reparte en partes iguales entre sus lotes.
+  const stockLote = Math.round(r.stockActual / diasVenc.length);
+  const lotes: StockLote[] = diasVenc.map((dias, i) => ({
+    serie: `L-${r.codigoArticulo}-${i + 1}`,
+    stockActual: stockLote,
     fechaIngreso: hoyMas(-diasEnStock),
-    fechaVencimiento: proximoVencimiento,
+    fechaVencimiento: hoyMas(dias),
     diasParaVencer: dias,
-    estadoVenc,
+    estadoVenc: estadoVencDe(dias),
     diasEnStock,
     semaforoRotacion: semaforoRotDe(diasEnStock),
-  };
-  const unidadesVencidas = estadoVenc === "Vencido" ? r.stockActual : 0;
-  const unidadesCriticas = estadoVenc === "Critico" ? r.stockActual : 0;
+  }));
+  const unidadesVencidas = unidadesEn(lotes, "Vencido");
+  const unidadesCriticas = unidadesEn(lotes, "Critico");
   return {
     ...r,
     nivelMinimo,
     bajoMinimo: nivelMinimo > 0 && r.stockActual <= nivelMinimo,
-    estadoVenc,
-    proximoVencimiento,
+    estadoVenc: peorEstadoVenc(lotes),
+    // El más temprano de los lotes (los días de demo pueden venir desordenados).
+    proximoVencimiento: hoyMas(Math.min(...diasVenc)),
     unidadesVencidas,
     unidadesCriticas,
     valorUsdVencido: Math.round(unidadesVencidas * r.precioUsd * 100) / 100,
     diasEnStockMax: diasEnStock,
     diasEnStockPromedio: diasEnStock,
     semaforoRotacion: semaforoRotDe(diasEnStock),
-    lotes: [lote],
+    lotes,
   };
 });
 
-function aplicarFiltros(rows: StockItem[], u: URL): StockItem[] {
+/**
+ * Filtros COMPARTIDOS (los del FilterBar): definen el SET BASE. Igual que el backend, los KPIs
+ * (`totales`/`porRubro`) se calculan acá, NO sobre el drill-down de la solapa.
+ */
+function setBase(rows: StockItem[], u: URL): StockItem[] {
   const depositos = u.searchParams.getAll("deposito").map(Number);
   const rubros = u.searchParams.getAll("rubro").map(Number);
   const tipo = u.searchParams.get("tipo") as TipoDeposito | null;
@@ -105,9 +132,48 @@ function aplicarFiltros(rows: StockItem[], u: URL): StockItem[] {
   if (tipo) out = out.filter((r) => r.tipoDeposito === tipo);
   if (q) out = out.filter((r) => r.nombreProducto.toLowerCase().includes(q) || String(r.codigoArticulo).includes(q));
   if (u.searchParams.get("soloBajoMinimo") === "true") out = out.filter((r) => r.bajoMinimo);
-  const estadoVenc = u.searchParams.get("estadoVenc");
-  if (estadoVenc) out = out.filter((r) => r.estadoVenc === estadoVenc);
   return out;
+}
+
+/** Drill-down de la solapa: afecta `items`/`total`, nunca los totales. */
+function drillDown(rows: StockItem[], u: URL): StockItem[] {
+  const estado = u.searchParams.get("estado") as EstadoStock | null;
+  const estadosVenc = u.searchParams.getAll("estadoVenc") as EstadoVencimiento[];
+  let out = rows;
+  if (estado) out = out.filter((r) => r.estado === estado);
+  if (estadosVenc.length) out = out.filter((r) => estadosVenc.includes(r.estadoVenc));
+  return out;
+}
+
+/** `proximoVencimiento` asc con nulls al final, desempate por valor desc. */
+function porVencimiento(a: StockItem, b: StockItem): number {
+  if (a.proximoVencimiento === null || b.proximoVencimiento === null) {
+    if (a.proximoVencimiento === b.proximoVencimiento) return b.valorUsd - a.valorUsd;
+    return a.proximoVencimiento === null ? 1 : -1;
+  }
+  const cmp = a.proximoVencimiento.localeCompare(b.proximoVencimiento);
+  return cmp !== 0 ? cmp : b.valorUsd - a.valorUsd;
+}
+
+function porDeposito(a: StockItem, b: StockItem): number {
+  return a.deposito - b.deposito || a.rubro - b.rubro || a.codigoArticulo - b.codigoArticulo;
+}
+
+/** Espeja OrdenStock: ausente/inválido → Deposito. */
+function ordenar(rows: StockItem[], orden: string | null): StockItem[] {
+  switch (orden) {
+    case "Vencimiento":
+      return [...rows].sort(porVencimiento);
+    case "Valor":
+      return [...rows].sort((a, b) => b.valorUsd - a.valorUsd);
+    default:
+      return [...rows].sort(porDeposito);
+  }
+}
+
+/** El set que se pagina/exporta: base + drill-down + orden. */
+function setVisible(u: URL): StockItem[] {
+  return ordenar(drillDown(setBase(STOCK, u), u), u.searchParams.get("orden"));
 }
 
 function totales(rows: StockItem[]) {
@@ -157,14 +223,16 @@ export const stockHandlers = [
     const u = new URL(request.url);
     const page = Number(u.searchParams.get("page") ?? "1");
     const pageSize = Number(u.searchParams.get("pageSize") ?? "50");
-    const rows = aplicarFiltros(STOCK, u);
+    const base = setBase(STOCK, u);
+    const rows = ordenar(drillDown(base, u), u.searchParams.get("orden"));
     const total = rows.length;
     const totalPages = pageSize <= 0 ? 0 : Math.ceil(total / pageSize);
     const items = rows.slice((page - 1) * pageSize, page * pageSize);
     return HttpResponse.json({
       items, total, page, pageSize, totalPages,
       hasNext: page < totalPages, hasPrevious: page > 1,
-      totales: totales(rows), porRubro: porRubro(rows),
+      // Totales/porRubro sobre el SET BASE: los KPIs no cambian al cambiar de solapa.
+      totales: totales(base), porRubro: porRubro(base),
     });
   }),
 
@@ -178,8 +246,9 @@ export const stockHandlers = [
   }),
 
   // Export .xlsx (demo): el backend real arma el Excel jerárquico; acá generamos un .xlsx plano válido.
+  // Respeta la solapa activa (drill-down + orden), igual que el backend.
   http.get(`${API}/stock/export`, async ({ request }) => {
-    const rows = aplicarFiltros(STOCK, new URL(request.url));
+    const rows = setVisible(new URL(request.url));
     const { default: writeXlsxFile } = await import("write-excel-file/browser");
     const FMT = '#,##0.00;(#,##0.00);"-"';
     const num = (value: number) => ({ type: Number, value, format: FMT });

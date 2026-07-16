@@ -1,58 +1,76 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { env } from "@/lib/env";
 import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { ExportButtons } from "@/shared/components/export-buttons";
-import { FilterBar, FilterField } from "@/shared/components/filter-bar";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { PageHeader } from "@/shared/components/page-header";
 import { Pagination } from "@/shared/components/pagination";
-import { MultiSelect } from "../components/multi-select";
+import { InmovilizadoTable } from "../components/inmovilizado-table";
+import { StockFiltrosBar } from "../components/stock-filtros-bar";
 import { StockKpis } from "../components/stock-kpis";
 import { StockPorRubro } from "../components/stock-por-rubro";
 import { StockSkeleton } from "../components/stock-skeleton";
 import { StockTable } from "../components/stock-table";
+import { VencimientosTable } from "../components/vencimientos-table";
 import { useStock } from "../queries/use-stock";
 import { useStockExport } from "../queries/use-stock-export";
 import { useStockFiltros } from "../queries/use-stock-filtros";
-import type { EstadoVencimiento, TipoDeposito } from "../types";
+import { FILTROS_INICIALES, filtrosAQuery, type FiltrosCompartidos } from "../filtros";
+import { presetDeTab, TABS_STOCK, type TabStock } from "../tabs";
+import type { StockListado } from "../types";
 
 const PAGE_SIZE = 50;
 
+function PanelPaginado({
+  listado,
+  onPage,
+  vacio,
+  children,
+}: {
+  listado: StockListado;
+  onPage: (p: number) => void;
+  vacio: string;
+  children: ReactNode;
+}) {
+  if (listado.items.length === 0) return <EmptyState mensaje={vacio} />;
+  return (
+    <div className="space-y-4">
+      {children}
+      <Pagination
+        page={listado.page}
+        totalPages={listado.totalPages}
+        total={listado.total}
+        onPage={onPage}
+      />
+    </div>
+  );
+}
+
 export function StockInsumosPage() {
-  const [q, setQ] = useState("");
-  const [deposito, setDeposito] = useState<number[]>([]);
-  const [rubro, setRubro] = useState<number[]>([]);
-  const [tipo, setTipo] = useState<TipoDeposito | "">("");
-  const [ventanaDias, setVentanaDias] = useState("90"); // default del backend
-  const [soloBajoMinimo, setSoloBajoMinimo] = useState(false);
-  const [estadoVenc, setEstadoVenc] = useState<EstadoVencimiento | "">("");
+  const [filtros, setFiltros] = useState<FiltrosCompartidos>(FILTROS_INICIALES);
+  const [tab, setTab] = useState<TabStock>("stock");
   const [page, setPage] = useState(1);
 
   const filtrosOpts = useStockFiltros();
-  const ventana = ventanaDias ? Number(ventanaDias) : undefined;
+  const compartidos = filtrosAQuery(filtros);
+  const preset = presetDeTab(tab);
 
-  const stock = useStock({
-    q: q || undefined,
-    deposito,
-    rubro,
-    tipo: tipo || undefined,
-    ventanaDias: ventana,
-    soloBajoMinimo,
-    estadoVenc: estadoVenc || undefined,
-    page,
-    pageSize: PAGE_SIZE,
-  });
+  const stock = useStock({ ...compartidos, ...preset, page, pageSize: PAGE_SIZE });
   const exportar = useStockExport();
 
-  const exportarExcel = () =>
-    exportar.mutate({ q: q || undefined, deposito, rubro, tipo: tipo || undefined, ventanaDias: ventana, soloBajoMinimo, estadoVenc: estadoVenc || undefined });
+  // Cambiar de solapa o de filtro invalida la página en la que estabas.
+  const cambiarTab = (v: TabStock) => {
+    setTab(v);
+    setPage(1);
+  };
+  const cambiarFiltros = (v: FiltrosCompartidos) => {
+    setFiltros(v);
+    setPage(1);
+  };
 
-  const depositoOpts =
-    filtrosOpts.data?.depositos.map((d) => ({ value: d.codigo, label: `${d.nombre} (${d.codigo})` })) ?? [];
-  const rubroOpts =
-    filtrosOpts.data?.rubros.map((r) => ({ value: r.rubro, label: r.rubroDesc })) ?? [];
+  // El Excel baja lo que estás mirando: mismos filtros + preset de la solapa activa.
+  const exportarExcel = () => exportar.mutate({ ...compartidos, ...preset });
 
   return (
     <>
@@ -68,121 +86,68 @@ export function StockInsumosPage() {
         </p>
       )}
 
-      <FilterBar>
-        <FilterField label="Buscar producto / código">
-          <Input
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Nombre o código"
-          />
-        </FilterField>
-        <FilterField label="Depósito">
-          <MultiSelect
-            options={depositoOpts}
-            value={deposito}
-            onChange={(v) => {
-              setDeposito(v);
-              setPage(1);
-            }}
-            placeholder="Todos los depósitos"
-            disabled={filtrosOpts.isPending}
-          />
-        </FilterField>
-        <FilterField label="Rubro">
-          <MultiSelect
-            options={rubroOpts}
-            value={rubro}
-            onChange={(v) => {
-              setRubro(v);
-              setPage(1);
-            }}
-            placeholder="Todos los rubros"
-            disabled={filtrosOpts.isPending}
-          />
-        </FilterField>
-        <FilterField label="Tipo">
-          <Select
-            value={tipo}
-            onChange={(e) => {
-              setTipo(e.target.value as TipoDeposito | "");
-              setPage(1);
-            }}
-          >
-            <option value="">Todos</option>
-            <option value="Propio">Propio</option>
-            <option value="Consignado">Consignado</option>
-          </Select>
-        </FilterField>
-        <FilterField label="Mínimo">
-          <label className="flex h-9 items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              className="size-4 accent-clementina-deep"
-              checked={soloBajoMinimo}
-              onChange={(e) => {
-                setSoloBajoMinimo(e.target.checked);
-                setPage(1);
-              }}
-            />
-            Solo bajo mínimo
-          </label>
-        </FilterField>
-        <FilterField label="Vencimiento">
-          <Select
-            value={estadoVenc}
-            onChange={(e) => {
-              setEstadoVenc(e.target.value as EstadoVencimiento | "");
-              setPage(1);
-            }}
-          >
-            <option value="">Todos</option>
-            <option value="Vencido">Vencido</option>
-            <option value="Critico">Crítico</option>
-            <option value="Alerta">Alerta</option>
-            <option value="Normal">Normal</option>
-            <option value="SinFecha">Sin fecha</option>
-          </Select>
-        </FilterField>
-        <FilterField label="Ventana de venta (días)">
-          <Input
-            type="number"
-            inputMode="numeric"
-            className="w-28"
-            value={ventanaDias}
-            onChange={(e) => {
-              setVentanaDias(e.target.value);
-              setPage(1);
-            }}
-            placeholder="90"
-          />
-        </FilterField>
-      </FilterBar>
+      <StockFiltrosBar
+        valor={filtros}
+        onChange={cambiarFiltros}
+        opciones={filtrosOpts.data}
+        cargando={filtrosOpts.isPending}
+      />
 
       {stock.isError ? (
         <ErrorState error={stock.error} onRetry={() => void stock.refetch()} />
-      ) : stock.isPending ? (
-        <StockSkeleton />
       ) : (
-        <>
-          <StockKpis totales={stock.data.totales} />
-          <StockPorRubro porRubro={stock.data.porRubro} />
-          {stock.data.items.length === 0 ? (
-            <EmptyState mensaje="No hay artículos con esos filtros." />
+        <Tabs value={tab} onValueChange={cambiarTab} className="space-y-4">
+          <TabsList>
+            {TABS_STOCK.map((t) => (
+              <TabsTrigger key={t.value} value={t.value}>
+                {t.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {stock.isPending ? (
+            <StockSkeleton />
           ) : (
-            <div className="space-y-4">
-              <StockTable filas={stock.data.items} />
-              <Pagination
-                page={stock.data.page}
-                totalPages={stock.data.totalPages}
-                total={stock.data.total}
-                onPage={setPage}
-              />
-            </div>
+            <>
+              {/* `totales` sale del set base: los KPIs no cambian al cambiar de solapa. */}
+              <StockKpis tab={tab} totales={stock.data.totales} />
+
+              <TabsContent value="stock">
+                <PanelPaginado
+                  listado={stock.data}
+                  onPage={setPage}
+                  vacio="No hay artículos con esos filtros."
+                >
+                  <StockTable filas={stock.data.items} />
+                </PanelPaginado>
+              </TabsContent>
+
+              <TabsContent value="vencimientos">
+                <PanelPaginado
+                  listado={stock.data}
+                  onPage={setPage}
+                  vacio="No hay lotes vencidos ni próximos a vencer con esos filtros."
+                >
+                  <VencimientosTable filas={stock.data.items} />
+                </PanelPaginado>
+              </TabsContent>
+
+              <TabsContent value="inmovilizado">
+                <PanelPaginado
+                  listado={stock.data}
+                  onPage={setPage}
+                  vacio="No hay artículos inmovilizados con esos filtros."
+                >
+                  <InmovilizadoTable filas={stock.data.items} />
+                </PanelPaginado>
+              </TabsContent>
+
+              <TabsContent value="rubro">
+                <StockPorRubro porRubro={stock.data.porRubro} />
+              </TabsContent>
+            </>
           )}
-        </>
+        </Tabs>
       )}
     </>
   );
