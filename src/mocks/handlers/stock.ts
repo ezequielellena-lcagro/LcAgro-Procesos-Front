@@ -42,10 +42,11 @@ const BASE: Omit<
 const MINIMOS: Record<number, number> = { 10002: 100, 10030: 100, 10080: 100 };
 // Días hasta vencer de CADA lote del artículo. Sin entrada → un solo lote que vence lejos (Normal).
 // Cubre las 4 solapas del demo: 10001 tiene dos lotes (uno vencido, uno normal) para que la solapa
-// Vencimientos muestre solo el problemático; 10002 Vencido, 10030/10010 Crítico, 10090 Alerta.
+// Vencimientos muestre solo el problemático; 10002 tiene DOS lotes accionables (vencido + crítico)
+// para que la solapa muestre más filas que artículos paginados; 10030/10010 Crítico, 10090 Alerta.
 const LOTES_DEMO: Record<number, number[]> = {
   10001: [-5, 500],
-  10002: [-20],
+  10002: [-20, 30],
   10030: [60],
   10010: [150],
   10090: [250],

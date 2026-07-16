@@ -61,11 +61,19 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
   );
 }
 
-export function TabsContent({ value, children }: { value: string; children: ReactNode }) {
+export function TabsContent({
+  value,
+  className,
+  children,
+}: {
+  value: string;
+  className?: string;
+  children: ReactNode;
+}) {
   const ctx = useTabsContext();
   if (ctx.value !== value) return null;
   return (
-    <div role="tabpanel" id={`tabpanel-${value}`} aria-labelledby={`tab-${value}`}>
+    <div role="tabpanel" id={`tabpanel-${value}`} aria-labelledby={`tab-${value}`} className={className}>
       {children}
     </div>
   );

@@ -6,6 +6,23 @@ describe("presetDeTab", () => {
     expect(presetDeTab("stock")).toEqual({ orden: "Deposito" });
   });
 
+  it("Stock: el filtro de estado se suma al preset (aísla los de riesgo de quiebre)", () => {
+    expect(presetDeTab("stock", "RiesgoQuiebre")).toEqual({
+      estado: "RiesgoQuiebre",
+      orden: "Deposito",
+    });
+  });
+
+  it("Stock: sin estado elegido no manda la clave (vacío = todos)", () => {
+    expect(presetDeTab("stock", undefined)).not.toHaveProperty("estado");
+  });
+
+  it("las otras solapas ignoran el estado: fijan el suyo o filtran por otro eje", () => {
+    expect(presetDeTab("inmovilizado", "Ok").estado).toBe("Inmovilizado");
+    expect(presetDeTab("vencimientos", "Ok")).not.toHaveProperty("estado");
+    expect(presetDeTab("rubro", "Ok")).toEqual({});
+  });
+
   it("Vencimientos: vencido + crítico + alerta, ordenado por urgencia", () => {
     expect(presetDeTab("vencimientos")).toEqual({
       estadosVenc: ["Vencido", "Critico", "Alerta"],

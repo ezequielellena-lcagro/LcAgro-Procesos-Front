@@ -1,4 +1,4 @@
-import type { StockFiltros } from "./types";
+import type { EstadoStock, StockFiltros } from "./types";
 
 /** Las 4 solapas de la pantalla de Stock. Cada una es el drill-down de su KPI. */
 export type TabStock = "stock" | "vencimientos" | "inmovilizado" | "rubro";
@@ -17,8 +17,13 @@ export type PresetTab = Pick<StockFiltros, "estado" | "estadosVenc" | "orden">;
 /**
  * Preset de consulta de cada solapa. Función pura: la solapa NO toca los filtros compartidos,
  * solo agrega el drill-down y el orden con el que se lee esa pregunta.
+ *
+ * `estado` es el filtro de la solapa Stock (Decisión 3: riesgo de quiebre queda como columna Y
+ * como filtro). Vive acá y no en los filtros compartidos por dos razones: los KPIs se calculan
+ * sobre el set base y no deben moverse al aislar un estado, y las otras solapas ya fijan el suyo
+ * (Inmovilizado) o filtran por otro eje (Vencimientos), así que no habría preset que pisar.
  */
-export function presetDeTab(tab: TabStock): PresetTab {
+export function presetDeTab(tab: TabStock, estado?: EstadoStock): PresetTab {
   switch (tab) {
     case "vencimientos":
       return { estadosVenc: ["Vencido", "Critico", "Alerta"], orden: "Vencimiento" };
@@ -28,6 +33,6 @@ export function presetDeTab(tab: TabStock): PresetTab {
       // No pagina: se dibuja con `porRubro` de la respuesta.
       return {};
     case "stock":
-      return { orden: "Deposito" };
+      return estado ? { estado, orden: "Deposito" } : { orden: "Deposito" };
   }
 }
