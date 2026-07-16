@@ -1,5 +1,5 @@
 import { Pencil, Plus } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -156,7 +156,15 @@ function CampaniaInicioBox({ inicioRaw, puedeConfig }: { inicioRaw: string | und
   const [valor, setValor] = useState(desdeConfig(inicioRaw) ?? "");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => setValor(desdeConfig(inicioRaw) ?? ""), [inicioRaw]);
+  // `inicioRaw` llega tarde (la query de config resuelve después del primer render) y vuelve a
+  // cambiar al guardar. Resincronizamos el input ajustando el estado DURANTE el render —el patrón
+  // que documenta React para "prop cambió → resetear estado"— en vez de un useEffect, que agrega
+  // un pase de render de más y pinta el valor viejo por un frame.
+  const [inicioSincronizado, setInicioSincronizado] = useState(inicioRaw);
+  if (inicioRaw !== inicioSincronizado) {
+    setInicioSincronizado(inicioRaw);
+    setValor(desdeConfig(inicioRaw) ?? "");
+  }
 
   const onGuardar = () => {
     const cfg = haciaConfig(valor);
