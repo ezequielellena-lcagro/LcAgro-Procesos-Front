@@ -221,7 +221,6 @@ export function CuentasPage() {
                   <CuentasTable
                     filas={cuentas.data.items}
                     puedeEditar={puedeEditar}
-                    vendedorFiltrado={vendNro !== ""}
                     onEditar={setEditar}
                     onVerFacturas={abrirContado}
                   />

@@ -9,14 +9,11 @@ import { EstadoContadoSemaforo } from "./estado-contado-badge";
 export function CuentasTable({
   filas,
   puedeEditar,
-  vendedorFiltrado,
   onEditar,
   onVerFacturas,
 }: {
   filas: CuentaDto[];
   puedeEditar: boolean;
-  /** Con un vendedor filtrado, la columna "Contado" se corre al final. */
-  vendedorFiltrado: boolean;
   onEditar: (c: CuentaDto) => void;
   onVerFacturas: (c: CuentaDto) => void;
 }) {
@@ -99,10 +96,8 @@ export function CuentasTable({
     },
   ];
 
-  // "Contado": junto al cliente en la lista completa; al final cuando se filtra por vendedor.
-  const columns: Column<CuentaDto>[] = vendedorFiltrado
-    ? [...base, contadoColumn]
-    : [...base.slice(0, 3), contadoColumn, ...base.slice(3)];
+  // "Contado" va siempre al final (última columna de datos, antes del botón de editar).
+  const columns: Column<CuentaDto>[] = [...base, contadoColumn];
 
   if (puedeEditar) {
     columns.push({
