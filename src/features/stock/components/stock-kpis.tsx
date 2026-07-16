@@ -1,26 +1,34 @@
+import type { ReactNode } from "react";
 import { KpiCard } from "@/shared/components/kpi-card";
-import { pct, usd } from "@/shared/format/format";
+import { oDash, pct, usd } from "@/shared/format/format";
+import type { TabStock } from "../tabs";
 import type { TotalesStock } from "../types";
 
-// KPIs sobre TODO el set filtrado (lo calcula el backend), no la página.
-export function StockKpis({ totales }: { totales: TotalesStock }) {
+interface Props {
+  totales: TotalesStock;
+}
+
+/** Encabezado de KPIs de una solapa: 1-2 tarjetas, no una pared. */
+function KpiRow({ children }: { children: ReactNode }) {
+  return <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">{children}</div>;
+}
+
+function KpisStock({ totales }: Props) {
   return (
-    <div className="mb-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-      <KpiCard label="Artículos" value={totales.cantidadArticulos} />
+    <KpiRow>
       <KpiCard
         label="Valor USD"
         value={usd(totales.valorUsdTotal)}
         hint={`Propio ${usd(totales.valorUsdPropio)} · Consignado ${usd(totales.valorUsdConsignado)}`}
         tone="verde"
       />
-      <KpiCard
-        label="Inmovilizado"
-        value={usd(totales.valorUsdInmovilizado)}
-        hint={`${pct(totales.pctInmovilizado)} del total`}
-        tone="rojo"
-      />
-      <KpiCard label="En riesgo de quiebre" value={totales.cantidadRiesgoQuiebre} tone="rojo" />
-      <KpiCard label="Bajo mínimo" value={totales.cantidadBajoMinimo} tone="rojo" />
+    </KpiRow>
+  );
+}
+
+function KpisVencimientos({ totales }: Props) {
+  return (
+    <KpiRow>
       <KpiCard label="USD vencido" value={usd(totales.valorUsdVencido)} tone="rojo" />
       <KpiCard
         label="Por vencer"
@@ -28,10 +36,38 @@ export function StockKpis({ totales }: { totales: TotalesStock }) {
         hint={`${totales.cantidadPorVencer} art. (vencido + crítico)`}
         tone="rojo"
       />
-      <KpiCard
-        label="Antigüedad prom."
-        value={totales.antiguedadPromedioDias !== null ? `${totales.antiguedadPromedioDias} días` : "—"}
-      />
-    </div>
+    </KpiRow>
   );
+}
+
+function KpisInmovilizado({ totales }: Props) {
+  const antiguedad = oDash(totales.antiguedadPromedioDias, (d) => `${d} días`);
+  return (
+    <KpiRow>
+      <KpiCard
+        label="USD inmovilizado"
+        value={usd(totales.valorUsdInmovilizado)}
+        hint={`${pct(totales.pctInmovilizado)} del total · antigüedad prom. ${antiguedad}`}
+        tone="rojo"
+      />
+    </KpiRow>
+  );
+}
+
+/**
+ * KPI(s) de la solapa activa. `totales` viene del SET BASE (filtros compartidos), así que los
+ * números NO cambian al cambiar de solapa: la solapa es el drill-down de ese número.
+ */
+export function StockKpis({ tab, totales }: { tab: TabStock } & Props) {
+  switch (tab) {
+    case "stock":
+      return <KpisStock totales={totales} />;
+    case "vencimientos":
+      return <KpisVencimientos totales={totales} />;
+    case "inmovilizado":
+      return <KpisInmovilizado totales={totales} />;
+    case "rubro":
+      // El gráfico por rubro ya es su propio número: no lleva KPI arriba.
+      return null;
+  }
 }

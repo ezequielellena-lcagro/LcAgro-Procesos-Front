@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import type { TabStock } from "../tabs";
 import type { TotalesStock } from "../types";
 import { StockKpis } from "./stock-kpis";
 
@@ -18,35 +19,67 @@ const totales: TotalesStock = {
   antiguedadPromedioDias: 145,
 };
 
-describe("StockKpis", () => {
-  it("muestra la cantidad de artículos", () => {
-    render(<StockKpis totales={totales} />);
-    expect(screen.getByText("207")).toBeInTheDocument();
-  });
+const TABS: TabStock[] = ["stock", "vencimientos", "inmovilizado", "rubro"];
 
+describe("StockKpis — solapa Stock", () => {
   it("muestra el valor USD total formateado", () => {
-    render(<StockKpis totales={totales} />);
+    render(<StockKpis tab="stock" totales={totales} />);
     expect(screen.getByText(/6\.588\.852/)).toBeInTheDocument();
   });
 
-  it("muestra el desglose propio/consignado", () => {
-    render(<StockKpis totales={totales} />);
+  it("muestra el desglose propio/consignado como hint", () => {
+    render(<StockKpis tab="stock" totales={totales} />);
     expect(screen.getByText(/Propio US\$ 5\.000\.000/)).toBeInTheDocument();
     expect(screen.getByText(/Consignado US\$ 1\.588\.852/)).toBeInTheDocument();
   });
+});
 
-  it("muestra la cantidad en riesgo de quiebre", () => {
-    render(<StockKpis totales={totales} />);
-    expect(screen.getByText("14")).toBeInTheDocument();
-  });
-
-  it("muestra la cantidad bajo mínimo", () => {
-    render(<StockKpis totales={totales} />);
-    expect(screen.getByText("9")).toBeInTheDocument();
-  });
-
-  it("muestra el USD vencido", () => {
-    render(<StockKpis totales={totales} />);
+describe("StockKpis — solapa Vencimientos", () => {
+  it("muestra USD vencido y por vencer", () => {
+    render(<StockKpis tab="vencimientos" totales={totales} />);
+    expect(screen.getByText("USD vencido")).toBeInTheDocument();
     expect(screen.getByText(/24\.218/)).toBeInTheDocument();
+    expect(screen.getByText("Por vencer")).toBeInTheDocument();
+    expect(screen.getByText(/56\.344/)).toBeInTheDocument();
+  });
+
+  it("muestra la cantidad de artículos por vencer como hint", () => {
+    render(<StockKpis tab="vencimientos" totales={totales} />);
+    expect(screen.getByText("31 art. (vencido + crítico)")).toBeInTheDocument();
+  });
+});
+
+describe("StockKpis — solapa Inmovilizado", () => {
+  it("muestra el USD inmovilizado", () => {
+    render(<StockKpis tab="inmovilizado" totales={totales} />);
+    expect(screen.getByText("USD inmovilizado")).toBeInTheDocument();
+    expect(screen.getByText(/1\.200\.000/)).toBeInTheDocument();
+  });
+
+  it("muestra el % del total y la antigüedad promedio como hint", () => {
+    render(<StockKpis tab="inmovilizado" totales={totales} />);
+    expect(screen.getByText("18,2 % del total · antigüedad prom. 145 días")).toBeInTheDocument();
+  });
+
+  it("muestra '—' de antigüedad cuando no hay dato", () => {
+    render(<StockKpis tab="inmovilizado" totales={{ ...totales, antiguedadPromedioDias: null }} />);
+    expect(screen.getByText(/antigüedad prom\. —/)).toBeInTheDocument();
+  });
+});
+
+describe("StockKpis — solapa Por rubro", () => {
+  it("no muestra KPI", () => {
+    const { container } = render(<StockKpis tab="rubro" totales={totales} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("StockKpis — tarjetas eliminadas", () => {
+  it.each(TABS)("la solapa %s no muestra Artículos / Bajo mínimo / En riesgo de quiebre", (tab) => {
+    render(<StockKpis tab={tab} totales={totales} />);
+    expect(screen.queryByText("Artículos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Bajo mínimo")).not.toBeInTheDocument();
+    expect(screen.queryByText("En riesgo de quiebre")).not.toBeInTheDocument();
+    expect(screen.queryByText("Antigüedad prom.")).not.toBeInTheDocument();
   });
 });
