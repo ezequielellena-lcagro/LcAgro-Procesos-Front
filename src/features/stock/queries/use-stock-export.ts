@@ -1,9 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
-import type { StockFiltros } from "../types";
-
-type ExportFiltros = Pick<StockFiltros, "deposito" | "rubro" | "tipo" | "q" | "ventanaDias" | "soloBajoMinimo" | "estadoVenc">;
+import { stockParams, type StockQueryFiltros } from "./params";
 
 function nombrePorDefecto(): string {
   const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -11,23 +9,15 @@ function nombrePorDefecto(): string {
 }
 
 /**
- * Descarga el listado completo (todos los filtros, sin paginar) como .xlsx generado por el backend
- * (Excel jerárquico Depósito→Rubro→Artículo con subtotales). El toast de error lo maneja el
- * MutationCache global.
+ * Descarga el listado completo (todos los filtros + el preset de la solapa activa, sin paginar)
+ * como .xlsx generado por el backend (Excel jerárquico Depósito→Rubro→Artículo con subtotales).
+ * El toast de error lo maneja el MutationCache global.
  */
 export function useStockExport() {
   return useMutation({
-    mutationFn: async (filtros: ExportFiltros) => {
+    mutationFn: async (filtros: StockQueryFiltros) => {
       const res = await apiClient.get("/stock/export", {
-        params: {
-          deposito: filtros.deposito.length ? filtros.deposito : undefined,
-          rubro: filtros.rubro.length ? filtros.rubro : undefined,
-          tipo: filtros.tipo,
-          q: filtros.q || undefined,
-          ventanaDias: filtros.ventanaDias,
-          soloBajoMinimo: filtros.soloBajoMinimo || undefined,
-          estadoVenc: filtros.estadoVenc,
-        },
+        params: stockParams(filtros),
         responseType: "blob",
         paramsSerializer: { indexes: null },
       });

@@ -10,6 +10,9 @@ export type EstadoVencimiento = "SinFecha" | "Vencido" | "Critico" | "Alerta" | 
 /** Semáforo de rotación por días en stock. Espeja SemaforoRotacion del backend. */
 export type SemaforoRotacion = "SinDato" | "Verde" | "Amarillo" | "Rojo";
 
+/** Orden del listado. Espeja OrdenStock del backend (ausente/inválido → Deposito). */
+export type OrdenStock = "Deposito" | "Vencimiento" | "Valor";
+
 /** Un lote del artículo en un depósito (espeja StockLoteDto). */
 export interface StockLote {
   serie: string;
@@ -104,7 +107,13 @@ export interface StockFiltrosResponse {
   rubros: RubroValor[];
 }
 
-/** Estado de los filtros que arma la página y consume el hook de listado. */
+/**
+ * Estado de los filtros que arma la página y consume el hook de listado.
+ *
+ * Los filtros COMPARTIDOS (q/deposito/rubro/tipo/ventanaDias/soloBajoMinimo) definen el set base
+ * sobre el que el backend calcula `totales`/`porRubro`. `estado`/`estadosVenc`/`orden` son el
+ * drill-down de la solapa: afectan `items`/`total`, NO los KPIs.
+ */
 export interface StockFiltros {
   q?: string;
   deposito: number[];
@@ -112,7 +121,10 @@ export interface StockFiltros {
   tipo?: TipoDeposito;
   ventanaDias?: number;
   soloBajoMinimo?: boolean;
-  estadoVenc?: EstadoVencimiento;
+  /** Vacío/ausente = sin filtro. Viaja como clave repetida (`estadoVenc=Vencido&estadoVenc=Critico`). */
+  estadosVenc?: EstadoVencimiento[];
+  estado?: EstadoStock;
+  orden?: OrdenStock;
   page: number;
   pageSize: number;
 }

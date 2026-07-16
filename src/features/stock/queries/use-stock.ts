@@ -2,6 +2,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type { StockFiltros, StockListado } from "../types";
 import { stockKeys } from "./keys";
+import { stockParams } from "./params";
 
 export function useStock(filtros: StockFiltros) {
   return useQuery({
@@ -9,13 +10,7 @@ export function useStock(filtros: StockFiltros) {
     queryFn: async () => {
       const { data } = await apiClient.get<StockListado>("/stock", {
         params: {
-          deposito: filtros.deposito.length ? filtros.deposito : undefined,
-          rubro: filtros.rubro.length ? filtros.rubro : undefined,
-          tipo: filtros.tipo,
-          q: filtros.q || undefined,
-          ventanaDias: filtros.ventanaDias,
-          soloBajoMinimo: filtros.soloBajoMinimo || undefined,
-          estadoVenc: filtros.estadoVenc,
+          ...stockParams(filtros),
           page: filtros.page,
           pageSize: filtros.pageSize,
         },
