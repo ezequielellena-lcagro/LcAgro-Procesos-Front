@@ -66,11 +66,39 @@ function detalleDe(campania: string, cereal: string): AjusteAplicado[] {
   }));
 }
 
+/** Suma tn y promedia el precio PONDERADO por tn (espeja Ponderar del backend). */
+function ponderar(xs: { tn: number; precio: number | null }[]) {
+  let tn = 0;
+  let pesoPrecio = 0;
+  let peso = 0;
+  for (const x of xs) {
+    tn += x.tn;
+    if (x.precio != null && x.tn !== 0) {
+      pesoPrecio += x.precio * x.tn;
+      peso += x.tn;
+    }
+  }
+  return { tn, precio: peso === 0 ? null : pesoPrecio / peso };
+}
+
 function toDto(b: BaseRow): PosicionDto {
+  const propios = AJUSTES.filter((a) => norm(a.campania) === norm(b.campania) && norm(a.cereal) === norm(b.cereal));
+  // Consolidado: cada ajuste a SU lado según el signo ('+' suma a compras, '−' a ventas), precio ponderado.
+  const compra = [{ tn: b.tnCompra, precio: b.precioCompra }];
+  const venta = [{ tn: b.tnVenta, precio: b.precioVenta }];
+  for (const a of propios) (a.signo === "+" ? compra : venta).push({ tn: a.tn, precio: a.precioUsd });
+  const c = ponderar(compra);
+  const v = ponderar(venta);
+
   return {
     ...b,
     posicionFinal: b.posicionSinAjustes + ajusteDe(b.campania, b.cereal),
     ajustesDetalle: detalleDe(b.campania, b.cereal),
+    tnCompraTotal: c.tn,
+    precioCompraTotal: c.precio,
+    tnVentaTotal: v.tn,
+    precioVentaTotal: v.precio,
+    margenTotalUsdTn: v.precio != null && c.precio != null ? v.precio - c.precio : null,
   };
 }
 

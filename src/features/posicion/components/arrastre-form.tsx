@@ -39,10 +39,12 @@ export function ArrastreForm({ campaniaFija, campaniasDisponibles, existentes, s
       setError("Elegí una campaña.");
       return;
     }
+    // 0 y vacío son válidos: significan "este cereal no arrastra" (girasol/sorgo normalmente no tienen).
+    // Solo se rechaza lo que no es número o es negativo (el sentido lo da el Signo, no el menos).
     for (const cer of CEREALES) {
       const v = celdas[cer].tn.trim();
-      if (v !== "" && !(Number(v) > 0)) {
-        setError(`Toneladas inválidas en ${cer}.`);
+      if (v !== "" && (!Number.isFinite(Number(v)) || Number(v) < 0)) {
+        setError(`Toneladas inválidas en ${cer}: poné un número ≥ 0 (o dejalo vacío).`);
         return;
       }
     }

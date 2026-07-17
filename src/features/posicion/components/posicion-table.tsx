@@ -4,12 +4,15 @@ import { numero, oDash, usd } from "@/shared/format/format";
 import type { PosicionDto } from "../types";
 
 // Vista simple, centrada en toneladas y posición neta (sin calzadas/margen, a pedido del negocio).
+// El resumen muestra los TOTALES (compras/ventas ya con arrastre, semilla y demás ajustes, a precio
+// ponderado): "en el resumen solo veo los totales; si voy al detallado veo el desglose". El desglose
+// de dónde sale cada número está en la pestaña Detalle.
 const columns: Column<PosicionDto>[] = [
   { key: "cereal", header: "Cereal", className: "whitespace-nowrap", cell: (r) => <span className="font-medium text-ink">{r.cereal}</span> },
-  { key: "tnCompra", header: "Compra tn", align: "right", className: "whitespace-nowrap", cell: (r) => numero(r.tnCompra) },
-  { key: "precioCompra", header: "P. compra", align: "right", className: "whitespace-nowrap", cell: (r) => oDash(r.precioCompra, usd) },
-  { key: "tnVenta", header: "Venta tn", align: "right", className: "whitespace-nowrap", cell: (r) => numero(r.tnVenta) },
-  { key: "precioVenta", header: "P. venta", align: "right", className: "whitespace-nowrap", cell: (r) => oDash(r.precioVenta, usd) },
+  { key: "tnCompraTotal", header: "Compra tn", align: "right", className: "whitespace-nowrap", cell: (r) => numero(r.tnCompraTotal) },
+  { key: "precioCompraTotal", header: "P. compra", align: "right", className: "whitespace-nowrap", cell: (r) => oDash(r.precioCompraTotal, usd) },
+  { key: "tnVentaTotal", header: "Venta tn", align: "right", className: "whitespace-nowrap", cell: (r) => numero(r.tnVentaTotal) },
+  { key: "precioVentaTotal", header: "P. venta", align: "right", className: "whitespace-nowrap", cell: (r) => oDash(r.precioVentaTotal, usd) },
   {
     key: "posicionFinal",
     header: "Posición tn",
@@ -30,9 +33,9 @@ export function PosicionTable({ filas }: { filas: PosicionDto[] }) {
   // Fila de totales (una celda por columna; en precios no tiene sentido sumar → vacío).
   const footer = [
     "TOTAL",
-    numero(suma((r) => r.tnCompra)),
+    numero(suma((r) => r.tnCompraTotal)),
     "",
-    numero(suma((r) => r.tnVenta)),
+    numero(suma((r) => r.tnVentaTotal)),
     "",
     <span className={cn(totalPosicion >= 0 ? "text-verde" : "text-rojo")}>{numero(totalPosicion)}</span>,
   ];

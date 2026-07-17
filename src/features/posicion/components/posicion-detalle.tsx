@@ -28,8 +28,9 @@ export function PosicionDetalle({ filas }: { filas: PosicionDto[] }) {
 
 function CampaniaBloque({ campania, rows }: { campania: string; rows: PosicionDto[] }) {
   const sinVentas = rows.every((r) => r.tnVenta === 0);
-  const totCompra = rows.reduce((s, r) => s + r.tnCompra, 0);
-  const totVenta = rows.reduce((s, r) => s + r.tnVenta, 0);
+  // Los totales de la campaña suman los CONSOLIDADOS (con ajustes), que es lo que el cliente compara.
+  const totCompra = rows.reduce((s, r) => s + r.tnCompraTotal, 0);
+  const totVenta = rows.reduce((s, r) => s + r.tnVentaTotal, 0);
   const totPosicion = rows.reduce((s, r) => s + r.posicionFinal, 0);
 
   return (
@@ -73,26 +74,45 @@ function CampaniaBloque({ campania, rows }: { campania: string; rows: PosicionDt
   );
 }
 
+/**
+ * Un cereal = el TOTAL arriba (título, con precio ponderado) y debajo el desglose de dónde sale:
+ * lo que da el sistema + cada ajuste en SU lado (el arrastre/semilla que restan van a ventas; los que
+ * suman, a compras). Es el formato que el cliente controla contra su planilla.
+ */
 function CerealFilas({ fila }: { fila: PosicionDto }) {
   return (
     <>
       <tr className="border-b border-line-soft">
-        <td className="py-1.5 text-left font-medium text-ink">{fila.cereal}</td>
-        <td className="py-1.5 text-right text-verde">{fila.tnCompra ? numero(fila.tnCompra) : "—"}</td>
-        <td className="py-1.5 text-right">{oDash(fila.precioCompra, usd)}</td>
-        <td className="py-1.5 text-right text-rojo">{fila.tnVenta ? numero(fila.tnVenta) : "—"}</td>
-        <td className="py-1.5 text-right">{oDash(fila.precioVenta, usd)}</td>
+        <td className="py-1.5 text-left font-semibold text-ink">{fila.cereal}</td>
+        <td className="py-1.5 text-right font-semibold text-verde">
+          {fila.tnCompraTotal ? numero(fila.tnCompraTotal) : "—"}
+        </td>
+        <td className="py-1.5 text-right font-semibold">{oDash(fila.precioCompraTotal, usd)}</td>
+        <td className="py-1.5 text-right font-semibold text-rojo">
+          {fila.tnVentaTotal ? numero(fila.tnVentaTotal) : "—"}
+        </td>
+        <td className="py-1.5 text-right font-semibold">{oDash(fila.precioVentaTotal, usd)}</td>
         <td className={cn("py-1.5 text-right font-semibold", fila.posicionFinal >= 0 ? "text-verde" : "text-rojo")}>
           {numero(fila.posicionFinal)}
         </td>
       </tr>
+
+      <tr className="text-ink-soft">
+        <td className="py-1 pl-6 text-left text-xs">del sistema</td>
+        <td className="py-1 text-right text-xs">{fila.tnCompra ? numero(fila.tnCompra) : "—"}</td>
+        <td className="py-1 text-right text-xs">{oDash(fila.precioCompra, usd)}</td>
+        <td className="py-1 text-right text-xs">{fila.tnVenta ? numero(fila.tnVenta) : "—"}</td>
+        <td className="py-1 text-right text-xs">{oDash(fila.precioVenta, usd)}</td>
+        <td />
+      </tr>
+
       {fila.ajustesDetalle.map((a) => (
-        <tr key={a.tipo} className="italic text-ink-soft">
+        <tr key={a.tipo} className="text-ink-soft">
           <td className="py-1 pl-6 text-left text-xs">{tipoLabel[a.tipo] ?? a.tipo}</td>
-          <td />
-          <td />
-          <td className="py-1 text-right text-xs">{numero(a.tn)}</td>
-          <td className="py-1 text-right text-xs">{oDash(a.precioUsd, usd)}</td>
+          <td className="py-1 text-right text-xs">{a.tn > 0 ? numero(a.tn) : ""}</td>
+          <td className="py-1 text-right text-xs">{a.tn > 0 ? oDash(a.precioUsd, usd) : ""}</td>
+          <td className="py-1 text-right text-xs">{a.tn < 0 ? numero(-a.tn) : ""}</td>
+          <td className="py-1 text-right text-xs">{a.tn < 0 ? oDash(a.precioUsd, usd) : ""}</td>
           <td />
         </tr>
       ))}

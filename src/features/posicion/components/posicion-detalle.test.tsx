@@ -4,7 +4,7 @@ import type { PosicionDto } from "../types";
 import { PosicionDetalle } from "./posicion-detalle";
 
 function fila(p: Partial<PosicionDto> & Pick<PosicionDto, "campania" | "cereal">): PosicionDto {
-  return {
+  const base = {
     tnCompra: 0,
     precioCompra: null,
     tnVenta: 0,
@@ -17,6 +17,15 @@ function fila(p: Partial<PosicionDto> & Pick<PosicionDto, "campania" | "cereal">
     posicionFinal: 0,
     ajustesDetalle: [],
     ...p,
+  };
+  // Por defecto el consolidado = lo que da el sistema (caso sin ajustes), como en la realidad.
+  return {
+    ...base,
+    tnCompraTotal: p.tnCompraTotal ?? base.tnCompra,
+    precioCompraTotal: p.precioCompraTotal ?? base.precioCompra,
+    tnVentaTotal: p.tnVentaTotal ?? base.tnVenta,
+    precioVentaTotal: p.precioVentaTotal ?? base.precioVenta,
+    margenTotalUsdTn: p.margenTotalUsdTn ?? null,
   };
 }
 
@@ -49,6 +58,43 @@ describe("PosicionDetalle", () => {
         ]}
       />,
     );
+    expect(screen.getByText("Arrastre")).toBeInTheDocument();
+    expect(screen.getByText("Semilla")).toBeInTheDocument();
+  });
+
+  it("el título del cereal lleva el TOTAL consolidado y debajo el desglose de dónde sale", () => {
+    // Trigo 2024-2025 de la planilla del cliente: el sistema da 6.189 de venta, pero el total es 8.485
+    // (con arrastre 295 + semilla 1.880). El cliente controla el total arriba y el desglose abajo.
+    render(
+      <PosicionDetalle
+        filas={[
+          fila({
+            campania: "2024-2025",
+            cereal: "Trigo",
+            tnCompra: 8215,
+            precioCompra: 201.95,
+            tnVenta: 6189,
+            precioVenta: 203.3,
+            tnCompraTotal: 8215,
+            precioCompraTotal: 201.95,
+            tnVentaTotal: 8485,
+            precioVentaTotal: 209.4,
+            posicionFinal: -270,
+            ajustesDetalle: [
+              { tipo: "arrastre", tn: -295, precioUsd: 240.4 },
+              { tipo: "semilla", tn: -1880, precioUsd: 222.9 },
+            ],
+          }),
+        ]}
+      />,
+    );
+
+    const titulo = screen.getByText("Trigo").closest("tr");
+    expect(titulo).toHaveTextContent("8.485"); // el TOTAL, no la venta cruda
+    expect(titulo).toHaveTextContent("-270");
+
+    const sistema = screen.getByText("del sistema").closest("tr");
+    expect(sistema).toHaveTextContent("6.189"); // lo que da MacroGest, para poder controlarlo
     expect(screen.getByText("Arrastre")).toBeInTheDocument();
     expect(screen.getByText("Semilla")).toBeInTheDocument();
   });

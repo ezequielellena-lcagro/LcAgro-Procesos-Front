@@ -14,6 +14,14 @@ export interface PosicionDto {
   posicionSinAjustes: number;
   posicionFinal: number;
   ajustesDetalle: AjusteAplicado[];
+
+  /** CONSOLIDADO: los ajustes imputados a su lado ('+' suma a compras, '−' a ventas), con precio
+   * PONDERADO. Es lo que el cliente controla contra su planilla; `posicionFinal` = compra − venta total. */
+  tnCompraTotal: number;
+  precioCompraTotal: number | null;
+  tnVentaTotal: number;
+  precioVentaTotal: number | null;
+  margenTotalUsdTn: number | null;
 }
 
 export type TipoAjuste = "arrastre" | "arrastre_inicial" | "semilla" | "canje" | "produccion_propia";

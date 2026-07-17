@@ -21,9 +21,10 @@ export function PosicionCard({ fila }: { fila: PosicionDto }) {
         <span className="ml-1 text-sm font-normal text-ink-soft">tn de posición</span>
       </div>
 
+      {/* Totales consolidados (ya con arrastre/semilla, a precio ponderado): el desglose va en Detalle. */}
       <dl className="mt-3 space-y-1 text-sm">
-        <Row k="Compra" v={`${numero(fila.tnCompra)} tn`} sub={oDash(fila.precioCompra, usd)} />
-        <Row k="Venta" v={`${numero(fila.tnVenta)} tn`} sub={oDash(fila.precioVenta, usd)} />
+        <Row k="Compra" v={`${numero(fila.tnCompraTotal)} tn`} sub={oDash(fila.precioCompraTotal, usd)} />
+        <Row k="Venta" v={`${numero(fila.tnVentaTotal)} tn`} sub={oDash(fila.precioVentaTotal, usd)} />
       </dl>
     </div>
   );
