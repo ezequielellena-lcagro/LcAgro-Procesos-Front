@@ -17,11 +17,13 @@ import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { numero } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
 import { ArrastreTab } from "../components/arrastre-tab";
+import { DescartadosAlerta } from "../components/descartados-alerta";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionDetalle } from "../components/posicion-detalle";
 import { PosicionSkeleton } from "../components/posicion-skeleton";
 import { PosicionTable } from "../components/posicion-table";
 import { useCampanias } from "../queries/use-campanias";
+import { useDescartados } from "../queries/use-descartados";
 import { usePosicion, usePosicionDetalle } from "../queries/use-posicion";
 import { CEREALES, type PosicionDto } from "../types";
 
@@ -47,6 +49,7 @@ export function PosicionPage() {
 
   const posicion = usePosicion(campania, cereal || undefined, precioMin, precioMax);
   const detalle = usePosicionDetalle(cereal || undefined, precioMin, precioMax, tab === "detalle");
+  const descartados = useDescartados(cereal || undefined, precioMin, precioMax, tab !== "arrastre");
 
   const exportColumns: ExportColumn<PosicionDto>[] = [
     { header: "Cereal", get: (r) => r.cereal },
@@ -145,6 +148,10 @@ export function PosicionPage() {
           />
         </FilterField>
       </FilterBar>
+
+      {descartados.data && descartados.data.length > 0 && tab !== "arrastre" && (
+        <DescartadosAlerta descartados={descartados.data} />
+      )}
 
       {campanias.isError ? (
         <ErrorState error={campanias.error} onRetry={() => void campanias.refetch()} />

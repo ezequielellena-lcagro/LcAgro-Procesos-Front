@@ -116,6 +116,13 @@ export const posicionHandlers = [
     return HttpResponse.json(rows.map(toDto));
   }),
 
+  http.get(`${API}/posicion/descartados`, ({ request }) => {
+    const cereal = new URL(request.url).searchParams.get("cereal");
+    // Demo: un contrato en pesos sin cotización quedó fuera por precio (como el caso real de Trigo).
+    const rows = [{ campania: "2025-2026", cereal: "Trigo", lado: "compra", contratos: 1, tn: 20 }];
+    return HttpResponse.json(cereal ? rows.filter((r) => norm(r.cereal) === norm(cereal)) : rows);
+  }),
+
   http.get(`${API}/ajustes`, ({ request }) => {
     const campania = new URL(request.url).searchParams.get("campania");
     return HttpResponse.json(AJUSTES.filter((a) => !campania || norm(a.campania) === norm(campania)));

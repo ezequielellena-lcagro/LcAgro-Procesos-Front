@@ -4,6 +4,8 @@ export const posicionKeys = {
     [...posicionKeys.all, "list", campania, cereal ?? "todos", precioMin ?? 50, precioMax ?? 700] as const,
   detalle: (cereal?: string, precioMin?: number, precioMax?: number) =>
     [...posicionKeys.all, "detalle", cereal ?? "todos", precioMin ?? 50, precioMax ?? 700] as const,
+  descartados: (cereal?: string, precioMin?: number, precioMax?: number) =>
+    [...posicionKeys.all, "descartados", cereal ?? "todos", precioMin ?? 50, precioMax ?? 700] as const,
   campanias: () => [...posicionKeys.all, "campanias"] as const,
 };
 

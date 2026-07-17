@@ -54,6 +54,15 @@ export interface AjusteDto {
   fechaAlta: string;
 }
 
+/** Alerta: contratos con precio anómalo (fuera de rango) que la posición no cuenta (espeja DescartadoDto). */
+export interface DescartadoDto {
+  campania: string;
+  cereal: string;
+  lado: "compra" | "venta";
+  contratos: number;
+  tn: number;
+}
+
 /** Payload de alta/edición (espeja AjusteRequest del backend). */
 export interface AjusteInput {
   campania: string;
