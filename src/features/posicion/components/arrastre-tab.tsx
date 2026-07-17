@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { useConfig, useGuardarConfig } from "@/features/config/queries/use-config";
 import { ErrorState } from "@/shared/components/error-state";
-import { numero } from "@/shared/format/format";
+import { numero, usd } from "@/shared/format/format";
 import { desdeConfig, haciaConfig } from "../campania-format";
 import { useArrastresIniciales, useGuardarArrastre, type ArrastreOp } from "../queries/use-arrastres";
 import { CEREALES } from "../types";
@@ -112,7 +112,16 @@ export function ArrastreTab({ puedeGestionar, puedeConfig, campanias }: {
                       const a = celda(camp, cer);
                       return (
                         <td key={cer} className="tabular py-2 pr-3 text-right text-ink">
-                          {a ? `${a.signo}${numero(a.tn)}` : <span className="text-ink-soft">—</span>}
+                          {a ? (
+                            <>
+                              <div>{`${a.signo}${numero(a.tn)}`}</div>
+                              {a.precioUsd != null && (
+                                <div className="text-xs font-normal text-ink-soft">{usd(a.precioUsd)}</div>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-ink-soft">—</span>
+                          )}
                         </td>
                       );
                     })}

@@ -6,6 +6,13 @@ import { Select } from "@/components/ui/select";
 import { CEREALES, type AjusteDto, type SignoAjuste } from "../types";
 import { calcularOps, type ArrastreOp, type CeldaArrastre } from "../queries/use-arrastres";
 
+/** El arrastre lleva toneladas, signo y su PRECIO promedio (entra al ponderado de la campaña). */
+interface Celda {
+  tn: string;
+  signo: SignoAjuste;
+  precio: string;
+}
+
 interface Props {
   /** Campaña cuando se edita una fila existente; null = fila nueva (se elige de `campaniasDisponibles`). */
   campaniaFija: string | null;
@@ -18,17 +25,22 @@ interface Props {
 
 export function ArrastreForm({ campaniaFija, campaniasDisponibles, existentes, submitting, onSubmit, onCancel }: Props) {
   const [campania, setCampania] = useState(campaniaFija ?? campaniasDisponibles[0] ?? "");
-  const [celdas, setCeldas] = useState<Record<string, { tn: string; signo: SignoAjuste }>>(() => {
-    const init: Record<string, { tn: string; signo: SignoAjuste }> = {};
+  const [celdas, setCeldas] = useState<Record<string, Celda>>(() => {
+    const init: Record<string, Celda> = {};
     for (const cer of CEREALES) {
       const ex = existentes.find((e) => e.cereal === cer);
-      init[cer] = { tn: ex ? String(ex.tn) : "", signo: ex?.signo ?? "+" };
+      init[cer] = {
+        tn: ex ? String(ex.tn) : "",
+        // Por defecto resta (va a ventas): es el caso habitual del arrastre en la planilla del cliente.
+        signo: ex?.signo ?? "-",
+        precio: ex?.precioUsd != null ? String(ex.precioUsd) : "",
+      };
     }
     return init;
   });
   const [error, setError] = useState<string | null>(null);
 
-  const setCelda = (cereal: string, patch: Partial<{ tn: string; signo: SignoAjuste }>) =>
+  const setCelda = (cereal: string, patch: Partial<Celda>) =>
     setCeldas((prev) => ({ ...prev, [cereal]: { ...prev[cereal], ...patch } }));
 
   const submit = async (e: React.FormEvent) => {
@@ -47,9 +59,19 @@ export function ArrastreForm({ campaniaFija, campaniasDisponibles, existentes, s
         setError(`Toneladas inválidas en ${cer}: poné un número ≥ 0 (o dejalo vacío).`);
         return;
       }
+      const p = celdas[cer].precio.trim();
+      if (p !== "" && (!Number.isFinite(Number(p)) || Number(p) < 0)) {
+        setError(`Precio inválido en ${cer}.`);
+        return;
+      }
     }
 
-    const celdasArr: CeldaArrastre[] = CEREALES.map((cer) => ({ cereal: cer, tn: celdas[cer].tn, signo: celdas[cer].signo }));
+    const celdasArr: CeldaArrastre[] = CEREALES.map((cer) => ({
+      cereal: cer,
+      tn: celdas[cer].tn,
+      signo: celdas[cer].signo,
+      precio: celdas[cer].precio,
+    }));
     const ops = calcularOps(existentes, celdasArr);
     await onSubmit(campania, ops);
   };
@@ -79,6 +101,7 @@ export function ArrastreForm({ campaniaFija, campaniasDisponibles, existentes, s
             <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-soft">
               <th className="py-2 pr-2 font-semibold">Cereal</th>
               <th className="py-2 pr-2 font-semibold">Toneladas</th>
+              <th className="py-2 pr-2 font-semibold">Precio USD</th>
               <th className="py-2 font-semibold">Signo</th>
             </tr>
           </thead>
@@ -99,15 +122,28 @@ export function ArrastreForm({ campaniaFija, campaniasDisponibles, existentes, s
                     onChange={(e) => setCelda(cer, { tn: e.target.value })}
                   />
                 </td>
+                <td className="py-1.5 pr-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min={0}
+                    inputMode="decimal"
+                    className="w-28"
+                    placeholder="—"
+                    aria-label={`Precio USD ${cer}`}
+                    value={celdas[cer].precio}
+                    onChange={(e) => setCelda(cer, { precio: e.target.value })}
+                  />
+                </td>
                 <td className="py-1.5">
                   <Select
-                    className="w-28"
+                    className="w-40"
                     aria-label={`Signo ${cer}`}
                     value={celdas[cer].signo}
                     onChange={(e) => setCelda(cer, { signo: e.target.value as SignoAjuste })}
                   >
-                    <option value="+">+ (suma)</option>
-                    <option value="-">− (resta)</option>
+                    <option value="-">− va a ventas</option>
+                    <option value="+">+ va a compras</option>
                   </Select>
                 </td>
               </tr>
@@ -117,8 +153,8 @@ export function ArrastreForm({ campaniaFija, campaniasDisponibles, existentes, s
       </div>
 
       <p className="text-xs text-ink-soft">
-        Dejá una celda vacía (o en 0) para que ese cereal no arrastre. El arrastre de las campañas siguientes se
-        calcula solo.
+        Dejá las toneladas vacías (o en 0) para que ese cereal no arrastre. El <b>precio</b> entra al promedio
+        ponderado de la campaña. El arrastre de las campañas siguientes se calcula solo.
       </p>
 
       {error && <p className="text-sm text-rojo">{error}</p>}
