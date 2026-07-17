@@ -24,7 +24,14 @@ export interface PosicionDto {
   margenTotalUsdTn: number | null;
 }
 
-export type TipoAjuste = "arrastre" | "arrastre_inicial" | "semilla" | "canje" | "produccion_propia";
+export type TipoAjuste =
+  | "arrastre"
+  | "arrastre_inicial"
+  | "semilla"
+  | "canje"
+  | "produccion_propia"
+  | "ganancia_acopio"
+  | "bioceres";
 export type SignoAjuste = "+" | "-";
 
 /** Sub-fila de ajuste agregada por tipo (espeja AjusteAplicadoDto del backend). */
@@ -67,6 +74,8 @@ export const TIPOS_AJUSTE: { value: TipoAjuste; label: string }[] = [
   { value: "semilla", label: "Semilla" },
   { value: "canje", label: "Canje" },
   { value: "produccion_propia", label: "Producción propia" },
+  { value: "ganancia_acopio", label: "Ganancia acopio" },
+  { value: "bioceres", label: "Bioceres" },
 ];
 
 /** Tipos que se cargan en el diálogo de ajustes manuales. El `arrastre` es automático (lo calcula el
