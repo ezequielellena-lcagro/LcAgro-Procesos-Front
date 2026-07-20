@@ -8,11 +8,15 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
-import { CEREALES, TIPOS_AJUSTE_MANUAL, type AjusteDto, type AjusteInput } from "../types";
+import { CEREALES, TIPOS_AJUSTE_MANUAL, type AjusteDto, type AjusteInput, type TipoAjuste } from "../types";
+
+// Los tipos válidos salen de TIPOS_AJUSTE_MANUAL (fuente única). Antes la lista estaba duplicada acá y
+// quedó desincronizada al sumar un tipo nuevo; derivándola, el select y la validación no pueden divergir.
+const TIPOS_MANUAL = TIPOS_AJUSTE_MANUAL.map((t) => t.value) as [TipoAjuste, ...TipoAjuste[]];
 
 const schema = z.object({
   cereal: z.enum(CEREALES),
-  tipo: z.enum(["semilla", "canje", "produccion_propia", "ganancia_acopio", "bioceres"]),
+  tipo: z.enum(TIPOS_MANUAL),
   signo: z.enum(["+", "-"]),
   tn: z.string().min(1, "Ingresá las toneladas.").refine((v) => Number(v) > 0, "Las toneladas deben ser mayores a 0."),
   precioUsd: z.string().refine((v) => v.trim() === "" || Number(v) >= 0, "Precio inválido."),
