@@ -12,7 +12,6 @@ const DevolucionPage = lazy(() => import("@/features/devolucion-publica/pages/de
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/dashboard-page").then((m) => ({ default: m.DashboardPage })));
 const PosicionPage = lazy(() => import("@/features/posicion/pages/posicion-page").then((m) => ({ default: m.PosicionPage })));
 const CuentasPage = lazy(() => import("@/features/cuentas/pages/cuentas-page").then((m) => ({ default: m.CuentasPage })));
-const CuentaContadoPage = lazy(() => import("@/features/cuentas/pages/cuenta-contado-page").then((m) => ({ default: m.CuentaContadoPage })));
 const SemillaPage = lazy(() => import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })));
 const StockPage = lazy(() => import("@/features/stock/pages/stock-insumos-page").then((m) => ({ default: m.StockInsumosPage })));
 const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
@@ -54,10 +53,7 @@ export const router = createBrowserRouter([
           },
           {
             element: <ProtectedRoute roles={["cuentas"]} />,
-            children: [
-              { path: "cuentas", element: <CuentasPage /> },
-              { path: "cuentas/:cuenta/contado", element: <CuentaContadoPage /> },
-            ],
+            children: [{ path: "cuentas", element: <CuentasPage /> }],
           },
           {
             element: <ProtectedRoute roles={["semilla"]} />,

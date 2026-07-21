@@ -1,6 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import { Link, Upload } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,18 +36,15 @@ export function CuentasPage() {
   const [q, setQ] = useState("");
   const [vendNro, setVendNro] = useState<number | "">("");
   const [minUsd, setMinUsd] = useState("50"); // umbral por defecto del proceso
-  const [umbralAvencer, setUmbralAvencer] = useState(7); // días para el semáforo "a vencer" (amarillo)
   const [page, setPage] = useState(1);
   const [tab, setTab] = useState<"lista" | "vendedores">("lista");
   const [editar, setEditar] = useState<CuentaDto | null>(null);
   const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
-  const navigate = useNavigate();
 
   const cuentas = useCuentas({
     q: q || undefined,
     vendNro: vendNro === "" ? undefined : vendNro,
     minUsd: minUsd ? Number(minUsd) : undefined,
-    umbralAvencer,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -63,11 +59,6 @@ export function CuentasPage() {
     e.target.value = ""; // permite re-seleccionar el mismo archivo
     if (file) importar.mutate(file);
   };
-
-  // El detalle de contado es una página propia (no modal). Llevamos la cuenta por router state
-  // (denominación + saldos) y el umbral por query (?av=) para que el link sea compartible.
-  const abrirContado = (c: CuentaDto) =>
-    navigate(`/cuentas/${c.cuenta}/contado?av=${umbralAvencer}`, { state: { cuenta: c } });
 
   const exportColumns: ExportColumn<CuentaDto>[] = [
     { header: "Vendedor", get: (r) => r.vendedor },
@@ -186,18 +177,6 @@ export function CuentasPage() {
             placeholder="0"
           />
         </FilterField>
-        <FilterField label="A vencer (días)">
-          <Input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={90}
-            className="w-24"
-            value={umbralAvencer}
-            onChange={(e) => setUmbralAvencer(Math.max(0, Number(e.target.value) || 0))}
-            placeholder="7"
-          />
-        </FilterField>
       </FilterBar>
 
       {cuentas.isError ? (
@@ -218,12 +197,7 @@ export function CuentasPage() {
                 <EmptyState mensaje="No hay cuentas con esos filtros." />
               ) : (
                 <div className="space-y-4">
-                  <CuentasTable
-                    filas={cuentas.data.items}
-                    puedeEditar={puedeEditar}
-                    onEditar={setEditar}
-                    onVerFacturas={abrirContado}
-                  />
+                  <CuentasTable filas={cuentas.data.items} puedeEditar={puedeEditar} onEditar={setEditar} />
                   <Pagination
                     page={cuentas.data.page}
                     totalPages={cuentas.data.totalPages}

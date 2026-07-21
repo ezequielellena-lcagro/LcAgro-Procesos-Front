@@ -1,41 +1,20 @@
-import { ChevronRight, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { usd } from "@/shared/format/format";
 import type { CuentaDto } from "../types";
-import { EstadoContadoSemaforo } from "./estado-contado-badge";
 
 export function CuentasTable({
   filas,
   puedeEditar,
   onEditar,
-  onVerFacturas,
 }: {
   filas: CuentaDto[];
   puedeEditar: boolean;
   onEditar: (c: CuentaDto) => void;
-  onVerFacturas: (c: CuentaDto) => void;
 }) {
-  const contadoColumn: Column<CuentaDto> = {
-    key: "contado",
-    header: "Contado",
-    align: "center",
-    cell: (r) => (
-      <button
-        type="button"
-        onClick={() => onVerFacturas(r)}
-        className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-ink-soft hover:bg-panel-soft hover:text-ink"
-        aria-label={`Ver facturas de contado de la cuenta ${r.cuenta}`}
-        title="Ver facturas de contado"
-      >
-        <EstadoContadoSemaforo estado={r.estadoContado} />
-        <ChevronRight className="size-3.5" />
-      </button>
-    ),
-  };
-
-  const base: Column<CuentaDto>[] = [
+  const columns: Column<CuentaDto>[] = [
     {
       key: "vendedor",
       header: "Vendedor",
@@ -95,9 +74,6 @@ export function CuentasTable({
         ),
     },
   ];
-
-  // "Contado" va siempre al final (última columna de datos, antes del botón de editar).
-  const columns: Column<CuentaDto>[] = [...base, contadoColumn];
 
   if (puedeEditar) {
     columns.push({
