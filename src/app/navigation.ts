@@ -73,6 +73,13 @@ export const NAV: Area[] = [
         to: "/cuentas",
         roles: ["cuentas"],
       },
+      {
+        kind: "activo",
+        label: "Proyección de Deuda a Proveedores USD",
+        title: "Proyección de Deuda a Proveedores USD",
+        to: "/proveedores",
+        roles: ["proveedores"],
+      },
       { kind: "futuro", label: "Conciliación de bancos" },
       { kind: "futuro", label: "Proyección de cash flow" },
     ],

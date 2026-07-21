@@ -3,11 +3,11 @@ import type { ActualizarUsuarioInput, CrearUsuarioInput, UsuarioDto } from "@/fe
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
-const ROLES = ["dashboard", "posicion", "cuentas", "semilla", "stock", "usuarios", "config", "auditoria"];
+const ROLES = ["dashboard", "posicion", "cuentas", "proveedores", "semilla", "stock", "usuarios", "config", "auditoria"];
 
 let seq = 4;
 const USUARIOS: UsuarioDto[] = [
-  { id: 1, nombre: "Admin Demo", email: "admin@lcagro.local", activo: true, roles: ["dashboard", "posicion", "cuentas", "semilla", "stock", "usuarios", "config", "auditoria"], fechaAlta: "2026-01-15T10:00:00Z" },
+  { id: 1, nombre: "Admin Demo", email: "admin@lcagro.local", activo: true, roles: ["dashboard", "posicion", "cuentas", "proveedores", "semilla", "stock", "usuarios", "config", "auditoria"], fechaAlta: "2026-01-15T10:00:00Z" },
   { id: 2, nombre: "Operador Acopio", email: "operador@lcagro.local", activo: true, roles: ["dashboard", "posicion", "semilla", "stock"], fechaAlta: "2026-02-03T09:30:00Z" },
   { id: 3, nombre: "Cobranzas Demo", email: "cobranzas@lcagro.local", activo: true, roles: ["dashboard", "cuentas"], fechaAlta: "2026-02-20T14:10:00Z" },
   { id: 4, nombre: "Solo Lectura", email: "lectura@lcagro.local", activo: true, roles: ["dashboard"], fechaAlta: "2026-03-01T08:00:00Z" },

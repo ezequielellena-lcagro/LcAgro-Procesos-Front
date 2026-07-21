@@ -6,6 +6,7 @@ export type RolNombre =
   | "dashboard"
   | "posicion"
   | "cuentas"
+  | "proveedores"
   | "semilla"
   | "stock"
   | "comisiones"
@@ -18,6 +19,7 @@ export const ETIQUETA_PANTALLA: Record<RolNombre, string> = {
   dashboard: "Dashboard",
   posicion: "Posición de Cereal",
   cuentas: "Cuentas Corrientes USD",
+  proveedores: "Proyección de Deuda a Proveedores USD",
   semilla: "Semilla Fiscalizada",
   stock: "Stock de Insumos",
   comisiones: "Liquidación de Comisiones",

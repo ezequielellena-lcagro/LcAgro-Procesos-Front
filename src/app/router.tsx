@@ -12,6 +12,7 @@ const DevolucionPage = lazy(() => import("@/features/devolucion-publica/pages/de
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/dashboard-page").then((m) => ({ default: m.DashboardPage })));
 const PosicionPage = lazy(() => import("@/features/posicion/pages/posicion-page").then((m) => ({ default: m.PosicionPage })));
 const CuentasPage = lazy(() => import("@/features/cuentas/pages/cuentas-page").then((m) => ({ default: m.CuentasPage })));
+const ProveedoresPage = lazy(() => import("@/features/proveedores/pages/proveedores-page").then((m) => ({ default: m.ProveedoresPage })));
 const SemillaPage = lazy(() => import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })));
 const StockPage = lazy(() => import("@/features/stock/pages/stock-insumos-page").then((m) => ({ default: m.StockInsumosPage })));
 const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
@@ -54,6 +55,10 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={["cuentas"]} />,
             children: [{ path: "cuentas", element: <CuentasPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["proveedores"]} />,
+            children: [{ path: "proveedores", element: <ProveedoresPage /> }],
           },
           {
             element: <ProtectedRoute roles={["semilla"]} />,
