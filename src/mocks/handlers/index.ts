@@ -6,6 +6,7 @@ import { cuentasHandlers } from "./cuentas";
 import { dashboardHandlers } from "./dashboard";
 import { devolucionHandlers } from "./devolucion";
 import { posicionHandlers } from "./posicion";
+import { proveedoresHandlers } from "./proveedores";
 import { semillaHandlers } from "./semilla";
 import { stockHandlers } from "./stock";
 import { usuariosHandlers } from "./usuarios";
@@ -15,6 +16,7 @@ export const handlers = [
   ...dashboardHandlers,
   ...posicionHandlers,
   ...cuentasHandlers,
+  ...proveedoresHandlers,
   ...devolucionHandlers,
   ...semillaHandlers,
   ...stockHandlers,
