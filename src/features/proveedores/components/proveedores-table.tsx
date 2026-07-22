@@ -3,9 +3,6 @@ import { DataTable, type Column } from "@/shared/components/data-table";
 import { usd } from "@/shared/format/format";
 import type { ProveedorDto, TotalesProveedores, TramoDto } from "../types";
 
-/** Se repite en encabezado y celdas para que nadie sume el memo con los tramos. */
-const MEMO_HINT = "Memo informativo: ya está contenido en el primer tramo, no suma al saldo total.";
-
 /**
  * Calendario de pagos por proveedor. Los encabezados de los tramos son DINÁMICOS: salen de
  * `tramos` (que el backend recalcula con el mes base), nunca de constantes del front; así al mes
@@ -54,15 +51,14 @@ export function ProveedoresTable({
     },
     {
       key: "yaVencido",
-      // Fuera de la suma: borde y fondo propios lo separan visualmente de las ventanas.
-      header: <span title={MEMO_HINT}>Ya vencido</span>,
+      // Fuera de la suma: el "(memo)" viaja en el encabezado —y por lo tanto también al papel—
+      // porque un title no se ve impreso, ni en touch, ni con teclado. El borde y el fondo propios
+      // lo separan además visualmente de las ventanas.
+      header: "Ya vencido (memo)",
       align: "right",
       className: "whitespace-nowrap border-l border-line bg-panel-soft/50 italic",
       cell: (r) => (
-        <span
-          className={cn("text-ink-soft", r.yaVencido > 0 && "font-medium text-rojo")}
-          title={MEMO_HINT}
-        >
+        <span className={cn("text-ink-soft", r.yaVencido > 0 && "font-medium text-rojo")}>
           {usd(r.yaVencido)}
         </span>
       ),
@@ -79,12 +75,20 @@ export function ProveedoresTable({
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      rows={filas}
-      getRowKey={(r) => r.numero}
-      empty="No hay proveedores con esos filtros."
-      footer={footer}
-    />
+    <div className="space-y-2">
+      <DataTable
+        columns={columns}
+        rows={filas}
+        getRowKey={(r) => r.numero}
+        empty="No hay proveedores con esos filtros."
+        footer={footer}
+      />
+      {/* Sin `no-print`: es la aclaración contable del informe y tiene que salir impresa. */}
+      <p className="px-1 text-xs text-ink-soft">
+        Las ventanas de vencimiento no se pisan: los {tramos.length} tramos suman el saldo total.
+        «Ya vencido» es un memo al cierre del mes base, ya está contenido en el primer tramo y no
+        suma.
+      </p>
+    </div>
   );
 }

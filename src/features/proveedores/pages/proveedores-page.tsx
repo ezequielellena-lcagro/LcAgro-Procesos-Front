@@ -23,22 +23,28 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 const HOY = new Date();
 
 /**
+ * El año es un combo y no un input libre a propósito: escribiendo, cada tecla deja un año a medio
+ * tipear ("202", "20", "2") que es un estado válido para React pero inválido para el backend
+ * (acepta 2020-2100) y dispara una consulta real por pulsación. Con un combo no existe el estado
+ * intermedio. Rango: el año en curso ±2, que cubre revisar el cierre anterior y proyectar.
+ */
+const ANIOS = Array.from({ length: 5 }, (_, i) => HOY.getFullYear() - 2 + i);
+
+/**
  * Proyección de deuda a proveedores (USD). El único parámetro temporal es el MES BASE: de ahí el
  * backend deriva la fecha base y los horizontes, así "a 6 meses" siempre es a 6 meses desde donde
  * estás parado. La pantalla es 100 % informativa: no edita nada.
  */
 export function ProveedoresPage() {
-  const [anio, setAnio] = useState(String(HOY.getFullYear()));
+  const [anio, setAnio] = useState(HOY.getFullYear());
   const [mes, setMes] = useState(HOY.getMonth() + 1);
   const [proveedor, setProveedor] = useState<number | "">("");
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
 
-  const anioNum = Number(anio) || HOY.getFullYear();
-
   const catalogo = useCatalogoProveedores();
   const proveedores = useProveedores({
-    anio: anioNum,
+    anio,
     mes,
     proveedor: proveedor === "" ? undefined : proveedor,
     q: q || undefined,
@@ -48,7 +54,7 @@ export function ProveedoresPage() {
   const exportar = useExportarProveedores();
 
   // Todo cambio de filtro vuelve a la página 1: si no, se queda en una página que ya no existe.
-  const cambiarMesBase = (nuevoAnio: string, nuevoMes: number) => {
+  const cambiarMesBase = (nuevoAnio: number, nuevoMes: number) => {
     setAnio(nuevoAnio);
     setMes(nuevoMes);
     setPage(1);
@@ -56,7 +62,7 @@ export function ProveedoresPage() {
 
   const exportarExcel = () => {
     exportar.mutate({
-      anio: anioNum,
+      anio,
       mes,
       proveedor: proveedor === "" ? undefined : proveedor,
       q: q || undefined,
@@ -88,13 +94,13 @@ export function ProveedoresPage() {
           </Select>
         </FilterField>
         <FilterField label="Año">
-          <Input
-            type="number"
-            inputMode="numeric"
-            className="w-24"
-            value={anio}
-            onChange={(e) => cambiarMesBase(e.target.value, mes)}
-          />
+          <Select value={anio} onChange={(e) => cambiarMesBase(Number(e.target.value), mes)}>
+            {ANIOS.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </Select>
         </FilterField>
         <FilterField label="Proveedor">
           <Select

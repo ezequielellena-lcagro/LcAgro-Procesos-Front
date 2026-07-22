@@ -13,19 +13,25 @@ const TRAMOS: TramoDto[] = [
   { etiqueta: "Posterior a 31-01-2027", desde: "2027-01-31", hasta: null },
 ];
 
+// `montos` viene con MENOS elementos que `tramos` a propósito: el último tramo no tiene deuda y
+// el backend podría no mandarlo. La tabla igual tiene que dibujar la columna (en 0), porque las
+// columnas las manda `tramos`. Si alguien iterara `montos` para armar la fila, faltaría una celda.
 const FILA: ProveedorDto = {
   numero: 10010,
   denominacion: "Agroquímica del Litoral S.A.",
-  montos: [100, 200, 300, 400, 0],
+  montos: [100, 200, 300, 400],
   saldoTotal: 1000, // invariante del backend: Σ montos = saldoTotal
   yaVencido: -50, // memo: NO suma
 };
 
+// A propósito NO coincide con la suma de `filas`: la página muestra 1 proveedor de 1.000, pero el
+// set filtrado son 87 proveedores por 87.000. Es el escenario real (pageSize 50) y es lo único que
+// distingue "totales del backend" de "sumar la página".
 const TOTALES: TotalesProveedores = {
-  montos: [100, 200, 300, 400, 0],
-  saldoTotal: 1000,
-  yaVencido: -50,
-  proveedores: 1,
+  montos: [12000, 25000, 30000, 15000, 5000],
+  saldoTotal: 87000,
+  yaVencido: -1500,
+  proveedores: 87,
 };
 
 describe("ProveedoresTable", () => {
@@ -49,7 +55,7 @@ describe("ProveedoresTable", () => {
       usd(200),
       usd(300),
       usd(400),
-      usd(0),
+      usd(0), // tramo sin dato: la columna existe igual
       usd(1000),
       usd(-50),
     ]);
@@ -61,9 +67,12 @@ describe("ProveedoresTable", () => {
     const pie = within(filas[filas.length - 1])
       .getAllByRole("cell")
       .map((c) => c.textContent);
-    expect(pie[1]).toBe("TOTAL (1 proveedor)");
-    expect(pie.slice(2, 7)).toEqual([usd(100), usd(200), usd(300), usd(400), usd(0)]);
-    expect(pie[7]).toBe(usd(1000));
+    expect(pie[1]).toBe("TOTAL (87 proveedores)");
+    expect(pie.slice(2, 7)).toEqual(TOTALES.montos.map(usd));
+    expect(pie[7]).toBe(usd(87000));
+    expect(pie[8]).toBe(usd(-1500));
+    // Y explícitamente: nada del pie sale de la fila que se está mostrando.
+    expect(pie).not.toContain(usd(1000));
   });
 
   // Blindaje del contrato: la cantidad de tramos la decide el BACKEND (hoy 5, mañana las que sean).
@@ -77,10 +86,10 @@ describe("ProveedoresTable", () => {
     ];
     const fila: ProveedorDto = { ...FILA, montos: [11, 22, 33], saldoTotal: 66 };
     const totales: TotalesProveedores = {
-      montos: [11, 22, 33],
-      saldoTotal: 66,
-      yaVencido: -50,
-      proveedores: 1,
+      montos: [4000, 5000, 6000],
+      saldoTotal: 15000,
+      yaVencido: -300,
+      proveedores: 12,
     };
 
     render(<ProveedoresTable filas={[fila]} tramos={tresTramos} totales={totales} />);
@@ -91,7 +100,7 @@ describe("ProveedoresTable", () => {
       "Proveedor",
       ...tresTramos.map((t) => t.etiqueta),
       "Saldo total",
-      "Ya vencido",
+      "Ya vencido (memo)",
     ]);
 
     const celdas = within(screen.getAllByRole("row")[1])
@@ -114,9 +123,14 @@ describe("ProveedoresTable", () => {
       desde: i === 0 ? null : `2026-0${i + 2}-01`,
       hasta: i === 6 ? null : `2026-0${i + 2}-28`,
     }));
-    const montos = [1, 2, 3, 4, 5, 6, 7];
-    const fila: ProveedorDto = { ...FILA, montos, saldoTotal: 28 };
-    const totales: TotalesProveedores = { montos, saldoTotal: 28, yaVencido: 0, proveedores: 2 };
+    const fila: ProveedorDto = { ...FILA, montos: [1, 2, 3, 4, 5, 6, 7], saldoTotal: 28 };
+    const montosTotales = [10, 20, 30, 40, 50, 60, 70];
+    const totales: TotalesProveedores = {
+      montos: montosTotales,
+      saldoTotal: 280,
+      yaVencido: 0,
+      proveedores: 2,
+    };
 
     render(<ProveedoresTable filas={[fila]} tramos={sieteTramos} totales={totales} />);
 
@@ -129,13 +143,16 @@ describe("ProveedoresTable", () => {
       .map((c) => c.textContent);
     expect(pie).toHaveLength(11); // el pie es posicional: nunca puede desalinearse de las columnas
     expect(pie[1]).toBe("TOTAL (2 proveedores)");
-    expect(pie.slice(2, 9)).toEqual(montos.map(usd));
-    expect(pie[9]).toBe(usd(28));
+    expect(pie.slice(2, 9)).toEqual(montosTotales.map(usd));
+    expect(pie[9]).toBe(usd(280));
   });
 
-  it("aclara que 'ya vencido' es un memo y no suma con los tramos", () => {
+  it("aclara —en pantalla y en el papel— que 'ya vencido' es un memo y no suma", () => {
     render(<ProveedoresTable filas={[FILA]} tramos={TRAMOS} totales={TOTALES} />);
-    const memo = screen.getByRole("columnheader", { name: /Ya vencido/ });
-    expect(within(memo).getByTitle(/no suma/i)).toBeInTheDocument();
+    // Visible, no en un title: el title no se ve al imprimir ni en touch, y esta pantalla se imprime.
+    expect(screen.getByRole("columnheader", { name: "Ya vencido (memo)" })).toBeInTheDocument();
+    const nota = screen.getByText(/no suma/i);
+    expect(nota).toBeVisible();
+    expect(nota).not.toHaveClass("no-print");
   });
 });
