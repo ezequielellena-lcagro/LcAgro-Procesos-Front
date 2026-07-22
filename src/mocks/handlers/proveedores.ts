@@ -71,23 +71,33 @@ interface ProveedorDemo {
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-// Proveedores de insumo FICTICIOS (nunca razones sociales ni saldos reales del cliente).
+/**
+ * Numeración deliberadamente SINTÉTICA (90xxx). Las cuentas de proveedor reales de MacroGest son
+ * 10xxx, así que ningún número de esta demo puede mapearse a un proveedor del cliente ni volver
+ * reversible el seudónimo: la razón social inventada tiene que ser un callejón sin salida, no una
+ * etiqueta pegada encima de una cuenta real.
+ */
+const PRIMER_NUMERO_CURADO = 90001;
+const PRIMER_NUMERO_GENERADO = 90101;
+
+// Proveedores de insumo FICTICIOS (nunca razones sociales, cuentas ni saldos reales del cliente:
+// los importes de acá son inventados, NO salen de ninguna consulta validada contra la base).
 // Estos 12 son casos elegidos a mano: ceros en distintas ventanas, deuda sólo al final, "ya vencido"
 // positivo, en cero y negativo (anticipos / notas de crédito).
 const CURADOS: ProveedorDemo[] = [
-  { numero: 10010, denominacion: "Agroquímica del Litoral S.A.", montos: [50116.86, 36583.31, 80856.15, 88430.76, 0], yaVencido: -68064.95 },
-  { numero: 10023, denominacion: "Fertilizantes Pampeanos SRL", montos: [120400.5, 44200, 0, 18900.25, 7500], yaVencido: 22100.4 },
-  { numero: 10031, denominacion: "Semillas del Centro S.A.", montos: [0, 98750.4, 32100, 12000, 0], yaVencido: 0 },
-  { numero: 10044, denominacion: "Nutrientes del Sur S.A.", montos: [18250.75, 0, 41300.6, 0, 25600], yaVencido: 9800.15 },
-  { numero: 10056, denominacion: "Protección Vegetal Argentina SRL", montos: [76900, 51230.4, 19870.9, 30400, 11200.55], yaVencido: -14320.8 },
-  { numero: 10062, denominacion: "Insumos Don Bosco SRL", montos: [9400.3, 12800, 0, 0, 0], yaVencido: 3100.2 },
-  { numero: 10078, denominacion: "Distribuidora Agro Litoral S.A.", montos: [33500, 27400.6, 15900, 42800.4, 0], yaVencido: 12750 },
-  { numero: 10085, denominacion: "Cereales y Servicios del Oeste SRL", montos: [0, 0, 64300.25, 21500, 38900], yaVencido: 0 },
-  { numero: 10097, denominacion: "Bioinsumos Río Cuarto S.A.", montos: [14200.9, 8600, 5400.35, 0, 0], yaVencido: -2400.5 },
-  { numero: 10103, denominacion: "Maquinaria y Repuestos La Estrella SRL", montos: [42800, 0, 0, 16750.8, 9300], yaVencido: 18400.6 },
-  { numero: 10118, denominacion: "Lubricantes y Combustibles Aurora S.A.", montos: [61300.45, 33900, 27600, 0, 4800.2], yaVencido: 25100.9 },
-  { numero: 10126, denominacion: "Envases y Bolsas del Plata SRL", montos: [7800, 4200.75, 0, 3100, 0], yaVencido: 1900.35 },
-];
+  { denominacion: "Agroquímica del Litoral S.A.", montos: [64250.4, 22180.75, 51900, 73640.2, 0], yaVencido: -35400.6 },
+  { denominacion: "Fertilizantes Pampeanos SRL", montos: [120400.5, 44200, 0, 18900.25, 7500], yaVencido: 22100.4 },
+  { denominacion: "Semillas del Centro S.A.", montos: [0, 98750.4, 32100, 12000, 0], yaVencido: 0 },
+  { denominacion: "Nutrientes del Sur S.A.", montos: [18250.75, 0, 41300.6, 0, 25600], yaVencido: 9800.15 },
+  { denominacion: "Protección Vegetal Argentina SRL", montos: [76900, 51230.4, 19870.9, 30400, 11200.55], yaVencido: -14320.8 },
+  { denominacion: "Insumos Don Bosco SRL", montos: [9400.3, 12800, 0, 0, 0], yaVencido: 3100.2 },
+  { denominacion: "Distribuidora Agro Litoral S.A.", montos: [33500, 27400.6, 15900, 42800.4, 0], yaVencido: 12750 },
+  { denominacion: "Cereales y Servicios del Oeste SRL", montos: [0, 0, 64300.25, 21500, 38900], yaVencido: 0 },
+  { denominacion: "Bioinsumos Río Cuarto S.A.", montos: [14200.9, 8600, 5400.35, 0, 0], yaVencido: -2400.5 },
+  { denominacion: "Maquinaria y Repuestos La Estrella SRL", montos: [42800, 0, 0, 16750.8, 9300], yaVencido: 18400.6 },
+  { denominacion: "Lubricantes y Combustibles Aurora S.A.", montos: [61300.45, 33900, 27600, 0, 4800.2], yaVencido: 25100.9 },
+  { denominacion: "Envases y Bolsas del Plata SRL", montos: [7800, 4200.75, 0, 3100, 0], yaVencido: 1900.35 },
+].map((p, i) => ({ ...p, numero: PRIMER_NUMERO_CURADO + i }));
 
 // Relleno, también FICTICIO: con sólo 12 filas la demo nunca pasaría de la página 1 (pageSize 50) y
 // no se podría probar el paginador. Los importes se generan (ver `demoGenerada`), los nombres no.
@@ -140,8 +150,6 @@ const NOMBRES_GENERADOS = [
   "Catering y Comedor Rural El Fogón SRL",
 ];
 
-const PRIMER_NUMERO_GENERADO = 10140;
-
 /**
  * PRNG determinista (xorshift32) sembrado con el número de proveedor: los importes de la demo son
  * inventados pero SIEMPRE los mismos, así una captura de pantalla o un Excel exportado se pueden
@@ -173,7 +181,7 @@ function memoYaVencido(primerTramo: number, siguiente: () => number): number {
 
 function demoGenerada(): ProveedorDemo[] {
   return NOMBRES_GENERADOS.map((denominacion, i) => {
-    const numero = PRIMER_NUMERO_GENERADO + i * 6;
+    const numero = PRIMER_NUMERO_GENERADO + i * 3;
     const siguiente = generador(numero);
     const montos = Array.from({ length: CANT_TRAMOS }, () => {
       const hayDeuda = siguiente() >= 0.28; // ~1 de cada 4 ventanas queda vacía

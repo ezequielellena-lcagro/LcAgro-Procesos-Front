@@ -17,7 +17,7 @@ const TRAMOS: TramoDto[] = [
 // el backend podría no mandarlo. La tabla igual tiene que dibujar la columna (en 0), porque las
 // columnas las manda `tramos`. Si alguien iterara `montos` para armar la fila, faltaría una celda.
 const FILA: ProveedorDto = {
-  numero: 10010,
+  numero: 90001,
   denominacion: "Agroquímica del Litoral S.A.",
   montos: [100, 200, 300, 400],
   saldoTotal: 1000, // invariante del backend: Σ montos = saldoTotal
@@ -49,7 +49,7 @@ describe("ProveedoresTable", () => {
       .getAllByRole("cell")
       .map((c) => c.textContent);
     expect(celdas).toEqual([
-      "10010",
+      "90001",
       "Agroquímica del Litoral S.A.",
       usd(100),
       usd(200),
@@ -107,7 +107,7 @@ describe("ProveedoresTable", () => {
       .getAllByRole("cell")
       .map((c) => c.textContent);
     expect(celdas).toEqual([
-      "10010",
+      "90001",
       "Agroquímica del Litoral S.A.",
       usd(11),
       usd(22),
