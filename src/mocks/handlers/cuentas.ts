@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { CuentaDto } from "@/features/cuentas/types";
+import type { CuentaDto, CuentaMora, FacturaMora, VendedorMora } from "@/features/cuentas/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -51,6 +51,123 @@ function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
   return out;
 }
 
+// ── Facturas en mora ────────────────────────────────────────────────────────────
+// Facturas de contado ficticias colgadas de las CUENTAS de arriba (nunca PII real).
+// A propósito hay dos cuentas (2044 y 3088) cuya mora supera el saldo global: es el caso
+// "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura.
+type FacturaMoraBase = Pick<FacturaMora, "comprobante" | "emision" | "vencimiento" | "importe" | "pendiente">;
+
+const FACTURAS_MORA: Record<number, FacturaMoraBase[]> = {
+  1024: [
+    { comprobante: "A-18402", emision: "2025-11-12", vencimiento: "2025-12-12", importe: 8200, pendiente: 4100 },
+    { comprobante: "A-18877", emision: "2026-01-20", vencimiento: "2026-02-19", importe: 3150.4, pendiente: 3150.4 },
+  ],
+  1090: [
+    { comprobante: "A-19110", emision: "2026-02-03", vencimiento: "2026-02-18", importe: 1420, pendiente: 620 },
+  ],
+  2011: [
+    { comprobante: "A-17650", emision: "2025-08-05", vencimiento: "2025-09-04", importe: 12500, pendiente: 9800 },
+    { comprobante: "A-18033", emision: "2025-09-30", vencimiento: "2025-10-30", importe: 6400, pendiente: 6400 },
+    { comprobante: "A-19540", emision: "2026-03-11", vencimiento: "2026-04-10", importe: 4300.25, pendiente: 1200.25 },
+  ],
+  // Saldo global 980 contra 5.400 de mora: pagó por canje sin imputar.
+  2044: [
+    { comprobante: "A-16988", emision: "2025-06-18", vencimiento: "2025-07-18", importe: 5400, pendiente: 5400 },
+  ],
+  2099: [
+    { comprobante: "A-19022", emision: "2026-01-08", vencimiento: "2026-01-23", importe: 2750, pendiente: 2750 },
+  ],
+  3051: [
+    { comprobante: "A-18190", emision: "2025-10-02", vencimiento: "2025-11-01", importe: 15000, pendiente: 7500 },
+    { comprobante: "A-19301", emision: "2026-02-14", vencimiento: "2026-03-16", importe: 9200, pendiente: 9200 },
+  ],
+  // Saldo global 540,60 contra 2.100 de mora: mismo caso que 2044.
+  3088: [
+    { comprobante: "A-17420", emision: "2025-07-22", vencimiento: "2025-08-21", importe: 2100, pendiente: 2100 },
+  ],
+};
+
+const DIA_MS = 86_400_000;
+
+/** Parsea yyyy-MM-dd como fecha LOCAL (evita el corrimiento de un día por timezone). */
+function aFechaLocal(iso: string): Date {
+  const [a, m, d] = iso.split("-").map(Number);
+  return new Date(a, m - 1, d);
+}
+
+const isoLocal = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+const diasEntre = (desde: string, hasta: string) =>
+  Math.round((aFechaLocal(hasta).getTime() - aFechaLocal(desde).getTime()) / DIA_MS);
+
+/** Arma el árbol vendedor → cuenta → factura con el mismo orden que el backend real. */
+function armarMora(u: URL) {
+  const vendNroParam = u.searchParams.get("vendNro");
+  const vendNro = vendNroParam ? Number(vendNroParam) : null;
+  // El umbral se aplica sobre la mora de la cuenta (es de lo que habla esta solapa), NO sobre su saldo
+  // global. Ausente o 0 → 50, igual que UmbralPorDefecto del backend.
+  const umbral = Number(u.searchParams.get("minUsd") ?? "50") || 50;
+  const corte = isoLocal(new Date());
+
+  const porVend = new Map<number, VendedorMora>();
+
+  for (const c of CUENTAS) {
+    const base = FACTURAS_MORA[c.cuenta];
+    if (!base) continue;
+    if (vendNro !== null && c.vendNro !== vendNro) continue;
+
+    const facturas: FacturaMora[] = base
+      .map((f) => ({
+        ...f,
+        plazoDias: diasEntre(f.emision, f.vencimiento),
+        diasAtraso: diasEntre(f.vencimiento, corte),
+      }))
+      .sort((a, b) => a.vencimiento.localeCompare(b.vencimiento));
+
+    const monto = facturas.reduce((s, f) => s + f.pendiente, 0);
+    if (monto < umbral) continue;
+
+    const cuenta: CuentaMora = {
+      cuenta: c.cuenta,
+      denominacion: c.denominacion,
+      saldoVencido: c.saldoVencido,
+      saldoAVencer: c.saldoAVencer,
+      saldo: c.saldo,
+      monto,
+      facturas,
+    };
+
+    const v = porVend.get(c.vendNro) ?? {
+      vendNro: c.vendNro,
+      vendedor: c.vendedor,
+      cuentas: 0,
+      facturas: 0,
+      monto: 0,
+      detalle: [],
+    };
+    v.cuentas += 1;
+    v.facturas += facturas.length;
+    v.monto += monto;
+    v.detalle.push(cuenta);
+    porVend.set(c.vendNro, v);
+  }
+
+  const vendedores = [...porVend.values()].sort((a, b) => a.vendedor.localeCompare(b.vendedor));
+  for (const v of vendedores) v.detalle.sort((a, b) => b.monto - a.monto);
+
+  return {
+    corte,
+    totales: {
+      vendedores: vendedores.length,
+      cuentas: vendedores.reduce((s, v) => s + v.cuentas, 0),
+      facturas: vendedores.reduce((s, v) => s + v.facturas, 0),
+      monto: vendedores.reduce((s, v) => s + v.monto, 0),
+    },
+    vendedores,
+  };
+}
+
 export const cuentasHandlers = [
   http.get(`${API}/cuentas`, ({ request }) => {
     const u = new URL(request.url);
@@ -95,6 +212,10 @@ export const cuentasHandlers = [
       totales,
       subtotales,
     });
+  }),
+
+  http.get(`${API}/cuentas/facturas-en-mora`, ({ request }) => {
+    return HttpResponse.json(armarMora(new URL(request.url)));
   }),
 
   // Export .xlsx (demo): el backend real arma el formato fiel; acá generamos un .xlsx válido
