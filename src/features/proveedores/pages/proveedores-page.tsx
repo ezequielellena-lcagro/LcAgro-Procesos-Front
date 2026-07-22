@@ -9,6 +9,7 @@ import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { Pagination } from "@/shared/components/pagination";
 import { fecha } from "@/shared/format/format";
+import { useDebounce } from "@/shared/hooks/use-debounce";
 import { ProveedoresKpis } from "../components/proveedores-kpis";
 import { ProveedoresSkeleton } from "../components/proveedores-skeleton";
 import { ProveedoresTable } from "../components/proveedores-table";
@@ -42,12 +43,20 @@ export function ProveedoresPage() {
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
 
+  /**
+   * El texto se debouncea antes de entrar al `queryKey`: sin esto cada tecla dispara una agregación
+   * completa sobre `moviprov1` (~34.500 movimientos de la zona) contra la base de producción, y
+   * encima el backend filtra el texto en memoria, así que la consulta no se acota. El input sigue
+   * mostrando lo que se tipea; lo que se retrasa es la consulta.
+   */
+  const qBuscado = useDebounce(q, 300);
+
   const catalogo = useCatalogoProveedores();
   const proveedores = useProveedores({
     anio,
     mes,
     proveedor: proveedor === "" ? undefined : proveedor,
-    q: q || undefined,
+    q: qBuscado || undefined,
     page,
     pageSize: PAGE_SIZE,
   });
@@ -65,7 +74,10 @@ export function ProveedoresPage() {
       anio,
       mes,
       proveedor: proveedor === "" ? undefined : proveedor,
-      q: q || undefined,
+      // El mismo texto debounceado que alimenta la tabla: el archivo tiene que ser exactamente lo
+      // que se está viendo. Con el `q` sin debouncear, exportar dentro de los 300 ms de tipear daría
+      // un Excel filtrado distinto de la pantalla.
+      q: qBuscado || undefined,
     });
   };
 
