@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { estadoFijoDeTab, presetDeTab, TABS_STOCK } from "./tabs";
+import {
+  estadoAplicaEnTab,
+  estadoFijoDeTab,
+  motivoEstadoIgnorado,
+  presetDeTab,
+  TABS_STOCK,
+} from "./tabs";
 
 describe("presetDeTab", () => {
   it("Stock: sin drill-down, ordenado por depósito", () => {
@@ -61,6 +67,36 @@ describe("estadoFijoDeTab", () => {
   it("sale del propio preset: lo que se muestra fijo es exactamente lo que se va a mandar", () => {
     for (const { value } of TABS_STOCK) {
       expect(estadoFijoDeTab(value)).toBe(presetDeTab(value).estado);
+    }
+  });
+});
+
+describe("estadoAplicaEnTab", () => {
+  it("'Por rubro' no usa el estado: se dibuja con porRubro, que el backend calcula sin drill-down", () => {
+    expect(estadoAplicaEnTab("rubro")).toBe(false);
+  });
+
+  it("las solapas que listan items sí lo usan", () => {
+    for (const { value } of TABS_STOCK.filter((t) => t.value !== "rubro")) {
+      expect(estadoAplicaEnTab(value)).toBe(true);
+    }
+  });
+});
+
+describe("motivoEstadoIgnorado", () => {
+  it("explica por qué el control queda deshabilitado en 'Por rubro'", () => {
+    expect(motivoEstadoIgnorado("rubro")).toContain("el estado no la afecta");
+  });
+
+  it("no hay motivo donde el filtro sí hace algo", () => {
+    for (const { value } of TABS_STOCK.filter((t) => t.value !== "rubro")) {
+      expect(motivoEstadoIgnorado(value)).toBeUndefined();
+    }
+  });
+
+  it("hay motivo exactamente donde el estado no aplica", () => {
+    for (const { value } of TABS_STOCK) {
+      expect(motivoEstadoIgnorado(value) === undefined).toBe(estadoAplicaEnTab(value));
     }
   });
 });

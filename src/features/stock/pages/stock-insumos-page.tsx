@@ -18,7 +18,14 @@ import { useStock } from "../queries/use-stock";
 import { useStockExport } from "../queries/use-stock-export";
 import { useStockFiltros } from "../queries/use-stock-filtros";
 import { FILTROS_INICIALES, filtrosAQuery, type FiltrosCompartidos } from "../filtros";
-import { estadoFijoDeTab, presetDeTab, TABS_STOCK, type TabStock } from "../tabs";
+import {
+  estadoAplicaEnTab,
+  estadoFijoDeTab,
+  motivoEstadoIgnorado,
+  presetDeTab,
+  TABS_STOCK,
+  type TabStock,
+} from "../tabs";
 import { filasDeVencimiento } from "../vencimientos";
 import type { StockListado } from "../types";
 
@@ -108,6 +115,7 @@ export function StockInsumosPage() {
         opciones={filtrosOpts.data}
         cargando={filtrosOpts.isPending}
         estadoFijo={estadoFijoDeTab(tab)}
+        estadoIgnorado={motivoEstadoIgnorado(tab)}
       />
 
       {stock.isError ? (
@@ -126,8 +134,13 @@ export function StockInsumosPage() {
             <StockSkeleton />
           ) : (
             <>
-              {/* `totales` sale del set base: los KPIs no cambian al cambiar de solapa. */}
-              <StockKpis tab={tab} totales={stock.data.totales} />
+              {/* `totales` sale del set base: los KPIs no cambian al cambiar de solapa (ni con el
+                  filtro de Estado, que el backend aplica como drill-down: de ahí la leyenda). */}
+              <StockKpis
+                tab={tab}
+                totales={stock.data.totales}
+                estadoFiltrado={filtros.estado !== "" && estadoAplicaEnTab(tab)}
+              />
 
               <TabsContent value="stock" className="space-y-4">
                 <PanelPaginado

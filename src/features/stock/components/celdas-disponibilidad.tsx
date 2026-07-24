@@ -1,6 +1,13 @@
 import { cn } from "@/lib/utils";
 import { numero } from "@/shared/format/format";
-import { comprometido, detalleComprometido, detalleDisponible, haySobreventa } from "../disponibilidad";
+import {
+  coberturaEsOptimista,
+  comprometido,
+  detalleCobertura,
+  detalleComprometido,
+  detalleDisponible,
+  haySobreventa,
+} from "../disponibilidad";
 import type { StockItem } from "../types";
 
 /** Los ceros se apagan para que la vista se lea por lo que SÍ tiene movimiento. */
@@ -49,6 +56,25 @@ export function DisponibleCelda({ item }: { item: StockItem }) {
       title={detalleDisponible(item)}
     >
       {numero(item.totalDisponible)}
+    </span>
+  );
+}
+
+/**
+ * Días de cobertura sobre el DISPONIBLE, que es con lo que el backend clasifica el Estado.
+ * Cuando el físico prometía más días (porque parte del stock ya está vendido) se marca con un
+ * asterisco y el `title` cuenta las dos cifras: si no, la fila mostraría dos señales contradictorias.
+ */
+export function CoberturaCelda({ item }: { item: StockItem }) {
+  const optimista = coberturaEsOptimista(item);
+  return (
+    <span
+      data-testid={`cobertura-${item.deposito}-${item.codigoArticulo}`}
+      className={cn("tabular", optimista && "text-ink-soft")}
+      title={detalleCobertura(item)}
+    >
+      {item.diasCoberturaDisponible ?? "—"}
+      {optimista && <span aria-hidden="true">*</span>}
     </span>
   );
 }

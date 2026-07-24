@@ -1,25 +1,20 @@
 import { Fragment, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { fecha, numero, usd } from "@/shared/format/format";
 import { EstadoBadge } from "./estado-badge";
 import { TipoBadge } from "./tipo-badge";
 import { MinimoBadge } from "./minimo-badge";
 import { VencimientoBadge } from "./vencimiento-badge";
-import { ComprometidoCelda, DisponibleCelda, PorLlegarCelda } from "./celdas-disponibilidad";
+import {
+  ComprometidoCelda,
+  CoberturaCelda,
+  DisponibleCelda,
+  PorLlegarCelda,
+} from "./celdas-disponibilidad";
 import { StockLotes } from "./stock-lotes";
+import { COLUMNAS, ENCABEZADOS, STICKY_CODIGO, STICKY_PRODUCTO } from "./stock-table-columnas";
 import type { StockItem, TipoDeposito } from "../types";
-
-/**
- * Columnas de la tabla (para los `colSpan` de encabezado de grupo y detalle de lotes).
- *
- * Decisión de legibilidad: la disponibilidad son CUATRO números (stock, por llegar, facturado,
- * sin facturar) y la tabla ya venía cargada. Se muestran tres columnas — "Por llegar",
- * "Comprometido" (facturado + sin facturar, con el desglose en el `title`) y "Disponible" — en vez
- * de cuatro: facturado y sin facturar se leen siempre juntos (ambos restan y ninguno se puede
- * vender), mientras que "por llegar" suma y hay que verlo aparte para no confundir un cero de
- * stock con un quiebre. "Disponible" es la columna estrella y va destacada.
- */
-const COLUMNAS = 13;
 
 interface Grupo {
   deposito: number;
@@ -51,6 +46,121 @@ function agruparPorDeposito(filas: StockItem[]): Grupo[] {
   return grupos;
 }
 
+function Encabezados() {
+  return (
+    <thead>
+      <tr className="border-b border-line bg-panel-soft text-xs uppercase tracking-wide text-ink-soft">
+        {ENCABEZADOS.map((h) => (
+          <th
+            key={h.label}
+            title={h.title}
+            className={cn("px-3 py-2 font-semibold", h.className, h.className?.includes("sticky") && "bg-panel-soft")}
+          >
+            {h.label}
+          </th>
+        ))}
+      </tr>
+    </thead>
+  );
+}
+
+/** Renglón de depósito: colapsa/expande sus artículos y muestra el subtotal en USD. */
+function EncabezadoGrupo({
+  grupo,
+  colapsado,
+  onToggle,
+}: {
+  grupo: Grupo;
+  colapsado: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <tr className="border-b border-line bg-panel-soft/70">
+      <td colSpan={COLUMNAS} className="px-3 py-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={!colapsado}
+          className="flex w-full items-center gap-2 text-left font-semibold text-ink"
+        >
+          {colapsado ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
+          Depósito {grupo.deposito} — {grupo.nombre}
+          <TipoBadge tipo={grupo.tipo} />
+          <span className="ml-2 text-xs font-normal text-ink-soft">
+            {grupo.items.length} art. · {usd(grupo.valorUsd)}
+          </span>
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+/** Un artículo en un depósito. Las 13 celdas de la fila, en el orden de `ENCABEZADOS`. */
+function FilaArticulo({
+  fila,
+  expandido,
+  onToggle,
+}: {
+  fila: StockItem;
+  expandido: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <tr className="border-b border-line-soft hover:bg-panel-soft/60">
+      <td className={cn("whitespace-nowrap bg-panel px-3 py-2 tabular", STICKY_CODIGO)}>
+        {fila.lotes.length > 0 ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expandido}
+            className="inline-flex items-center gap-1 text-ink"
+          >
+            {expandido ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {fila.codigoArticulo}
+          </button>
+        ) : (
+          fila.codigoArticulo
+        )}
+      </td>
+      <td className={cn("bg-panel px-3 py-2", STICKY_PRODUCTO)}>
+        <span className="block truncate font-medium text-ink" title={fila.nombreProducto}>
+          {fila.nombreProducto}
+        </span>
+      </td>
+      <td className="px-3 py-2">{fila.rubroDesc}</td>
+      <td className="px-3 py-2">{fila.unidad}</td>
+      <td className="px-3 py-2 text-right tabular">{numero(fila.stockActual)}</td>
+      <td className="px-3 py-2 text-right">
+        <PorLlegarCelda item={fila} />
+      </td>
+      <td className="px-3 py-2 text-right">
+        <ComprometidoCelda item={fila} />
+      </td>
+      <td className="bg-panel-soft/40 px-3 py-2 text-right">
+        <DisponibleCelda item={fila} />
+      </td>
+      <td className="px-3 py-2 text-right tabular">{usd(fila.valorUsd)}</td>
+      <td className="px-3 py-2 text-right">
+        <CoberturaCelda item={fila} />
+      </td>
+      <td className="px-3 py-2 text-right tabular">
+        {fila.bajoMinimo ? <MinimoBadge /> : fila.nivelMinimo > 0 ? numero(fila.nivelMinimo) : null}
+      </td>
+      <td className="px-3 py-2 text-center">
+        <div className="flex flex-col items-center gap-0.5">
+          <VencimientoBadge estado={fila.estadoVenc} />
+          {fila.proximoVencimiento && (
+            <span className="text-xs text-ink-soft">{fecha(fila.proximoVencimiento)}</span>
+          )}
+        </div>
+      </td>
+      <td className="px-3 py-2 text-center">
+        <EstadoBadge estado={fila.estado} />
+      </td>
+    </tr>
+  );
+}
+
 export function StockTable({ filas }: { filas: StockItem[] }) {
   const [colapsados, setColapsados] = useState<Set<number>>(new Set());
   const toggle = (deposito: number) =>
@@ -73,112 +183,24 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
   const grupos = agruparPorDeposito(filas);
 
   return (
-    <div className="overflow-x-auto rounded-card border border-line bg-panel shadow-card">
+    // `print:overflow-visible`: al imprimir/guardar como PDF el scroll no existe y el recorte se
+    // comería la cola de columnas sin ningún aviso.
+    <div className="overflow-x-auto rounded-card border border-line bg-panel shadow-card print:overflow-visible">
       <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-line bg-panel-soft text-xs uppercase tracking-wide text-ink-soft">
-            <th className="px-3 py-2 text-left font-semibold">Código</th>
-            <th className="px-3 py-2 text-left font-semibold">Producto</th>
-            <th className="px-3 py-2 text-left font-semibold">Rubro</th>
-            <th className="px-3 py-2 text-left font-semibold">Un.</th>
-            <th className="px-3 py-2 text-right font-semibold">Stock</th>
-            <th className="px-3 py-2 text-right font-semibold" title="Pedidos de compra pendientes de ingreso.">
-              Por llegar
-            </th>
-            <th className="px-3 py-2 text-right font-semibold" title="Vendido y todavía en el galpón: facturado + sin facturar.">
-              Comprom.
-            </th>
-            <th
-              className="whitespace-nowrap bg-panel px-3 py-2 text-right font-semibold text-ink"
-              title="Stock + por llegar − comprometido. En rojo cuando es negativo (sobreventa)."
-            >
-              Disponible
-            </th>
-            <th className="px-3 py-2 text-right font-semibold">Valor USD</th>
-            <th className="px-3 py-2 text-right font-semibold">Días cob.</th>
-            <th className="px-3 py-2 text-right font-semibold">Mínimo</th>
-            <th className="px-3 py-2 text-center font-semibold">Vence</th>
-            <th className="px-3 py-2 text-center font-semibold">Estado</th>
-          </tr>
-        </thead>
+        <Encabezados />
         <tbody>
           {grupos.map((g) => {
             const colapsado = colapsados.has(g.deposito);
             return (
               <Fragment key={g.deposito}>
-                <tr className="border-b border-line bg-panel-soft/70">
-                  <td colSpan={COLUMNAS} className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => toggle(g.deposito)}
-                      aria-expanded={!colapsado}
-                      className="flex w-full items-center gap-2 text-left font-semibold text-ink"
-                    >
-                      {colapsado ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
-                      Depósito {g.deposito} — {g.nombre}
-                      <TipoBadge tipo={g.tipo} />
-                      <span className="ml-2 text-xs font-normal text-ink-soft">
-                        {g.items.length} art. · {usd(g.valorUsd)}
-                      </span>
-                    </button>
-                  </td>
-                </tr>
+                <EncabezadoGrupo grupo={g} colapsado={colapsado} onToggle={() => toggle(g.deposito)} />
                 {!colapsado &&
                   g.items.map((r) => {
                     const key = `${g.deposito}-${r.codigoArticulo}`;
                     const expandido = expandidos.has(key);
                     return (
                       <Fragment key={key}>
-                        <tr className="border-b border-line-soft hover:bg-panel-soft/60">
-                          <td className="whitespace-nowrap px-3 py-2 tabular">
-                            {r.lotes.length > 0 ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleFila(key)}
-                                aria-expanded={expandido}
-                                className="inline-flex items-center gap-1 text-ink"
-                              >
-                                {expandido ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                                {r.codigoArticulo}
-                              </button>
-                            ) : (
-                              r.codigoArticulo
-                            )}
-                          </td>
-                          <td className="max-w-[18rem] px-3 py-2">
-                            <span className="block truncate font-medium text-ink" title={r.nombreProducto}>
-                              {r.nombreProducto}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">{r.rubroDesc}</td>
-                          <td className="px-3 py-2">{r.unidad}</td>
-                          <td className="px-3 py-2 text-right tabular">{numero(r.stockActual)}</td>
-                          <td className="px-3 py-2 text-right">
-                            <PorLlegarCelda item={r} />
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <ComprometidoCelda item={r} />
-                          </td>
-                          <td className="bg-panel-soft/40 px-3 py-2 text-right">
-                            <DisponibleCelda item={r} />
-                          </td>
-                          <td className="px-3 py-2 text-right tabular">{usd(r.valorUsd)}</td>
-                          <td className="px-3 py-2 text-right tabular">{r.diasCobertura ?? "—"}</td>
-                          <td className="px-3 py-2 text-right tabular">
-                            {r.bajoMinimo ? <MinimoBadge /> : r.nivelMinimo > 0 ? numero(r.nivelMinimo) : null}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <div className="flex flex-col items-center gap-0.5">
-                              <VencimientoBadge estado={r.estadoVenc} />
-                              {r.proximoVencimiento && (
-                                <span className="text-xs text-ink-soft">{fecha(r.proximoVencimiento)}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <EstadoBadge estado={r.estado} />
-                          </td>
-                        </tr>
+                        <FilaArticulo fila={r} expandido={expandido} onToggle={() => toggleFila(key)} />
                         {expandido && r.lotes.length > 0 && (
                           <tr className="bg-panel-soft/40">
                             <td colSpan={COLUMNAS} className="px-3 pb-3 pt-1">

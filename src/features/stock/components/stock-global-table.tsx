@@ -42,7 +42,9 @@ export function StockGlobalTable({ filas }: { filas: StockItem[] }) {
     <DataTable
       columns={COLUMNAS}
       rows={filas}
-      getRowKey={(r) => r.codigoArticulo}
+      // El código de artículo solo es único DENTRO del modo consolidado. La key lleva el depósito
+      // igual, para que un render con filas por depósito no genere dos hijos con la misma key.
+      getRowKey={(r) => `${r.deposito}-${r.codigoArticulo}`}
       empty="No hay artículos con esos filtros."
     />
   );

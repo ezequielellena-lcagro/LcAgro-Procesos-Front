@@ -19,31 +19,33 @@ const CATALOGO: DepositoFiltro[] = [
   { codigo: 56, nombre: "Bayer", tipo: "Consignado" },
 ];
 
-// Stock ficticio (NUNCA datos reales). Cobertura/estado precalculados para el demo.
+// Stock ficticio (NUNCA datos reales). La cobertura FÍSICA viene precalculada para el demo; la del
+// disponible y el estado se derivan abajo, igual que en el backend.
 const BASE: Omit<
   StockItem,
   | "nivelMinimo" | "bajoMinimo"
   | "estadoVenc" | "proximoVencimiento" | "unidadesVencidas" | "unidadesCriticas" | "valorUsdVencido"
   | "diasEnStockMax" | "diasEnStockPromedio" | "semaforoRotacion" | "lotes"
   | "pedidosCompras" | "ventaFacturados" | "ventaSinFacturar" | "totalDisponible"
+  | "diasCoberturaDisponible" | "estado"
 >[] = [
-  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 1200, precioUsd: 4.5, valorUsd: 5400, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
-  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10002, nombreProducto: "ATRAZINA 50% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 80, precioUsd: 6.2, valorUsd: 496, ventaDiaria: 9.0, diasCobertura: 9, estado: "RiesgoQuiebre" },
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 1200, precioUsd: 4.5, valorUsd: 5400, ventaDiaria: 12.3, diasCobertura: 97 },
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10002, nombreProducto: "ATRAZINA 50% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 80, precioUsd: 6.2, valorUsd: 496, ventaDiaria: 9.0, diasCobertura: 9 },
   // Caso testigo de la feature: hay 870 litros en el galpón pero 840 ya están vendidos → 30 disponibles.
-  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10003, nombreProducto: "DICAMBA 57% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 870, precioUsd: 12.0, valorUsd: 10440, ventaDiaria: 43.5, diasCobertura: 20, estado: "Ok" },
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10003, nombreProducto: "DICAMBA 57% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 870, precioUsd: 12.0, valorUsd: 10440, ventaDiaria: 43.5, diasCobertura: 20 },
   // Agotado pero con mercadería en camino: sin la columna "Por llegar" parece un quiebre total.
-  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10004, nombreProducto: "GLUFOSINATO 15% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 0, precioUsd: 9.0, valorUsd: 0, ventaDiaria: 15.0, diasCobertura: 0, estado: "RiesgoQuiebre" },
-  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10010, nombreProducto: "CIPERMETRINA 25% X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 300, precioUsd: 8.0, valorUsd: 2400, ventaDiaria: 0, diasCobertura: null, estado: "Inmovilizado" },
-  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10020, nombreProducto: "FOSFATO DIAMONICO X 50KG", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 25000, precioUsd: 0.85, valorUsd: 21250, ventaDiaria: 140, diasCobertura: 178, estado: "Ok" },
-  { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 400, precioUsd: 4.5, valorUsd: 1800, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
-  { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10030, nombreProducto: "2,4-D 100% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 60, precioUsd: 5.5, valorUsd: 330, ventaDiaria: 6.0, diasCobertura: 10, estado: "RiesgoQuiebre" },
-  { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10040, nombreProducto: "UREA GRANULADA X 50KG", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 60000, precioUsd: 0.6, valorUsd: 36000, ventaDiaria: 0, diasCobertura: null, estado: "Inmovilizado" },
-  { deposito: 2, depositoNombre: "Semillero", tipoDeposito: "Propio", codigoArticulo: 10060, nombreProducto: "CURASEMILLA X 5L", rubro: 203, rubroDesc: "CURASEMILLAS", unidad: "LT", stockActual: 220, precioUsd: 11.0, valorUsd: 2420, ventaDiaria: 4.0, diasCobertura: 55, estado: "Ok" },
-  { deposito: 3, depositoNombre: "Las Piur", tipoDeposito: "Propio", codigoArticulo: 10050, nombreProducto: "FUNGICIDA TRIAZOL X 5L", rubro: 202, rubroDesc: "FUNGICIDAS", unidad: "LT", stockActual: 150, precioUsd: 14.0, valorUsd: 2100, ventaDiaria: 3.0, diasCobertura: 50, estado: "Ok" },
-  { deposito: 44, depositoNombre: "Adama", tipoDeposito: "Consignado", codigoArticulo: 10070, nombreProducto: "INSECTICIDA ADAMA X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 500, precioUsd: 9.5, valorUsd: 4750, ventaDiaria: 8.0, diasCobertura: 62, estado: "Ok" },
-  { deposito: 45, depositoNombre: "Sigma", tipoDeposito: "Consignado", codigoArticulo: 10080, nombreProducto: "HERBICIDA SIGMA X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 90, precioUsd: 7.0, valorUsd: 630, ventaDiaria: 9.0, diasCobertura: 10, estado: "RiesgoQuiebre" },
-  { deposito: 55, depositoNombre: "Bayer", tipoDeposito: "Consignado", codigoArticulo: 10090, nombreProducto: "FUNGICIDA BAYER X 5L", rubro: 202, rubroDesc: "FUNGICIDAS", unidad: "LT", stockActual: 700, precioUsd: 16.0, valorUsd: 11200, ventaDiaria: 0, diasCobertura: null, estado: "Inmovilizado" },
-  { deposito: 56, depositoNombre: "Bayer", tipoDeposito: "Consignado", codigoArticulo: 10091, nombreProducto: "SEMILLA BAYER MAIZ X BOLSA", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 3000, precioUsd: 2.0, valorUsd: 6000, ventaDiaria: 20, diasCobertura: 150, estado: "Ok" },
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10004, nombreProducto: "GLUFOSINATO 15% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 0, precioUsd: 9.0, valorUsd: 0, ventaDiaria: 15.0, diasCobertura: 0 },
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10010, nombreProducto: "CIPERMETRINA 25% X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 300, precioUsd: 8.0, valorUsd: 2400, ventaDiaria: 0, diasCobertura: null },
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10020, nombreProducto: "FOSFATO DIAMONICO X 50KG", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 25000, precioUsd: 0.85, valorUsd: 21250, ventaDiaria: 140, diasCobertura: 178 },
+  { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 400, precioUsd: 4.5, valorUsd: 1800, ventaDiaria: 12.3, diasCobertura: 97 },
+  { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10030, nombreProducto: "2,4-D 100% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 60, precioUsd: 5.5, valorUsd: 330, ventaDiaria: 6.0, diasCobertura: 10 },
+  { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10040, nombreProducto: "UREA GRANULADA X 50KG", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 60000, precioUsd: 0.6, valorUsd: 36000, ventaDiaria: 0, diasCobertura: null },
+  { deposito: 2, depositoNombre: "Semillero", tipoDeposito: "Propio", codigoArticulo: 10060, nombreProducto: "CURASEMILLA X 5L", rubro: 203, rubroDesc: "CURASEMILLAS", unidad: "LT", stockActual: 220, precioUsd: 11.0, valorUsd: 2420, ventaDiaria: 4.0, diasCobertura: 55 },
+  { deposito: 3, depositoNombre: "Las Piur", tipoDeposito: "Propio", codigoArticulo: 10050, nombreProducto: "FUNGICIDA TRIAZOL X 5L", rubro: 202, rubroDesc: "FUNGICIDAS", unidad: "LT", stockActual: 150, precioUsd: 14.0, valorUsd: 2100, ventaDiaria: 3.0, diasCobertura: 50 },
+  { deposito: 44, depositoNombre: "Adama", tipoDeposito: "Consignado", codigoArticulo: 10070, nombreProducto: "INSECTICIDA ADAMA X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 500, precioUsd: 9.5, valorUsd: 4750, ventaDiaria: 8.0, diasCobertura: 62 },
+  { deposito: 45, depositoNombre: "Sigma", tipoDeposito: "Consignado", codigoArticulo: 10080, nombreProducto: "HERBICIDA SIGMA X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 90, precioUsd: 7.0, valorUsd: 630, ventaDiaria: 9.0, diasCobertura: 10 },
+  { deposito: 55, depositoNombre: "Bayer", tipoDeposito: "Consignado", codigoArticulo: 10090, nombreProducto: "FUNGICIDA BAYER X 5L", rubro: 202, rubroDesc: "FUNGICIDAS", unidad: "LT", stockActual: 700, precioUsd: 16.0, valorUsd: 11200, ventaDiaria: 0, diasCobertura: null },
+  { deposito: 56, depositoNombre: "Bayer", tipoDeposito: "Consignado", codigoArticulo: 10091, nombreProducto: "SEMILLA BAYER MAIZ X BOLSA", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 3000, precioUsd: 2.0, valorUsd: 6000, ventaDiaria: 20, diasCobertura: 150 },
 ];
 
 // Mínimos de demo (espeja articulo.nivel_minimo). Los que tienen stock por debajo quedan "bajo mínimo".
@@ -108,7 +110,31 @@ function unidadesEn(lotes: StockLote[], estado: EstadoVencimiento): number {
   return lotes.filter((l) => l.estadoVenc === estado).reduce((s, l) => s + l.stockActual, 0);
 }
 
-const STOCK: StockItem[] = BASE.map((r) => {
+/** Antigüedad promedio ponderada por unidades (null si ningún lote tiene ingreso). Espeja PromedioPonderado. */
+function antiguedadPromedio(lotes: StockLote[]): number | null {
+  const conIngreso = lotes.filter((l) => l.diasEnStock !== null);
+  if (!conIngreso.length) return null;
+  const peso = conIngreso.reduce((s, l) => s + l.stockActual, 0);
+  if (peso <= 0) return null;
+  return Math.round(conIngreso.reduce((s, l) => s + (l.diasEnStock as number) * l.stockActual, 0) / peso);
+}
+
+// Umbrales de cobertura del backend (StockOptions): < 15 días = riesgo de quiebre, > 180 = inmovilizado.
+const COBERTURA_MIN = 15;
+const COBERTURA_MAX = 180;
+
+/** Espeja ClasificarEstado del backend: se alimenta de la cobertura del DISPONIBLE, no de la física. */
+function clasificarEstado(cobertura: number | null): EstadoStock {
+  if (cobertura === null) return "Inmovilizado";
+  if (cobertura < COBERTURA_MIN) return "RiesgoQuiebre";
+  if (cobertura > COBERTURA_MAX) return "Inmovilizado";
+  return "Ok";
+}
+
+/** Fila armada, antes de lo que se calcula a nivel ARTÍCULO (cobertura del disponible, estado, mínimo). */
+type FilaSinDerivar = Omit<StockItem, "diasCoberturaDisponible" | "estado" | "bajoMinimo">;
+
+const SIN_DERIVAR: FilaSinDerivar[] = BASE.map((r) => {
   const nivelMinimo = MINIMOS[r.codigoArticulo] ?? 0;
   const diasEnStock = ANTIGUEDAD_DEMO[r.codigoArticulo] ?? 120;
   const diasVenc = LOTES_DEMO[r.codigoArticulo] ?? [500];
@@ -138,7 +164,6 @@ const STOCK: StockItem[] = BASE.map((r) => {
     // Igual que el backend: puede quedar NEGATIVO (sobreventa) y no se pisa en 0.
     totalDisponible: r.stockActual + pedidosCompras - ventaFacturados - ventaSinFacturar,
     nivelMinimo,
-    bajoMinimo: nivelMinimo > 0 && r.stockActual <= nivelMinimo,
     estadoVenc: peorEstadoVenc(lotes),
     // El más temprano de los lotes (los días de demo pueden venir desordenados).
     proximoVencimiento: hoyMas(Math.min(...diasVenc)),
@@ -149,6 +174,28 @@ const STOCK: StockItem[] = BASE.map((r) => {
     diasEnStockPromedio: diasEnStock,
     semaforoRotacion: semaforoRotDe(diasEnStock),
     lotes,
+  };
+});
+
+/** Disponible por ARTÍCULO (todos los depósitos): la base de la cobertura y del mínimo. */
+const DISPONIBLE_POR_ARTICULO = SIN_DERIVAR.reduce((acc, r) => {
+  acc.set(r.codigoArticulo, (acc.get(r.codigoArticulo) ?? 0) + r.totalDisponible);
+  return acc;
+}, new Map<number, number>());
+
+/**
+ * Cobertura, semáforo y "bajo mínimo" miran el DISPONIBLE del artículo, no el stock físico: con el
+ * físico, DICAMBA (10003) salía "Ok, 20 días de cobertura" teniendo 840 de sus 870 litros vendidos.
+ * Al revés, 10004 está agotado pero con 800 en camino, así que no es un quiebre.
+ */
+const STOCK: StockItem[] = SIN_DERIVAR.map((r) => {
+  const disponible = DISPONIBLE_POR_ARTICULO.get(r.codigoArticulo) ?? 0;
+  const diasCoberturaDisponible = r.ventaDiaria > 0 ? Math.round(disponible / r.ventaDiaria) : null;
+  return {
+    ...r,
+    diasCoberturaDisponible,
+    estado: clasificarEstado(diasCoberturaDisponible),
+    bajoMinimo: r.nivelMinimo > 0 && disponible <= r.nivelMinimo,
   };
 });
 
@@ -212,8 +259,13 @@ const DEPOSITO_CONSOLIDADO = 0;
 /** Suma las filas de un artículo en un solo renglón sin depósito. Espeja ConsolidarArticulo. */
 function consolidarArticulo(filas: StockItem[]): StockItem {
   const suma = (f: (r: StockItem) => number) => filas.reduce((s, r) => s + f(r), 0);
+  const lotes = filas.flatMap((r) => r.lotes);
+  const conIngreso = lotes.filter((l) => l.diasEnStock !== null);
+  const promedio = antiguedadPromedio(lotes);
   return {
-    // Lo no sumable (nombre, rubro, unidad, cobertura, estado) sale de la primera fila.
+    // Lo no sumable (nombre, rubro, unidad, cobertura, estado) sale de la primera fila: son de nivel
+    // artículo. La antigüedad y la rotación NO lo son —salen de los lotes de cada depósito—, así que
+    // se recalculan sobre los lotes ya fusionados.
     ...filas[0],
     deposito: DEPOSITO_CONSOLIDADO,
     depositoNombre: "Todos los depósitos",
@@ -227,8 +279,11 @@ function consolidarArticulo(filas: StockItem[]): StockItem {
     unidadesVencidas: suma((r) => r.unidadesVencidas),
     unidadesCriticas: suma((r) => r.unidadesCriticas),
     valorUsdVencido: suma((r) => r.valorUsdVencido),
-    estadoVenc: peorEstadoVenc(filas.flatMap((r) => r.lotes)),
-    lotes: filas.flatMap((r) => r.lotes),
+    estadoVenc: peorEstadoVenc(lotes),
+    diasEnStockMax: conIngreso.length ? Math.max(...conIngreso.map((l) => l.diasEnStock as number)) : null,
+    diasEnStockPromedio: promedio,
+    semaforoRotacion: promedio === null ? "SinDato" : semaforoRotDe(promedio),
+    lotes,
   };
 }
 
@@ -277,14 +332,7 @@ function totales(rows: StockItem[]) {
     cantidadPorVencer: new Set(
       rows.filter((r) => r.estadoVenc === "Vencido" || r.estadoVenc === "Critico").map((r) => r.codigoArticulo),
     ).size,
-    antiguedadPromedioDias: (() => {
-      const ls = rows.flatMap((r) => r.lotes).filter((l) => l.diasEnStock !== null);
-      if (!ls.length) return null;
-      const peso = ls.reduce((s, l) => s + l.stockActual, 0);
-      return peso > 0
-        ? Math.round(ls.reduce((s, l) => s + (l.diasEnStock as number) * l.stockActual, 0) / peso)
-        : null;
-    })(),
+    antiguedadPromedioDias: antiguedadPromedio(rows.flatMap((r) => r.lotes)),
   };
 }
 
@@ -347,7 +395,8 @@ export const stockHandlers = [
         { header: "Sin facturar", width: 12, cell: (r: StockItem) => num(r.ventaSinFacturar) },
         { header: "Disponible", width: 12, cell: (r: StockItem) => num(r.totalDisponible) },
         { header: "Valor USD", width: 14, cell: (r: StockItem) => num(r.valorUsd) },
-        { header: "Días cob.", width: 10, cell: (r: StockItem) => ({ type: Number, value: r.diasCobertura ?? undefined }) },
+        // La cobertura del DISPONIBLE, que es la que muestra la tabla y con la que se clasifica el Estado.
+        { header: "Días cob.", width: 10, cell: (r: StockItem) => ({ type: Number, value: r.diasCoberturaDisponible ?? undefined }) },
         { header: "Estado", width: 16, cell: (r: StockItem) => ({ type: String, value: r.estado }) },
       ],
     }).toBlob();

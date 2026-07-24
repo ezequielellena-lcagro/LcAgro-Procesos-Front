@@ -49,3 +49,20 @@ export function presetDeTab(tab: TabStock): PresetTab {
 export function estadoFijoDeTab(tab: TabStock): EstadoStock | undefined {
   return presetDeTab(tab).estado;
 }
+
+/**
+ * Solapas que se dibujan con `items` y por lo tanto SÍ sienten el filtro de estado. "Por rubro" no:
+ * se dibuja con `porRubro`, que el backend calcula sobre el set base sin drill-down. Ahí el control
+ * quedaba habilitado y no movía un pixel del gráfico — el mismo pisado silencioso que resuelve
+ * `estadoFijoDeTab`, pero al revés (control activo sin efecto en vez de elección pisada).
+ */
+export function estadoAplicaEnTab(tab: TabStock): boolean {
+  return tab !== "rubro";
+}
+
+/** Por qué el filtro de estado está deshabilitado en esta solapa, o `undefined` si no lo está. */
+export function motivoEstadoIgnorado(tab: TabStock): string | undefined {
+  return estadoAplicaEnTab(tab)
+    ? undefined
+    : "Esta solapa se dibuja sobre el total por rubro: el estado no la afecta.";
+}

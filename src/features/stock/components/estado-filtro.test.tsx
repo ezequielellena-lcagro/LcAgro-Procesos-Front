@@ -35,6 +35,39 @@ describe("EstadoFiltroField", () => {
     render(<EstadoFiltroField valor="" onChange={vi.fn()} />);
     expect(screen.getByLabelText("Estado")).toBeEnabled();
   });
+
+  /**
+   * Es el único control de la barra que NO mueve los KPIs (el backend lo aplica como drill-down).
+   * Sin decirlo, aislar "Riesgo quiebre" deja 3 filas abajo y el valor USD del total arriba.
+   */
+  it("avisa siempre que solo filtra el listado, no los KPIs", () => {
+    render(<EstadoFiltroField valor="" onChange={vi.fn()} />);
+    expect(screen.getByLabelText("Estado")).toHaveAttribute(
+      "title",
+      "Filtra el listado de abajo; los KPIs de arriba siguen siendo los del total filtrado.",
+    );
+  });
+});
+
+describe("EstadoFiltroField — solapa que ignora el estado", () => {
+  it("deshabilita el control en vez de ofrecer algo que no hace nada", () => {
+    render(<EstadoFiltroField valor="Ok" onChange={vi.fn()} ignorado="Esta solapa no filtra por estado." />);
+    expect(screen.getByLabelText("Estado")).toBeDisabled();
+  });
+
+  it("pone el motivo en el title", () => {
+    render(<EstadoFiltroField valor="" onChange={vi.fn()} ignorado="Esta solapa no filtra por estado." />);
+    expect(screen.getByLabelText("Estado")).toHaveAttribute("title", "Esta solapa no filtra por estado.");
+  });
+
+  it("el estado fijo de la solapa gana sobre el motivo de ignorado", () => {
+    render(
+      <EstadoFiltroField valor="" onChange={vi.fn()} fijo="Inmovilizado" ignorado="otro motivo" />,
+    );
+    const select = screen.getByLabelText("Estado");
+    expect(select).toHaveValue("Inmovilizado");
+    expect(select).toHaveAttribute("title", 'Esta solapa ya filtra por "Inmovilizado": el filtro queda fijo.');
+  });
 });
 
 describe("EstadoFiltroField — estado impuesto por la solapa", () => {

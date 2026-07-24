@@ -34,11 +34,42 @@ describe("StockKpis — solapa Stock", () => {
     expect(screen.getByText(/Consignado US\$ 1\.588\.852/)).toBeInTheDocument();
   });
 
-  it("muestra el USD comprometido con el hint que lo explica", () => {
+  it("muestra el USD comprometido con su relación al stock valorizado", () => {
     render(<StockKpis tab="stock" totales={totales} />);
     expect(screen.getByText("USD comprometido")).toBeInTheDocument();
     expect(screen.getByText(/412\.500/)).toBeInTheDocument();
-    expect(screen.getByText("Ya vendido, sin entregar")).toBeInTheDocument();
+    // 412.500 / 6.588.852 = 6,3 %
+    expect(screen.getByText("6,3 % del stock valorizado · ya vendido, sin entregar")).toBeInTheDocument();
+  });
+
+  /**
+   * El comprometido NO es siempre una tajada del valorizado: las filas de artículos agotados con
+   * ventas pendientes aportan al comprometido y cero al total. Sin decirlo, "US$ 630 valorizado" al
+   * lado de "US$ 1.050 comprometido" se lee como una pantalla rota.
+   */
+  it("explica el caso en que el comprometido supera al stock valorizado", () => {
+    render(<StockKpis tab="stock" totales={{ ...totales, valorUsdTotal: 630, valorUsdComprometido: 1050 }} />);
+    expect(
+      screen.getByText("Supera el stock valorizado: hay artículos vendidos sin existencia física"),
+    ).toBeInTheDocument();
+  });
+
+  it("no marca el comprometido como alarma: es mercadería vendida, no un problema", () => {
+    render(<StockKpis tab="stock" totales={totales} />);
+    const tarjeta = screen.getByText("USD comprometido").closest("div");
+    expect(tarjeta?.className).not.toContain("border-l-rojo");
+  });
+});
+
+describe("StockKpis — filtro de Estado activo", () => {
+  it("aclara que los KPIs no sienten el filtro de Estado", () => {
+    render(<StockKpis tab="stock" totales={totales} estadoFiltrado />);
+    expect(screen.getByText(/KPIs sobre el total filtrado arriba/)).toBeInTheDocument();
+  });
+
+  it("sin filtro de Estado no agrega ruido", () => {
+    render(<StockKpis tab="stock" totales={totales} />);
+    expect(screen.queryByText(/KPIs sobre el total filtrado arriba/)).not.toBeInTheDocument();
   });
 });
 

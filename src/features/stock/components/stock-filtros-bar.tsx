@@ -8,7 +8,9 @@ import type { EstadoStock, StockFiltrosResponse, TipoDeposito } from "../types";
 
 /**
  * Filtros compartidos por las solapas (el estado de vencimiento lo reemplaza la solapa).
- * `estadoFijo` es el estado que impone la solapa activa, si impone alguno.
+ * `estadoFijo` es el estado que impone la solapa activa, si impone alguno; `estadoIgnorado` es el
+ * motivo por el que la solapa activa no lo usa (Por rubro). Los dos deshabilitan el control con su
+ * explicación a la vista: la barra nunca ofrece un control que no hace nada.
  */
 export function StockFiltrosBar({
   valor,
@@ -16,12 +18,14 @@ export function StockFiltrosBar({
   opciones,
   cargando,
   estadoFijo,
+  estadoIgnorado,
 }: {
   valor: FiltrosCompartidos;
   onChange: (v: FiltrosCompartidos) => void;
   opciones?: StockFiltrosResponse;
   cargando: boolean;
   estadoFijo?: EstadoStock;
+  estadoIgnorado?: string;
 }) {
   const set = <K extends keyof FiltrosCompartidos>(campo: K, v: FiltrosCompartidos[K]) =>
     onChange({ ...valor, [campo]: v });
@@ -59,7 +63,12 @@ export function StockFiltrosBar({
           <option value="Consignado">Consignado</option>
         </Select>
       </FilterField>
-      <EstadoFiltroField valor={valor.estado} onChange={(v) => set("estado", v)} fijo={estadoFijo} />
+      <EstadoFiltroField
+        valor={valor.estado}
+        onChange={(v) => set("estado", v)}
+        fijo={estadoFijo}
+        ignorado={estadoIgnorado}
+      />
       <FilterField label="Mínimo">
         <label className="flex h-9 items-center gap-2 text-sm text-ink">
           <input

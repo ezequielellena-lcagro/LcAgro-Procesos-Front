@@ -10,6 +10,14 @@ const OPCIONES: { value: EstadoFiltro; label: string }[] = [
   { value: "Inmovilizado", label: "Inmovilizado" },
 ];
 
+/**
+ * Qué es este filtro, siempre visible en el `title`: es el ÚNICO control de la barra que no mueve los
+ * KPIs (el backend lo aplica como drill-down, después del set base). Sin esta aclaración, aislar
+ * "Riesgo quiebre" bajaba la tabla a 3 filas dejando arriba el valor USD del total, y lo natural era
+ * leerlo como el valor de esas 3 filas.
+ */
+const AYUDA = "Filtra el listado de abajo; los KPIs de arriba siguen siendo los del total filtrado.";
+
 function motivoFijo(fijo: EstadoStock): string {
   return `Esta solapa ya filtra por "${OPCIONES.find((o) => o.value === fijo)?.label ?? fijo}": el filtro queda fijo.`;
 }
@@ -18,26 +26,31 @@ function motivoFijo(fijo: EstadoStock): string {
  * Filtro de estado de cobertura, en la barra de filtros compartida: permite aislar los artículos
  * en riesgo de quiebre y sigue teniendo su badge en la columna Estado de la tabla.
  *
- * Cuando la solapa activa fija su propio estado (Inmovilizado), el preset ganaría igual al armar
- * la query. En vez de pisar la elección del usuario en silencio, se muestra el estado impuesto y
- * el control queda deshabilitado, con el motivo en el `title`.
+ * Se deshabilita, siempre con el motivo en el `title`, en dos casos —nunca en silencio—:
+ * - `fijo`: la solapa impone su propio estado (Inmovilizado) y el preset ganaría igual al armar la
+ *   query. Se muestra el estado impuesto en vez de pisar la elección del usuario.
+ * - `ignorado`: la solapa no se dibuja con `items` (Por rubro), así que el control no haría nada.
  */
 export function EstadoFiltroField({
   valor,
   onChange,
   fijo,
+  ignorado,
 }: {
   valor: EstadoFiltro;
   onChange: (v: EstadoFiltro) => void;
   fijo?: EstadoStock;
+  /** Motivo por el que la solapa activa ignora el estado. Presente = control deshabilitado. */
+  ignorado?: string;
 }) {
-  const motivo = fijo ? motivoFijo(fijo) : undefined;
+  const motivo = fijo ? motivoFijo(fijo) : ignorado;
+  const deshabilitado = fijo !== undefined || ignorado !== undefined;
   return (
-    <FilterField label="Estado" title={motivo}>
+    <FilterField label="Estado" title={motivo ? `${motivo} ${AYUDA}` : AYUDA}>
       <Select
         value={fijo ?? valor}
-        disabled={fijo !== undefined}
-        title={motivo}
+        disabled={deshabilitado}
+        title={motivo ?? AYUDA}
         onChange={(e) => onChange(e.target.value as EstadoFiltro)}
       >
         {OPCIONES.map((o) => (

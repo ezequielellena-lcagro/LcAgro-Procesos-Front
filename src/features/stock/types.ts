@@ -50,11 +50,20 @@ export interface StockItem {
    */
   totalDisponible: number;
   ventaDiaria: number;
+  /**
+   * Días de cobertura sobre el stock FÍSICO del artículo. Dato secundario: sobrestima cuando parte
+   * del stock ya está vendido y sin entregar.
+   */
   diasCobertura: number | null;
+  /**
+   * Días de cobertura sobre el DISPONIBLE del artículo. Es el número honesto y el que clasifica
+   * `estado`; es también el que muestra la tabla. Puede ser negativo (sobreventa).
+   */
+  diasCoberturaDisponible: number | null;
   estado: EstadoStock;
   /** Stock mínimo del artículo (MacroGest, global). 0 = no cargado. */
   nivelMinimo: number;
-  /** true si hay mínimo cargado y el stock del artículo no lo supera. */
+  /** true si hay mínimo cargado y el DISPONIBLE del artículo no lo supera. */
   bajoMinimo: boolean;
   /** Peor estado de vencimiento entre los lotes del artículo en este depósito. */
   estadoVenc: EstadoVencimiento;

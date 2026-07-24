@@ -28,3 +28,28 @@ export function detalleDisponible(item: StockItem): string {
     ` = ${numero(item.totalDisponible)}`;
   return haySobreventa(item) ? `${cuenta}. Sobreventa: hay más vendido que existencias.` : cuenta;
 }
+
+/**
+ * true cuando la cobertura sobre el stock FÍSICO promete más días que la del disponible, es decir
+ * cuando parte del stock ya tiene dueño. Es el caso DICAMBA: 20 días de "cobertura" con 30 litros
+ * vendibles. La tabla muestra siempre la del disponible; esto sirve para explicar la diferencia.
+ */
+export function coberturaEsOptimista(item: StockItem): boolean {
+  return (
+    item.diasCobertura !== null &&
+    item.diasCoberturaDisponible !== null &&
+    item.diasCoberturaDisponible < item.diasCobertura
+  );
+}
+
+/** `title` de la celda de cobertura: qué número es y, si difiere, cuánto prometía el físico. */
+export function detalleCobertura(item: StockItem): string {
+  if (item.diasCoberturaDisponible === null)
+    return "Sin ventas en la ventana: no hay ritmo con el que calcular la cobertura.";
+  const base =
+    `Días de venta que cubre el DISPONIBLE del artículo (sumando todos los depósitos).` +
+    ` El semáforo de Estado se calcula con este número.`;
+  return coberturaEsOptimista(item)
+    ? `${base} Sobre el stock físico serían ${item.diasCobertura} días, pero parte ya está vendida.`
+    : base;
+}
