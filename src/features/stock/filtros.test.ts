@@ -31,10 +31,15 @@ describe("filtrosAQuery", () => {
     });
   });
 
-  it("no arrastra drill-down de solapa (eso lo agrega presetDeTab)", () => {
+  it("manda el estado elegido y lo omite cuando es 'Todos'", () => {
+    expect(filtrosAQuery({ ...FILTROS_INICIALES, estado: "RiesgoQuiebre" }).estado).toBe("RiesgoQuiebre");
+    expect(filtrosAQuery(FILTROS_INICIALES).estado).toBeUndefined();
+  });
+
+  it("no arrastra el drill-down que pone la solapa (eso lo agrega presetDeTab)", () => {
     const q = filtrosAQuery(FILTROS_INICIALES);
-    expect(q).not.toHaveProperty("estado");
     expect(q).not.toHaveProperty("estadosVenc");
     expect(q).not.toHaveProperty("orden");
+    expect(q).not.toHaveProperty("consolidado");
   });
 });

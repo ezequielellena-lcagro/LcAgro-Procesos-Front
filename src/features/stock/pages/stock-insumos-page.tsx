@@ -6,9 +6,9 @@ import { ErrorState } from "@/shared/components/error-state";
 import { ExportButtons } from "@/shared/components/export-buttons";
 import { PageHeader } from "@/shared/components/page-header";
 import { Pagination, type UnidadPaginacion } from "@/shared/components/pagination";
-import { StockEstadoFiltro, type EstadoFiltro } from "../components/estado-filtro";
 import { InmovilizadoTable } from "../components/inmovilizado-table";
 import { StockFiltrosBar } from "../components/stock-filtros-bar";
+import { StockGlobalTable } from "../components/stock-global-table";
 import { StockKpis } from "../components/stock-kpis";
 import { StockPorRubro } from "../components/stock-por-rubro";
 import { StockSkeleton } from "../components/stock-skeleton";
@@ -18,7 +18,7 @@ import { useStock } from "../queries/use-stock";
 import { useStockExport } from "../queries/use-stock-export";
 import { useStockFiltros } from "../queries/use-stock-filtros";
 import { FILTROS_INICIALES, filtrosAQuery, type FiltrosCompartidos } from "../filtros";
-import { presetDeTab, TABS_STOCK, type TabStock } from "../tabs";
+import { estadoFijoDeTab, presetDeTab, TABS_STOCK, type TabStock } from "../tabs";
 import { filasDeVencimiento } from "../vencimientos";
 import type { StockListado } from "../types";
 
@@ -65,12 +65,12 @@ function detalleDeLotes(listado: StockListado): string {
 export function StockInsumosPage() {
   const [filtros, setFiltros] = useState<FiltrosCompartidos>(FILTROS_INICIALES);
   const [tab, setTab] = useState<TabStock>("stock");
-  const [estado, setEstado] = useState<EstadoFiltro>("");
   const [page, setPage] = useState(1);
 
   const filtrosOpts = useStockFiltros();
   const compartidos = filtrosAQuery(filtros);
-  const preset = presetDeTab(tab, estado || undefined);
+  // El preset va último: lo que fija la solapa gana sobre lo elegido arriba (ver `estadoFijoDeTab`).
+  const preset = presetDeTab(tab);
 
   const stock = useStock({ ...compartidos, ...preset, page, pageSize: PAGE_SIZE });
   const exportar = useStockExport();
@@ -84,10 +84,6 @@ export function StockInsumosPage() {
     setFiltros(v);
     setPage(1);
   };
-  const cambiarEstado = (v: EstadoFiltro) => {
-    setEstado(v);
-    setPage(1);
-  };
 
   // El Excel baja lo que estás mirando: mismos filtros + preset de la solapa activa.
   const exportarExcel = () => exportar.mutate({ ...compartidos, ...preset });
@@ -96,7 +92,7 @@ export function StockInsumosPage() {
     <>
       <PageHeader
         title="Stock de Insumos"
-        subtitle="Stock valorizado en USD por depósito, rubro y artículo, con cobertura y semáforo de rotación."
+        subtitle="Stock valorizado en USD por depósito, rubro y artículo, con lo disponible de verdad (descontando lo ya vendido), cobertura y semáforo de rotación."
         actions={<ExportButtons onExcel={exportarExcel} excelLoading={exportar.isPending} />}
       />
 
@@ -111,6 +107,7 @@ export function StockInsumosPage() {
         onChange={cambiarFiltros}
         opciones={filtrosOpts.data}
         cargando={filtrosOpts.isPending}
+        estadoFijo={estadoFijoDeTab(tab)}
       />
 
       {stock.isError ? (
@@ -133,13 +130,23 @@ export function StockInsumosPage() {
               <StockKpis tab={tab} totales={stock.data.totales} />
 
               <TabsContent value="stock" className="space-y-4">
-                <StockEstadoFiltro valor={estado} onChange={cambiarEstado} />
                 <PanelPaginado
                   listado={stock.data}
                   onPage={setPage}
                   vacio="No hay artículos con esos filtros."
                 >
                   <StockTable filas={stock.data.items} />
+                </PanelPaginado>
+              </TabsContent>
+
+              {/* Mismo set, sumado por artículo: sin depósito, para ver la posición total. */}
+              <TabsContent value="global">
+                <PanelPaginado
+                  listado={stock.data}
+                  onPage={setPage}
+                  vacio="No hay artículos con esos filtros."
+                >
+                  <StockGlobalTable filas={stock.data.items} />
                 </PanelPaginado>
               </TabsContent>
 

@@ -38,6 +38,17 @@ export interface StockItem {
   stockActual: number;
   precioUsd: number;
   valorUsd: number;
+  /** Mercadería comprada que todavía no ingresó al galpón. SUMA al disponible. */
+  pedidosCompras: number;
+  /** Vendido y facturado, pero todavía en el galpón. RESTA del disponible. */
+  ventaFacturados: number;
+  /** Vendido sin facturar, todavía en el galpón. RESTA del disponible. */
+  ventaSinFacturar: number;
+  /**
+   * `stockActual + pedidosCompras − ventaFacturados − ventaSinFacturar`.
+   * PUEDE SER NEGATIVO: es sobreventa real (MacroGest también la muestra en negativo), no se pisa en 0.
+   */
+  totalDisponible: number;
   ventaDiaria: number;
   diasCobertura: number | null;
   estado: EstadoStock;
@@ -65,6 +76,8 @@ export interface TotalesStock {
   valorUsdPropio: number;
   valorUsdConsignado: number;
   valorUsdInmovilizado: number;
+  /** Valor USD del stock que ya tiene dueño (vendido y sin entregar). */
+  valorUsdComprometido: number;
   pctInmovilizado: number;
   cantidadRiesgoQuiebre: number;
   cantidadBajoMinimo: number;
@@ -113,6 +126,9 @@ export interface StockFiltrosResponse {
  * Los filtros COMPARTIDOS (q/deposito/rubro/tipo/ventanaDias/soloBajoMinimo) definen el set base
  * sobre el que el backend calcula `totales`/`porRubro`. `estado`/`estadosVenc`/`orden` son el
  * drill-down de la solapa: afectan `items`/`total`, NO los KPIs.
+ *
+ * `estado` se elige en la barra de filtros de arriba, pero viaja igual como drill-down: el backend
+ * lo aplica DESPUÉS del set base, así que los KPIs no se mueven al aislar un estado.
  */
 export interface StockFiltros {
   q?: string;
@@ -125,6 +141,8 @@ export interface StockFiltros {
   estadosVenc?: EstadoVencimiento[];
   estado?: EstadoStock;
   orden?: OrdenStock;
+  /** true = una fila por artículo sumando todos los depósitos (solapa "Stock global"). */
+  consolidado?: boolean;
   page: number;
   pageSize: number;
 }

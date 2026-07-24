@@ -5,10 +5,21 @@ import { EstadoBadge } from "./estado-badge";
 import { TipoBadge } from "./tipo-badge";
 import { MinimoBadge } from "./minimo-badge";
 import { VencimientoBadge } from "./vencimiento-badge";
+import { ComprometidoCelda, DisponibleCelda, PorLlegarCelda } from "./celdas-disponibilidad";
 import { StockLotes } from "./stock-lotes";
 import type { StockItem, TipoDeposito } from "../types";
 
-const COLUMNAS = 10;
+/**
+ * Columnas de la tabla (para los `colSpan` de encabezado de grupo y detalle de lotes).
+ *
+ * Decisión de legibilidad: la disponibilidad son CUATRO números (stock, por llegar, facturado,
+ * sin facturar) y la tabla ya venía cargada. Se muestran tres columnas — "Por llegar",
+ * "Comprometido" (facturado + sin facturar, con el desglose en el `title`) y "Disponible" — en vez
+ * de cuatro: facturado y sin facturar se leen siempre juntos (ambos restan y ninguno se puede
+ * vender), mientras que "por llegar" suma y hay que verlo aparte para no confundir un cero de
+ * stock con un quiebre. "Disponible" es la columna estrella y va destacada.
+ */
+const COLUMNAS = 13;
 
 interface Grupo {
   deposito: number;
@@ -71,6 +82,18 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
             <th className="px-3 py-2 text-left font-semibold">Rubro</th>
             <th className="px-3 py-2 text-left font-semibold">Un.</th>
             <th className="px-3 py-2 text-right font-semibold">Stock</th>
+            <th className="px-3 py-2 text-right font-semibold" title="Pedidos de compra pendientes de ingreso.">
+              Por llegar
+            </th>
+            <th className="px-3 py-2 text-right font-semibold" title="Vendido y todavía en el galpón: facturado + sin facturar.">
+              Comprom.
+            </th>
+            <th
+              className="whitespace-nowrap bg-panel px-3 py-2 text-right font-semibold text-ink"
+              title="Stock + por llegar − comprometido. En rojo cuando es negativo (sobreventa)."
+            >
+              Disponible
+            </th>
             <th className="px-3 py-2 text-right font-semibold">Valor USD</th>
             <th className="px-3 py-2 text-right font-semibold">Días cob.</th>
             <th className="px-3 py-2 text-right font-semibold">Mínimo</th>
@@ -130,6 +153,15 @@ export function StockTable({ filas }: { filas: StockItem[] }) {
                           <td className="px-3 py-2">{r.rubroDesc}</td>
                           <td className="px-3 py-2">{r.unidad}</td>
                           <td className="px-3 py-2 text-right tabular">{numero(r.stockActual)}</td>
+                          <td className="px-3 py-2 text-right">
+                            <PorLlegarCelda item={r} />
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <ComprometidoCelda item={r} />
+                          </td>
+                          <td className="bg-panel-soft/40 px-3 py-2 text-right">
+                            <DisponibleCelda item={r} />
+                          </td>
                           <td className="px-3 py-2 text-right tabular">{usd(r.valorUsd)}</td>
                           <td className="px-3 py-2 text-right tabular">{r.diasCobertura ?? "—"}</td>
                           <td className="px-3 py-2 text-right tabular">

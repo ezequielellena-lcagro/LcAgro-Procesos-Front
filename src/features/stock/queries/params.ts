@@ -19,5 +19,7 @@ export function stockParams(f: StockQueryFiltros) {
     estado: f.estado,
     estadoVenc: f.estadosVenc?.length ? f.estadosVenc : undefined,
     orden: f.orden,
+    // Solo viaja cuando está prendido: `consolidado=false` es el default del backend.
+    consolidado: f.consolidado || undefined,
   };
 }

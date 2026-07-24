@@ -1,29 +1,30 @@
 import type { EstadoStock, StockFiltros } from "./types";
 
-/** Las 4 solapas de la pantalla de Stock. Cada una es el drill-down de su KPI. */
-export type TabStock = "stock" | "vencimientos" | "inmovilizado" | "rubro";
+/** Las 5 solapas de la pantalla de Stock. Cada una es el drill-down de su KPI. */
+export type TabStock = "stock" | "global" | "vencimientos" | "inmovilizado" | "rubro";
 
 /** Solapas en el orden en que se muestran. */
 export const TABS_STOCK: { value: TabStock; label: string }[] = [
   { value: "stock", label: "Stock" },
+  { value: "global", label: "Stock global" },
   { value: "vencimientos", label: "Vencimientos" },
   { value: "inmovilizado", label: "Inmovilizado" },
   { value: "rubro", label: "Por rubro" },
 ];
 
 /** Lo que la solapa le agrega a los filtros compartidos. No afecta los KPIs (los calcula el set base). */
-export type PresetTab = Pick<StockFiltros, "estado" | "estadosVenc" | "orden">;
+export type PresetTab = Pick<StockFiltros, "estado" | "estadosVenc" | "orden" | "consolidado">;
 
 /**
  * Preset de consulta de cada solapa. Función pura: la solapa NO toca los filtros compartidos,
  * solo agrega el drill-down y el orden con el que se lee esa pregunta.
  *
- * `estado` es el filtro de la solapa Stock (Decisión 3: riesgo de quiebre queda como columna Y
- * como filtro). Vive acá y no en los filtros compartidos por dos razones: los KPIs se calculan
- * sobre el set base y no deben moverse al aislar un estado, y las otras solapas ya fijan el suyo
- * (Inmovilizado) o filtran por otro eje (Vencimientos), así que no habría preset que pisar.
+ * El preset se aplica DESPUÉS de los filtros compartidos (`{...compartidos, ...preset}`), así que
+ * lo que fije acá gana. Cuando eso pasa con un filtro que el usuario también ve arriba —hoy solo
+ * `estado`, en la solapa Inmovilizado— la barra lo muestra fijo y deshabilitado
+ * (ver `estadoFijoDeTab`), para que se entienda en vez de pisarse en silencio.
  */
-export function presetDeTab(tab: TabStock, estado?: EstadoStock): PresetTab {
+export function presetDeTab(tab: TabStock): PresetTab {
   switch (tab) {
     case "vencimientos":
       return { estadosVenc: ["Vencido", "Critico", "Alerta"], orden: "Vencimiento" };
@@ -32,7 +33,19 @@ export function presetDeTab(tab: TabStock, estado?: EstadoStock): PresetTab {
     case "rubro":
       // No pagina: se dibuja con `porRubro` de la respuesta.
       return {};
+    case "global":
+      // Una fila por artículo sumando todos los depósitos, la plata más grande arriba.
+      return { consolidado: true, orden: "Valor" };
     case "stock":
-      return estado ? { estado, orden: "Deposito" } : { orden: "Deposito" };
+      return { orden: "Deposito" };
   }
+}
+
+/**
+ * Estado que la solapa IMPONE sobre el filtro compartido, o `undefined` si respeta lo que elija
+ * el usuario. Sale del propio preset para que no haya dos verdades: si mañana otra solapa fija un
+ * estado, la barra de filtros se entera sola.
+ */
+export function estadoFijoDeTab(tab: TabStock): EstadoStock | undefined {
+  return presetDeTab(tab).estado;
 }

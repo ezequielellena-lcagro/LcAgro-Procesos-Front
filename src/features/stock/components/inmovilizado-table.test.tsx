@@ -1,35 +1,24 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+import { fakeStockItem } from "../fakes";
 import type { StockItem } from "../types";
 import { InmovilizadoTable } from "./inmovilizado-table";
 
 function item(p: Partial<StockItem> & Pick<StockItem, "deposito" | "codigoArticulo">): StockItem {
-  return {
-    depositoNombre: "San Jorge",
-    tipoDeposito: "Propio",
-    nombreProducto: "PRODUCTO",
-    rubro: 200,
-    rubroDesc: "HERBICIDAS",
-    unidad: "LT",
+  return fakeStockItem({
     stockActual: 300,
     precioUsd: 8,
     valorUsd: 2400,
+    totalDisponible: 300,
     ventaDiaria: 0,
     diasCobertura: null,
     estado: "Inmovilizado",
-    nivelMinimo: 0,
-    bajoMinimo: false,
     estadoVenc: "Normal",
-    proximoVencimiento: null,
-    unidadesVencidas: 0,
-    unidadesCriticas: 0,
-    valorUsdVencido: 0,
     diasEnStockMax: 300,
     diasEnStockPromedio: 300,
     semaforoRotacion: "Rojo",
-    lotes: [],
     ...p,
-  };
+  });
 }
 
 describe("InmovilizadoTable", () => {

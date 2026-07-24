@@ -10,6 +10,7 @@ const totales: TotalesStock = {
   valorUsdPropio: 5000000,
   valorUsdConsignado: 1588852,
   valorUsdInmovilizado: 1200000,
+  valorUsdComprometido: 412500,
   pctInmovilizado: 18.2,
   cantidadRiesgoQuiebre: 14,
   cantidadBajoMinimo: 9,
@@ -19,7 +20,7 @@ const totales: TotalesStock = {
   antiguedadPromedioDias: 145,
 };
 
-const TABS: TabStock[] = ["stock", "vencimientos", "inmovilizado", "rubro"];
+const TABS: TabStock[] = ["stock", "global", "vencimientos", "inmovilizado", "rubro"];
 
 describe("StockKpis — solapa Stock", () => {
   it("muestra el valor USD total formateado", () => {
@@ -31,6 +32,21 @@ describe("StockKpis — solapa Stock", () => {
     render(<StockKpis tab="stock" totales={totales} />);
     expect(screen.getByText(/Propio US\$ 5\.000\.000/)).toBeInTheDocument();
     expect(screen.getByText(/Consignado US\$ 1\.588\.852/)).toBeInTheDocument();
+  });
+
+  it("muestra el USD comprometido con el hint que lo explica", () => {
+    render(<StockKpis tab="stock" totales={totales} />);
+    expect(screen.getByText("USD comprometido")).toBeInTheDocument();
+    expect(screen.getByText(/412\.500/)).toBeInTheDocument();
+    expect(screen.getByText("Ya vendido, sin entregar")).toBeInTheDocument();
+  });
+});
+
+describe("StockKpis — solapa Stock global", () => {
+  it("comparte los KPIs con la solapa Stock (mismo set, sumado por artículo)", () => {
+    render(<StockKpis tab="global" totales={totales} />);
+    expect(screen.getByText("Valor USD")).toBeInTheDocument();
+    expect(screen.getByText("USD comprometido")).toBeInTheDocument();
   });
 });
 

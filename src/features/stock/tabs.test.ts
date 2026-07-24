@@ -1,26 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { presetDeTab, TABS_STOCK } from "./tabs";
+import { estadoFijoDeTab, presetDeTab, TABS_STOCK } from "./tabs";
 
 describe("presetDeTab", () => {
   it("Stock: sin drill-down, ordenado por depósito", () => {
     expect(presetDeTab("stock")).toEqual({ orden: "Deposito" });
   });
 
-  it("Stock: el filtro de estado se suma al preset (aísla los de riesgo de quiebre)", () => {
-    expect(presetDeTab("stock", "RiesgoQuiebre")).toEqual({
-      estado: "RiesgoQuiebre",
-      orden: "Deposito",
-    });
+  it("Stock global: consolida por artículo y muestra primero la plata más grande", () => {
+    expect(presetDeTab("global")).toEqual({ consolidado: true, orden: "Valor" });
   });
 
-  it("Stock: sin estado elegido no manda la clave (vacío = todos)", () => {
-    expect(presetDeTab("stock", undefined)).not.toHaveProperty("estado");
-  });
-
-  it("las otras solapas ignoran el estado: fijan el suyo o filtran por otro eje", () => {
-    expect(presetDeTab("inmovilizado", "Ok").estado).toBe("Inmovilizado");
-    expect(presetDeTab("vencimientos", "Ok")).not.toHaveProperty("estado");
-    expect(presetDeTab("rubro", "Ok")).toEqual({});
+  it("solo la solapa global consolida (las demás muestran artículo × depósito)", () => {
+    for (const { value } of TABS_STOCK.filter((t) => t.value !== "global")) {
+      expect(presetDeTab(value).consolidado).toBeUndefined();
+    }
   });
 
   it("Vencimientos: vencido + crítico + alerta, ordenado por urgencia", () => {
@@ -51,5 +44,23 @@ describe("presetDeTab", () => {
     const a = presetDeTab("vencimientos");
     a.estadosVenc?.push("Normal");
     expect(presetDeTab("vencimientos").estadosVenc).toEqual(["Vencido", "Critico", "Alerta"]);
+  });
+});
+
+describe("estadoFijoDeTab", () => {
+  it("Inmovilizado impone su estado: el filtro de arriba tiene que mostrarse fijo", () => {
+    expect(estadoFijoDeTab("inmovilizado")).toBe("Inmovilizado");
+  });
+
+  it("las demás solapas respetan lo que elija el usuario", () => {
+    for (const { value } of TABS_STOCK.filter((t) => t.value !== "inmovilizado")) {
+      expect(estadoFijoDeTab(value)).toBeUndefined();
+    }
+  });
+
+  it("sale del propio preset: lo que se muestra fijo es exactamente lo que se va a mandar", () => {
+    for (const { value } of TABS_STOCK) {
+      expect(estadoFijoDeTab(value)).toBe(presetDeTab(value).estado);
+    }
   });
 });

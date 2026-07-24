@@ -1,49 +1,21 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import type { StockItem, StockLote } from "../types";
+import { fakeLote as lote, fakeStockItem } from "../fakes";
+import type { StockItem } from "../types";
 import { filasDeVencimiento } from "../vencimientos";
 import { VencimientosTable } from "./vencimientos-table";
 
-function lote(p: Partial<StockLote> & Pick<StockLote, "serie">): StockLote {
-  return {
-    stockActual: 10,
-    fechaIngreso: "2026-01-01",
-    fechaVencimiento: "2026-08-01",
-    diasParaVencer: 16,
-    estadoVenc: "Critico",
-    diasEnStock: 100,
-    semaforoRotacion: "Amarillo",
-    ...p,
-  };
-}
-
 function item(p: Partial<StockItem> & Pick<StockItem, "deposito" | "codigoArticulo">): StockItem {
-  return {
-    depositoNombre: "San Jorge",
-    tipoDeposito: "Propio",
-    nombreProducto: "PRODUCTO",
-    rubro: 200,
-    rubroDesc: "HERBICIDAS",
-    unidad: "LT",
-    stockActual: 100,
+  return fakeStockItem({
     precioUsd: 2,
     valorUsd: 200,
-    ventaDiaria: 1,
-    diasCobertura: 50,
-    estado: "Ok",
-    nivelMinimo: 0,
-    bajoMinimo: false,
     estadoVenc: "Critico",
     proximoVencimiento: "2026-08-01",
-    unidadesVencidas: 0,
-    unidadesCriticas: 0,
-    valorUsdVencido: 0,
     diasEnStockMax: 100,
     diasEnStockPromedio: 100,
     semaforoRotacion: "Amarillo",
-    lotes: [],
     ...p,
-  };
+  });
 }
 
 describe("filasDeVencimiento", () => {

@@ -14,10 +14,21 @@ export function FilterBar({ children, className }: { children: ReactNode; classN
   );
 }
 
-/** Campo etiquetado para la FilterBar (label arriba, control abajo). */
-export function FilterField({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * Campo etiquetado para la FilterBar (label arriba, control abajo).
+ * `title` va en el label y no solo en el control: un control deshabilitado no dispara el tooltip.
+ */
+export function FilterField({
+  label,
+  title,
+  children,
+}: {
+  label: string;
+  title?: string;
+  children: ReactNode;
+}) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
+    <label title={title} className="flex flex-col gap-1 text-xs font-medium text-ink-soft">
       {label}
       {children}
     </label>

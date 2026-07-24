@@ -4,14 +4,17 @@ import { env } from "@/lib/env";
 
 const API = env.apiUrl;
 
-// Catálogo de depósitos (los 8 reales que el backend whitelistea). Espeja DepositoCatalogo.
+// Catálogo de depósitos (los 11 que el backend whitelistea). Espeja DepositoCatalogo.
 const CATALOGO: DepositoFiltro[] = [
   { codigo: 0, nombre: "San Jorge", tipo: "Propio" },
   { codigo: 2, nombre: "Semillero", tipo: "Propio" },
   { codigo: 3, nombre: "Las Piur", tipo: "Propio" },
   { codigo: 5, nombre: "San Francisco", tipo: "Propio" },
+  { codigo: 8, nombre: "Prod. Vencidos y/o Abiertos", tipo: "Propio" },
+  { codigo: 43, nombre: "Monsanto / Bayer (SJ)", tipo: "Consignado" },
   { codigo: 44, nombre: "Adama", tipo: "Consignado" },
   { codigo: 45, nombre: "Sigma", tipo: "Consignado" },
+  { codigo: 53, nombre: "Monsanto / Bayer (LV)", tipo: "Consignado" },
   { codigo: 55, nombre: "Bayer", tipo: "Consignado" },
   { codigo: 56, nombre: "Bayer", tipo: "Consignado" },
 ];
@@ -22,9 +25,14 @@ const BASE: Omit<
   | "nivelMinimo" | "bajoMinimo"
   | "estadoVenc" | "proximoVencimiento" | "unidadesVencidas" | "unidadesCriticas" | "valorUsdVencido"
   | "diasEnStockMax" | "diasEnStockPromedio" | "semaforoRotacion" | "lotes"
+  | "pedidosCompras" | "ventaFacturados" | "ventaSinFacturar" | "totalDisponible"
 >[] = [
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 1200, precioUsd: 4.5, valorUsd: 5400, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10002, nombreProducto: "ATRAZINA 50% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 80, precioUsd: 6.2, valorUsd: 496, ventaDiaria: 9.0, diasCobertura: 9, estado: "RiesgoQuiebre" },
+  // Caso testigo de la feature: hay 870 litros en el galpón pero 840 ya están vendidos → 30 disponibles.
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10003, nombreProducto: "DICAMBA 57% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 870, precioUsd: 12.0, valorUsd: 10440, ventaDiaria: 43.5, diasCobertura: 20, estado: "Ok" },
+  // Agotado pero con mercadería en camino: sin la columna "Por llegar" parece un quiebre total.
+  { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10004, nombreProducto: "GLUFOSINATO 15% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 0, precioUsd: 9.0, valorUsd: 0, ventaDiaria: 15.0, diasCobertura: 0, estado: "RiesgoQuiebre" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10010, nombreProducto: "CIPERMETRINA 25% X 5L", rubro: 201, rubroDesc: "INSECTICIDAS", unidad: "LT", stockActual: 300, precioUsd: 8.0, valorUsd: 2400, ventaDiaria: 0, diasCobertura: null, estado: "Inmovilizado" },
   { deposito: 0, depositoNombre: "San Jorge", tipoDeposito: "Propio", codigoArticulo: 10020, nombreProducto: "FOSFATO DIAMONICO X 50KG", rubro: 207, rubroDesc: "FERTILIZANTES", unidad: "KG", stockActual: 25000, precioUsd: 0.85, valorUsd: 21250, ventaDiaria: 140, diasCobertura: 178, estado: "Ok" },
   { deposito: 5, depositoNombre: "San Francisco", tipoDeposito: "Propio", codigoArticulo: 10001, nombreProducto: "GLIFOSATO 48% X 20L", rubro: 200, rubroDesc: "HERBICIDAS", unidad: "LT", stockActual: 400, precioUsd: 4.5, valorUsd: 1800, ventaDiaria: 12.3, diasCobertura: 97, estado: "Ok" },
@@ -40,6 +48,23 @@ const BASE: Omit<
 
 // Mínimos de demo (espeja articulo.nivel_minimo). Los que tienen stock por debajo quedan "bajo mínimo".
 const MINIMOS: Record<number, number> = { 10002: 100, 10030: 100, 10080: 100 };
+
+/**
+ * Pedidos de demo por `depósito-artículo`: compras por llegar (suman) y ventas todavía en el
+ * galpón (restan). Sin entrada → todo en cero. Los tres casos que la feature existe para mostrar:
+ * 10003 vendido casi entero (30 disponibles con 20 días de "cobertura"), 10004 agotado pero con
+ * mercadería en camino, 10080 en SOBREVENTA (disponible negativo, igual que lo muestra MacroGest).
+ */
+const PEDIDOS_DEMO: Record<string, { compras?: number; facturados?: number; sinFacturar?: number }> = {
+  "0-10001": { facturados: 100, sinFacturar: 50 },
+  "0-10003": { facturados: 600, sinFacturar: 240 },
+  "0-10004": { compras: 800 },
+  "0-10020": { compras: 5000, facturados: 2000 },
+  "5-10001": { sinFacturar: 40 },
+  "44-10070": { sinFacturar: 50 },
+  "45-10080": { facturados: 120, sinFacturar: 30 },
+  "56-10091": { compras: 1000 },
+};
 // Días hasta vencer de CADA lote del artículo. Sin entrada → un solo lote que vence lejos (Normal).
 // Cubre las 4 solapas del demo: 10001 tiene dos lotes (uno vencido, uno normal) para que la solapa
 // Vencimientos muestre solo el problemático; 10002 tiene DOS lotes accionables (vencido + crítico)
@@ -101,8 +126,17 @@ const STOCK: StockItem[] = BASE.map((r) => {
   }));
   const unidadesVencidas = unidadesEn(lotes, "Vencido");
   const unidadesCriticas = unidadesEn(lotes, "Critico");
+  const pedidos = PEDIDOS_DEMO[`${r.deposito}-${r.codigoArticulo}`] ?? {};
+  const pedidosCompras = pedidos.compras ?? 0;
+  const ventaFacturados = pedidos.facturados ?? 0;
+  const ventaSinFacturar = pedidos.sinFacturar ?? 0;
   return {
     ...r,
+    pedidosCompras,
+    ventaFacturados,
+    ventaSinFacturar,
+    // Igual que el backend: puede quedar NEGATIVO (sobreventa) y no se pisa en 0.
+    totalDisponible: r.stockActual + pedidosCompras - ventaFacturados - ventaSinFacturar,
     nivelMinimo,
     bajoMinimo: nivelMinimo > 0 && r.stockActual <= nivelMinimo,
     estadoVenc: peorEstadoVenc(lotes),
@@ -172,9 +206,48 @@ function ordenar(rows: StockItem[], orden: string | null): StockItem[] {
   }
 }
 
-/** El set que se pagina/exporta: base + drill-down + orden. */
-function setVisible(u: URL): StockItem[] {
-  return ordenar(drillDown(setBase(STOCK, u), u), u.searchParams.get("orden"));
+/** Depósito ficticio de las filas consolidadas (espeja DepositoConsolidado del backend). */
+const DEPOSITO_CONSOLIDADO = 0;
+
+/** Suma las filas de un artículo en un solo renglón sin depósito. Espeja ConsolidarArticulo. */
+function consolidarArticulo(filas: StockItem[]): StockItem {
+  const suma = (f: (r: StockItem) => number) => filas.reduce((s, r) => s + f(r), 0);
+  return {
+    // Lo no sumable (nombre, rubro, unidad, cobertura, estado) sale de la primera fila.
+    ...filas[0],
+    deposito: DEPOSITO_CONSOLIDADO,
+    depositoNombre: "Todos los depósitos",
+    tipoDeposito: filas.some((r) => r.tipoDeposito === "Propio") ? "Propio" : "Consignado",
+    stockActual: suma((r) => r.stockActual),
+    valorUsd: suma((r) => r.valorUsd),
+    pedidosCompras: suma((r) => r.pedidosCompras),
+    ventaFacturados: suma((r) => r.ventaFacturados),
+    ventaSinFacturar: suma((r) => r.ventaSinFacturar),
+    totalDisponible: suma((r) => r.totalDisponible),
+    unidadesVencidas: suma((r) => r.unidadesVencidas),
+    unidadesCriticas: suma((r) => r.unidadesCriticas),
+    valorUsdVencido: suma((r) => r.valorUsdVencido),
+    estadoVenc: peorEstadoVenc(filas.flatMap((r) => r.lotes)),
+    lotes: filas.flatMap((r) => r.lotes),
+  };
+}
+
+/** Una fila por artículo sumando todos los depósitos (solapa "Stock global"). */
+function consolidar(rows: StockItem[]): StockItem[] {
+  const map = new Map<number, StockItem[]>();
+  for (const r of rows) map.set(r.codigoArticulo, [...(map.get(r.codigoArticulo) ?? []), r]);
+  return [...map.values()]
+    .map(consolidarArticulo)
+    .sort((a, b) => a.rubro - b.rubro || a.codigoArticulo - b.codigoArticulo);
+}
+
+/**
+ * El set que se muestra/exporta. Espeja FilasDeLaSolapa: la consolidación va sobre el SET BASE,
+ * antes del drill-down y del orden, y los totales se siguen calculando sobre el set sin consolidar.
+ */
+function filasDeLaSolapa(base: StockItem[], u: URL): StockItem[] {
+  const filas = u.searchParams.get("consolidado") === "true" ? consolidar(base) : base;
+  return ordenar(drillDown(filas, u), u.searchParams.get("orden"));
 }
 
 function totales(rows: StockItem[]) {
@@ -182,6 +255,11 @@ function totales(rows: StockItem[]) {
   const valorUsdPropio = rows.filter((r) => r.tipoDeposito === "Propio").reduce((s, r) => s + r.valorUsd, 0);
   const valorUsdConsignado = rows.filter((r) => r.tipoDeposito === "Consignado").reduce((s, r) => s + r.valorUsd, 0);
   const valorUsdInmovilizado = rows.filter((r) => r.estado === "Inmovilizado").reduce((s, r) => s + r.valorUsd, 0);
+  // Plata que está en el galpón pero ya tiene dueño: facturado + sin facturar, al precio del artículo.
+  const valorUsdComprometido = rows.reduce(
+    (s, r) => s + (r.ventaFacturados + r.ventaSinFacturar) * r.precioUsd,
+    0,
+  );
   const articulos = new Set(rows.map((r) => r.codigoArticulo));
   const riesgo = new Set(rows.filter((r) => r.estado === "RiesgoQuiebre").map((r) => r.codigoArticulo));
   return {
@@ -190,6 +268,7 @@ function totales(rows: StockItem[]) {
     valorUsdPropio,
     valorUsdConsignado,
     valorUsdInmovilizado,
+    valorUsdComprometido: Math.round(valorUsdComprometido * 100) / 100,
     pctInmovilizado: valorUsdTotal > 0 ? Math.round((valorUsdInmovilizado / valorUsdTotal) * 1000) / 10 : 0,
     cantidadRiesgoQuiebre: riesgo.size,
     cantidadBajoMinimo: new Set(rows.filter((r) => r.bajoMinimo).map((r) => r.codigoArticulo)).size,
@@ -225,7 +304,7 @@ export const stockHandlers = [
     const page = Number(u.searchParams.get("page") ?? "1");
     const pageSize = Number(u.searchParams.get("pageSize") ?? "50");
     const base = setBase(STOCK, u);
-    const rows = ordenar(drillDown(base, u), u.searchParams.get("orden"));
+    const rows = filasDeLaSolapa(base, u);
     const total = rows.length;
     const totalPages = pageSize <= 0 ? 0 : Math.ceil(total / pageSize);
     const items = rows.slice((page - 1) * pageSize, page * pageSize);
@@ -249,7 +328,8 @@ export const stockHandlers = [
   // Export .xlsx (demo): el backend real arma el Excel jerárquico; acá generamos un .xlsx plano válido.
   // Respeta la solapa activa (drill-down + orden), igual que el backend.
   http.get(`${API}/stock/export`, async ({ request }) => {
-    const rows = setVisible(new URL(request.url));
+    const u = new URL(request.url);
+    const rows = filasDeLaSolapa(setBase(STOCK, u), u);
     const { default: writeXlsxFile } = await import("write-excel-file/browser");
     const FMT = '#,##0.00;(#,##0.00);"-"';
     const num = (value: number) => ({ type: Number, value, format: FMT });
@@ -262,6 +342,10 @@ export const stockHandlers = [
         { header: "Rubro", width: 18, cell: (r: StockItem) => ({ type: String, value: r.rubroDesc }) },
         { header: "Unidad", width: 8, cell: (r: StockItem) => ({ type: String, value: r.unidad }) },
         { header: "Stock", width: 12, cell: (r: StockItem) => num(r.stockActual) },
+        { header: "Por llegar", width: 12, cell: (r: StockItem) => num(r.pedidosCompras) },
+        { header: "Facturado", width: 12, cell: (r: StockItem) => num(r.ventaFacturados) },
+        { header: "Sin facturar", width: 12, cell: (r: StockItem) => num(r.ventaSinFacturar) },
+        { header: "Disponible", width: 12, cell: (r: StockItem) => num(r.totalDisponible) },
         { header: "Valor USD", width: 14, cell: (r: StockItem) => num(r.valorUsd) },
         { header: "Días cob.", width: 10, cell: (r: StockItem) => ({ type: Number, value: r.diasCobertura ?? undefined }) },
         { header: "Estado", width: 16, cell: (r: StockItem) => ({ type: String, value: r.estado }) },

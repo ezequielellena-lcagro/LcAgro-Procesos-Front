@@ -22,6 +22,13 @@ function KpisStock({ totales }: Props) {
         hint={`Propio ${usd(totales.valorUsdPropio)} · Consignado ${usd(totales.valorUsdConsignado)}`}
         tone="verde"
       />
+      {/* Plata que está en el galpón pero ya no es nuestra: el stock valorizado la incluye. */}
+      <KpiCard
+        label="USD comprometido"
+        value={usd(totales.valorUsdComprometido)}
+        hint="Ya vendido, sin entregar"
+        tone="rojo"
+      />
     </KpiRow>
   );
 }
@@ -60,7 +67,9 @@ function KpisInmovilizado({ totales }: Props) {
  */
 export function StockKpis({ tab, totales }: { tab: TabStock } & Props) {
   switch (tab) {
+    // "Stock global" es el mismo set visto sin depósitos: comparte los KPIs con la solapa Stock.
     case "stock":
+    case "global":
       return <KpisStock totales={totales} />;
     case "vencimientos":
       return <KpisVencimientos totales={totales} />;
