@@ -64,6 +64,24 @@ describe("StockTable", () => {
     expect(screen.getAllByRole("columnheader")).toHaveLength(COLUMNAS);
   });
 
+  /**
+   * Con 13 columnas y dos sidebars hay que scrollear para llegar a "Disponible". Código y Producto
+   * quedan fijos: sin eso, al scrollear se pierde de qué artículo es el número.
+   */
+  it("mantiene Código y Producto fijos al scrollear, en encabezado y en fila", () => {
+    render(<StockTable filas={[filas[0]]} />);
+    const [codigo, producto] = screen.getAllByRole("columnheader");
+    // El `left` de Producto tiene que coincidir con el ancho de Código: si no, queda un hueco.
+    expect(codigo.className).toContain("sticky left-0");
+    expect(codigo.className).toContain("w-[6rem]");
+    expect(producto.className).toContain("sticky left-[6rem]");
+
+    const celdas = screen.getAllByRole("cell");
+    // La primera fila del tbody es el encabezado de grupo (una sola celda con colSpan).
+    expect(celdas[1].className).toContain("sticky left-0");
+    expect(celdas[2].className).toContain("sticky left-[6rem]");
+  });
+
   it("el subtotal del grupo suma el valor USD de sus artículos", () => {
     render(<StockTable filas={filas} />);
     // 500 + 300 en San Jorge; Adama va solo con 1.000.

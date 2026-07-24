@@ -5,8 +5,10 @@ import { cn } from "@/lib/utils";
  * app dos sidebars, así que en un notebook de 1366px hay que scrollear para llegar a "Disponible" —
  * y sin esto se perdía de qué artículo era el número. Van con fondo propio (el hover no las pinta).
  */
-export const STICKY_CODIGO = "sticky left-0 z-10 w-24";
-export const STICKY_PRODUCTO = "sticky left-24 z-10 max-w-[18rem]";
+// Los 6rem van literales en las dos clases (Tailwind no ve las clases armadas por interpolación) y
+// tienen que coincidir: el `left` de Producto arranca donde termina el ancho de Código.
+export const STICKY_CODIGO = "sticky left-0 z-10 w-[6rem] min-w-[6rem]";
+export const STICKY_PRODUCTO = "sticky left-[6rem] z-10 max-w-[18rem]";
 
 export interface Encabezado {
   label: string;
