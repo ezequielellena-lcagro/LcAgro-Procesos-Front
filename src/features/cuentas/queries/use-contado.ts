@@ -1,17 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import type { FacturasEnMora, FacturasMoraFiltros } from "../types";
+import type { Contado, ContadoFiltros } from "../types";
 import { cuentasKeys } from "./keys";
 
 /**
- * Facturas de contado vencidas y sin cancelar, agrupadas vendedor → cuenta → factura.
+ * Facturas de contado impagas (vencidas y a vencer), agrupadas vendedor → cuenta → factura.
  * `enabled` evita pegarle a la API mientras la solapa no está activa.
  */
-export function useFacturasEnMora(filtros: FacturasMoraFiltros, enabled: boolean) {
+export function useContado(filtros: ContadoFiltros, enabled: boolean) {
   return useQuery({
-    queryKey: cuentasKeys.mora(filtros),
+    queryKey: cuentasKeys.contado(filtros),
     queryFn: async () => {
-      const { data } = await apiClient.get<FacturasEnMora>("/cuentas/facturas-en-mora", {
+      const { data } = await apiClient.get<Contado>("/cuentas/contado", {
         params: {
           vendNro: filtros.vendNro,
           minUsd: filtros.minUsd,

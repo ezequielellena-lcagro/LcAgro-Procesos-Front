@@ -19,8 +19,8 @@ import { CuentasKpis } from "../components/cuentas-kpis";
 import { CuentasSkeleton } from "../components/cuentas-skeleton";
 import { CuentasSubtotales } from "../components/cuentas-subtotales";
 import { CuentasTable } from "../components/cuentas-table";
+import { ContadoPanel } from "../components/contado-panel";
 import { EnviarLinkDialog } from "../components/enviar-link-dialog";
-import { FacturasMoraPanel } from "../components/facturas-mora-panel";
 import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
 import { useExportarCuentas } from "../queries/use-exportar-cuentas";
@@ -38,7 +38,7 @@ export function CuentasPage() {
   const [vendNro, setVendNro] = useState<number | "">("");
   const [minUsd, setMinUsd] = useState("50"); // umbral por defecto del proceso
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState<"lista" | "vendedores" | "mora">("lista");
+  const [tab, setTab] = useState<"lista" | "vendedores" | "contado">("lista");
   const [editar, setEditar] = useState<CuentaDto | null>(null);
   const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
 
@@ -191,7 +191,7 @@ export function CuentasPage() {
             <TabsList>
               <TabsTrigger value="lista">Lista completa</TabsTrigger>
               <TabsTrigger value="vendedores">Total por vendedor</TabsTrigger>
-              <TabsTrigger value="mora">Facturas en mora</TabsTrigger>
+              <TabsTrigger value="contado">Contado</TabsTrigger>
             </TabsList>
 
             <TabsContent value="lista">
@@ -218,11 +218,11 @@ export function CuentasPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="mora">
-              <FacturasMoraPanel
+            <TabsContent value="contado">
+              <ContadoPanel
                 vendNro={vendNro === "" ? undefined : vendNro}
                 minUsd={minUsd ? Number(minUsd) : undefined}
-                activa={tab === "mora"}
+                activa={tab === "contado"}
               />
             </TabsContent>
           </Tabs>

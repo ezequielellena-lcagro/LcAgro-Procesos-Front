@@ -1,5 +1,5 @@
 import { http, HttpResponse } from "msw";
-import type { CuentaDto, CuentaMora, FacturaMora, VendedorMora } from "@/features/cuentas/types";
+import type { CuentaContado, CuentaDto, FacturaContado, VendedorContado } from "@/features/cuentas/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -51,39 +51,56 @@ function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
   return out;
 }
 
-// ── Facturas en mora ────────────────────────────────────────────────────────────
-// Facturas de contado ficticias colgadas de las CUENTAS de arriba (nunca PII real).
-// A propósito hay dos cuentas (2044 y 3088) cuya mora supera el saldo global: es el caso
-// "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura.
-type FacturaMoraBase = Pick<FacturaMora, "comprobante" | "emision" | "vencimiento" | "importe" | "pendiente">;
+// ── Contado ───────────────────────────────────────────────────────────────────────
+// Facturas de contado ficticias colgadas de las CUENTAS de arriba (nunca PII real). Incluye tanto
+// vencidas como a vencer. Las fechas van como OFFSETS de días respecto del corte (hoy) para que el
+// estado vencida/a-vencer sea estable sin importar cuándo corre el demo.
+// A propósito:
+//  - la cuenta 3015 tiene SOLO facturas a vencer (vencido 0) y DEBE aparecer igual: el umbral filtra
+//    por el total impago (monto), nunca por lo vencido;
+//  - las cuentas 2044 y 3088 tienen un monto de contado mayor que su saldo global: es el caso
+//    "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura.
+interface FacturaContadoBase {
+  comprobante: string;
+  emisionOffset: number; // días respecto del corte (negativo = pasado)
+  vencimientoOffset: number; // días respecto del corte (negativo = vencida; >= 0 = a vencer)
+  importe: number;
+  pendiente: number;
+}
 
-const FACTURAS_MORA: Record<number, FacturaMoraBase[]> = {
+const FACTURAS_CONTADO: Record<number, FacturaContadoBase[]> = {
   1024: [
-    { comprobante: "A-18402", emision: "2025-11-12", vencimiento: "2025-12-12", importe: 8200, pendiente: 4100 },
-    { comprobante: "A-18877", emision: "2026-01-20", vencimiento: "2026-02-19", importe: 3150.4, pendiente: 3150.4 },
+    { comprobante: "A-18402", emisionOffset: -220, vencimientoOffset: -190, importe: 8200, pendiente: 4100 }, // vencida
+    { comprobante: "A-19980", emisionOffset: -8, vencimientoOffset: 22, importe: 5200, pendiente: 5200 }, // a vencer
   ],
   1090: [
-    { comprobante: "A-19110", emision: "2026-02-03", vencimiento: "2026-02-18", importe: 1420, pendiente: 620 },
+    { comprobante: "A-19110", emisionOffset: -160, vencimientoOffset: -145, importe: 1420, pendiente: 620 }, // vencida
   ],
   2011: [
-    { comprobante: "A-17650", emision: "2025-08-05", vencimiento: "2025-09-04", importe: 12500, pendiente: 9800 },
-    { comprobante: "A-18033", emision: "2025-09-30", vencimiento: "2025-10-30", importe: 6400, pendiente: 6400 },
-    { comprobante: "A-19540", emision: "2026-03-11", vencimiento: "2026-04-10", importe: 4300.25, pendiente: 1200.25 },
+    { comprobante: "A-17650", emisionOffset: -330, vencimientoOffset: -300, importe: 12500, pendiente: 9800 }, // vencida
+    { comprobante: "A-18033", emisionOffset: -300, vencimientoOffset: -270, importe: 6400, pendiente: 6400 }, // vencida
+    { comprobante: "A-19540", emisionOffset: -10, vencimientoOffset: 20, importe: 4300.25, pendiente: 1200.25 }, // a vencer
   ],
-  // Saldo global 980 contra 5.400 de mora: pagó por canje sin imputar.
+  // Canje: saldo global 980 contra un monto de contado mayor (pagó por canje sin imputar).
   2044: [
-    { comprobante: "A-16988", emision: "2025-06-18", vencimiento: "2025-07-18", importe: 5400, pendiente: 5400 },
+    { comprobante: "A-16988", emisionOffset: -380, vencimientoOffset: -350, importe: 5400, pendiente: 5400 }, // vencida
   ],
   2099: [
-    { comprobante: "A-19022", emision: "2026-01-08", vencimiento: "2026-01-23", importe: 2750, pendiente: 2750 },
+    { comprobante: "A-19022", emisionOffset: -200, vencimientoOffset: -185, importe: 2750, pendiente: 2750 }, // vencida
+  ],
+  // SOLO a vencer (vencido 0): DEBE aparecer aunque no tenga nada vencido.
+  3015: [
+    { comprobante: "A-20110", emisionOffset: -5, vencimientoOffset: 25, importe: 14000, pendiente: 14000 }, // a vencer
+    { comprobante: "A-20155", emisionOffset: -2, vencimientoOffset: 40, importe: 7000, pendiente: 7000 }, // a vencer
   ],
   3051: [
-    { comprobante: "A-18190", emision: "2025-10-02", vencimiento: "2025-11-01", importe: 15000, pendiente: 7500 },
-    { comprobante: "A-19301", emision: "2026-02-14", vencimiento: "2026-03-16", importe: 9200, pendiente: 9200 },
+    { comprobante: "A-18190", emisionOffset: -270, vencimientoOffset: -240, importe: 15000, pendiente: 7500 }, // vencida
+    { comprobante: "A-19301", emisionOffset: -150, vencimientoOffset: -120, importe: 9200, pendiente: 9200 }, // vencida
+    { comprobante: "A-20240", emisionOffset: -3, vencimientoOffset: 30, importe: 8200, pendiente: 8200 }, // a vencer
   ],
-  // Saldo global 540,60 contra 2.100 de mora: mismo caso que 2044.
+  // Canje: saldo global 540,60 contra un monto de contado mayor (mismo caso que 2044).
   3088: [
-    { comprobante: "A-17420", emision: "2025-07-22", vencimiento: "2025-08-21", importe: 2100, pendiente: 2100 },
+    { comprobante: "A-17420", emisionOffset: -360, vencimientoOffset: -330, importe: 2100, pendiente: 2100 }, // vencida
   ],
 };
 
@@ -101,39 +118,62 @@ const isoLocal = (d: Date) =>
 const diasEntre = (desde: string, hasta: string) =>
   Math.round((aFechaLocal(hasta).getTime() - aFechaLocal(desde).getTime()) / DIA_MS);
 
-/** Arma el árbol vendedor → cuenta → factura con el mismo orden que el backend real. */
-function armarMora(u: URL) {
+/** Suma `n` días a una fecha yyyy-MM-dd (en local) y la devuelve como yyyy-MM-dd. */
+function sumarDias(iso: string, n: number): string {
+  const d = aFechaLocal(iso);
+  d.setDate(d.getDate() + n);
+  return isoLocal(d);
+}
+
+/** Arma el árbol vendedor → cuenta → factura de contado con el mismo orden que el backend real. */
+function armarContado(u: URL) {
   const vendNroParam = u.searchParams.get("vendNro");
   const vendNro = vendNroParam ? Number(vendNroParam) : null;
-  // El umbral se aplica sobre la mora de la cuenta (es de lo que habla esta solapa), NO sobre su saldo
-  // global. Ausente o 0 → 50, igual que UmbralPorDefecto del backend.
+  // El umbral se aplica sobre el total de contado impago de la cuenta (monto), NO sobre su saldo
+  // global ni sobre lo vencido: si filtrara por vencido, una cuenta con todo a vencer (vencido 0)
+  // desaparecería, que es justo la que interesa ver. Ausente o 0 → 50 (UmbralPorDefecto del backend).
   const umbral = Number(u.searchParams.get("minUsd") ?? "50") || 50;
   const corte = isoLocal(new Date());
 
-  const porVend = new Map<number, VendedorMora>();
+  const porVend = new Map<number, VendedorContado>();
 
   for (const c of CUENTAS) {
-    const base = FACTURAS_MORA[c.cuenta];
+    const base = FACTURAS_CONTADO[c.cuenta];
     if (!base) continue;
     if (vendNro !== null && c.vendNro !== vendNro) continue;
 
-    const facturas: FacturaMora[] = base
-      .map((f) => ({
-        ...f,
-        plazoDias: diasEntre(f.emision, f.vencimiento),
-        diasAtraso: diasEntre(f.vencimiento, corte),
-      }))
+    const facturas: FacturaContado[] = base
+      .map((f) => {
+        const emision = sumarDias(corte, f.emisionOffset);
+        const vencimiento = sumarDias(corte, f.vencimientoOffset);
+        const vencida = f.vencimientoOffset < 0; // vencimiento < hoy
+        return {
+          comprobante: f.comprobante,
+          emision,
+          vencimiento,
+          plazoDias: diasEntre(emision, vencimiento),
+          vencida,
+          diasAtraso: vencida ? diasEntre(vencimiento, corte) : 0,
+          importe: f.importe,
+          pendiente: f.pendiente,
+        };
+      })
+      // vencimiento asc → las vencidas (fecha pasada) quedan primero.
       .sort((a, b) => a.vencimiento.localeCompare(b.vencimiento));
 
-    const monto = facturas.reduce((s, f) => s + f.pendiente, 0);
+    const montoVencido = facturas.filter((f) => f.vencida).reduce((s, f) => s + f.pendiente, 0);
+    const montoAVencer = facturas.filter((f) => !f.vencida).reduce((s, f) => s + f.pendiente, 0);
+    const monto = montoVencido + montoAVencer;
     if (monto < umbral) continue;
 
-    const cuenta: CuentaMora = {
+    const cuenta: CuentaContado = {
       cuenta: c.cuenta,
       denominacion: c.denominacion,
       saldoVencido: c.saldoVencido,
       saldoAVencer: c.saldoAVencer,
       saldo: c.saldo,
+      montoVencido,
+      montoAVencer,
       monto,
       facturas,
     };
@@ -143,11 +183,15 @@ function armarMora(u: URL) {
       vendedor: c.vendedor,
       cuentas: 0,
       facturas: 0,
+      montoVencido: 0,
+      montoAVencer: 0,
       monto: 0,
       detalle: [],
     };
     v.cuentas += 1;
     v.facturas += facturas.length;
+    v.montoVencido += montoVencido;
+    v.montoAVencer += montoAVencer;
     v.monto += monto;
     v.detalle.push(cuenta);
     porVend.set(c.vendNro, v);
@@ -162,6 +206,8 @@ function armarMora(u: URL) {
       vendedores: vendedores.length,
       cuentas: vendedores.reduce((s, v) => s + v.cuentas, 0),
       facturas: vendedores.reduce((s, v) => s + v.facturas, 0),
+      montoVencido: vendedores.reduce((s, v) => s + v.montoVencido, 0),
+      montoAVencer: vendedores.reduce((s, v) => s + v.montoAVencer, 0),
       monto: vendedores.reduce((s, v) => s + v.monto, 0),
     },
     vendedores,
@@ -214,8 +260,8 @@ export const cuentasHandlers = [
     });
   }),
 
-  http.get(`${API}/cuentas/facturas-en-mora`, ({ request }) => {
-    return HttpResponse.json(armarMora(new URL(request.url)));
+  http.get(`${API}/cuentas/contado`, ({ request }) => {
+    return HttpResponse.json(armarContado(new URL(request.url)));
   }),
 
   // Export .xlsx (demo): el backend real arma el formato fiel; acá generamos un .xlsx válido
