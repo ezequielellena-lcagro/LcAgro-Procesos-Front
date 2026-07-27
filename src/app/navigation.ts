@@ -56,6 +56,13 @@ export const NAV: Area[] = [
         to: "/posicion",
         roles: ["posicion"],
       },
+      {
+        kind: "activo",
+        label: "Stock Físico de Cereal",
+        title: "Stock Físico de Cereal",
+        to: "/stock-fisico",
+        roles: ["stockfisico"],
+      },
       { kind: "futuro", label: "Conciliación con corredores/exportadores" },
       { kind: "futuro", label: "Otorgamiento de cupos" },
     ],

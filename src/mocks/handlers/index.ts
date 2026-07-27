@@ -9,6 +9,7 @@ import { posicionHandlers } from "./posicion";
 import { proveedoresHandlers } from "./proveedores";
 import { semillaHandlers } from "./semilla";
 import { stockHandlers } from "./stock";
+import { stockfisicoHandlers } from "./stockfisico";
 import { usuariosHandlers } from "./usuarios";
 
 export const handlers = [
@@ -20,6 +21,7 @@ export const handlers = [
   ...devolucionHandlers,
   ...semillaHandlers,
   ...stockHandlers,
+  ...stockfisicoHandlers,
   ...comisionesHandlers,
   ...usuariosHandlers,
   ...configHandlers,

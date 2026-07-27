@@ -15,6 +15,7 @@ const CuentasPage = lazy(() => import("@/features/cuentas/pages/cuentas-page").t
 const ProveedoresPage = lazy(() => import("@/features/proveedores/pages/proveedores-page").then((m) => ({ default: m.ProveedoresPage })));
 const SemillaPage = lazy(() => import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })));
 const StockPage = lazy(() => import("@/features/stock/pages/stock-insumos-page").then((m) => ({ default: m.StockInsumosPage })));
+const StockFisicoPage = lazy(() => import("@/features/stockfisico/pages/stockfisico-page").then((m) => ({ default: m.StockFisicoPage })));
 const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })));
 const ConfigPage = lazy(() => import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })));
@@ -67,6 +68,10 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={["stock"]} />,
             children: [{ path: "stock", element: <StockPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["stockfisico"]} />,
+            children: [{ path: "stock-fisico", element: <StockFisicoPage /> }],
           },
           {
             element: <ProtectedRoute roles={["comisiones"]} />,

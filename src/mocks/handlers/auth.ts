@@ -8,11 +8,11 @@ const API = env.apiUrl;
 const USUARIOS: Record<string, User> = {
   "admin@lcagro.local": {
     id: 1, nombre: "Admin Demo", email: "admin@lcagro.local",
-    roles: ["dashboard", "posicion", "cuentas", "proveedores", "semilla", "stock", "usuarios", "config", "auditoria"],
+    roles: ["dashboard", "posicion", "stockfisico", "cuentas", "proveedores", "semilla", "stock", "usuarios", "config", "auditoria"],
   },
   "operador@lcagro.local": {
     id: 2, nombre: "Operador Acopio", email: "operador@lcagro.local",
-    roles: ["dashboard", "posicion", "semilla", "stock"],
+    roles: ["dashboard", "posicion", "stockfisico", "semilla", "stock"],
   },
   "cobranzas@lcagro.local": {
     id: 3, nombre: "Cobranzas Demo", email: "cobranzas@lcagro.local",
