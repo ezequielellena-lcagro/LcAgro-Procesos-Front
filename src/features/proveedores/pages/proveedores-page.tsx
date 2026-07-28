@@ -84,7 +84,7 @@ export function ProveedoresPage() {
   return (
     <>
       <PageHeader
-        title="Proyección de Deuda a Proveedores"
+        title="Cuentas Corrientes Proveedores USD"
         subtitle="Cuántos dólares hay que desembolsar en cada ventana de vencimiento (USD)."
         actions={<ExportButtons onExcel={exportarExcel} excelLoading={exportar.isPending} />}
       />

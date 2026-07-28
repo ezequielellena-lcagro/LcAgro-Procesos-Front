@@ -74,7 +74,7 @@ export function CuentasPage() {
 
   const exportSpec = (): ExportSpec<CuentaDto> => ({
     filename: "cuentas-usd",
-    title: "Cuentas Corrientes USD",
+    title: "Cuentas Corrientes Clientes USD",
     subtitle: `Saldos USD · ${new Date().toLocaleDateString("es-AR")}`,
     columns: exportColumns,
     rows: cuentas.data?.items ?? [],
@@ -94,7 +94,7 @@ export function CuentasPage() {
   return (
     <>
       <PageHeader
-        title="Cuentas Corrientes USD"
+        title="Cuentas Corrientes Clientes USD"
         subtitle="Saldos vencidos y a vencer en USD (modelo open-item)."
         actions={
           <div className="no-print flex items-center gap-2">

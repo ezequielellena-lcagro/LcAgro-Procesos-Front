@@ -53,7 +53,7 @@ export function DashboardPage() {
               <DefRow k="Posición final" v={`${numero(data.posicion.posicionFinalTn)} tn`} />
             </Panel>
 
-            <Panel title="Cuentas Corrientes USD">
+            <Panel title="Cuentas Corrientes Clientes USD">
               <DefRow k="Cuentas" v={String(data.cuentas.totalCuentas)} />
               <DefRow k="Saldo total" v={usd(data.cuentas.saldoTotalUsd)} />
               <DefRow k="Vencido" v={usd(data.cuentas.saldoVencidoUsd)} />

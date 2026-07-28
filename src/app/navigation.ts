@@ -75,15 +75,15 @@ export const NAV: Area[] = [
     procesos: [
       {
         kind: "activo",
-        label: "Cuentas Corrientes USD",
-        title: "Cuentas Corrientes USD",
+        label: "Cuentas Corrientes Clientes USD",
+        title: "Cuentas Corrientes Clientes USD",
         to: "/cuentas",
         roles: ["cuentas"],
       },
       {
         kind: "activo",
-        label: "Proyección de Deuda a Proveedores USD",
-        title: "Proyección de Deuda a Proveedores USD",
+        label: "Cuentas Corrientes Proveedores USD",
+        title: "Cuentas Corrientes Proveedores USD",
         to: "/proveedores",
         roles: ["proveedores"],
       },
