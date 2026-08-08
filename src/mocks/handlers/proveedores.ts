@@ -10,8 +10,9 @@ import { env } from "@/lib/env";
 
 const API = env.apiUrl;
 
-/** Offsets en meses de los 4 horizontes (espeja CalendarioTramos.OffsetsPorDefecto del backend). */
-const OFFSETS = [1, 2, 4, 6];
+/** Offsets en meses de los 4 horizontes (espeja CalendarioTramos.OffsetsPorDefecto del backend).
+ *  El 0 = el propio mes base: la 1ª columna es el mes corriente ("Hasta fin de mes"). */
+const OFFSETS = [0, 1, 3, 5];
 
 /** 4 horizontes + la ventana "posterior", que es la que hace cerrar Σ montos = saldo total. */
 const CANT_TRAMOS = OFFSETS.length + 1;
