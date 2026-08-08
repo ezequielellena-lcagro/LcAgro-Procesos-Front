@@ -129,3 +129,69 @@ export interface Contado {
   totales: TotalesContado;
   vendedores: VendedorContado[];
 }
+
+// ── Histórico mensual (cierre) ──────────────────────────────────────────────────
+// Foto por cuenta y por mes (append-only). Espeja el contrato de /cuentas/cierre.
+
+/**
+ * Estado del cierre: el período ABIERTO (mes en curso) y si ya terminó y falta cerrarlo.
+ * Espeja GET /cuentas/cierre/estado.
+ */
+export interface CierreEstado {
+  anio: number;
+  mes: number;
+  /** El período abierto ya terminó y nadie lo cerró todavía → conviene cerrar. */
+  faltaCerrar: boolean;
+}
+
+/** Un período ya CERRADO (una fila del selector de meses). Espeja un item de /cuentas/cierre/periodos. */
+export interface CierrePeriodo {
+  anio: number;
+  mes: number;
+  cuentas: number;
+  saldo: number;
+  /** Cuándo se sacó la foto (ISO datetime UTC). */
+  fechaCierre: string;
+}
+
+/** Totales USD congelados de la foto de un período. */
+export interface TotalesCierre {
+  cuentas: number;
+  vencido: number;
+  aVencer: number;
+  saldo: number;
+}
+
+/** Una cuenta dentro de la foto de un período (solo lectura). `denominacion` es PII. */
+export interface CierreCuenta {
+  cuenta: number;
+  denominacion: string;
+  vendedor: string;
+  vendNro: number;
+  saldoVencido: number;
+  saldoAVencer: number;
+  saldo: number;
+  devolucion: string | null;
+  observaciones: string | null;
+}
+
+/**
+ * Foto completa de un período cerrado. `corte` es el último día del mes: solo entran movimientos
+ * con fecha_contable <= corte, así la foto es correcta aunque el cierre se corra tarde.
+ * Espeja GET /cuentas/cierre/{anio}/{mes}. Orden de `items`: vendedor, luego cuenta.
+ */
+export interface CierreDetalle {
+  anio: number;
+  mes: number;
+  corte: string;
+  totales: TotalesCierre;
+  items: CierreCuenta[];
+}
+
+/** Respuesta de POST /cuentas/cierre: el mes que quedó cerrado + sus totales. */
+export interface CierreResultado {
+  anio: number;
+  mes: number;
+  cuentas: number;
+  saldo: number;
+}

@@ -20,6 +20,7 @@ import { CuentasSkeleton } from "../components/cuentas-skeleton";
 import { CuentasSubtotales } from "../components/cuentas-subtotales";
 import { CuentasTable } from "../components/cuentas-table";
 import { ContadoPanel } from "../components/contado-panel";
+import { HistoricoPanel } from "../components/historico-panel";
 import { EnviarLinkDialog } from "../components/enviar-link-dialog";
 import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
@@ -38,7 +39,7 @@ export function CuentasPage() {
   const [vendNro, setVendNro] = useState<number | "">("");
   const [minUsd, setMinUsd] = useState("50"); // umbral por defecto del proceso
   const [page, setPage] = useState(1);
-  const [tab, setTab] = useState<"lista" | "vendedores" | "contado">("lista");
+  const [tab, setTab] = useState<"lista" | "vendedores" | "contado" | "historico">("lista");
   const [editar, setEditar] = useState<CuentaDto | null>(null);
   const [enviarLinkOpen, setEnviarLinkOpen] = useState(false);
 
@@ -192,6 +193,7 @@ export function CuentasPage() {
               <TabsTrigger value="lista">Lista completa</TabsTrigger>
               <TabsTrigger value="vendedores">Total por vendedor</TabsTrigger>
               <TabsTrigger value="contado">Contado</TabsTrigger>
+              <TabsTrigger value="historico">Histórico</TabsTrigger>
             </TabsList>
 
             <TabsContent value="lista">
@@ -224,6 +226,10 @@ export function CuentasPage() {
                 minUsd={minUsd ? Number(minUsd) : undefined}
                 activa={tab === "contado"}
               />
+            </TabsContent>
+
+            <TabsContent value="historico">
+              <HistoricoPanel puedeGestionar={puedeEditar} />
             </TabsContent>
           </Tabs>
         </div>

@@ -1,5 +1,11 @@
 import { http, HttpResponse } from "msw";
-import type { CuentaContado, CuentaDto, FacturaContado, VendedorContado } from "@/features/cuentas/types";
+import type {
+  CierreCuenta,
+  CuentaContado,
+  CuentaDto,
+  FacturaContado,
+  VendedorContado,
+} from "@/features/cuentas/types";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -214,6 +220,103 @@ function armarContado(u: URL) {
   };
 }
 
+// ── Histórico mensual (cierre) ──────────────────────────────────────────────────
+// Foto append-only por (periodo, cuenta). En memoria: se siembran 2 meses cerrados y el POST agrega
+// uno nuevo (upsert por período → idempotente). El "mes en curso" es el primer mes NO cerrado.
+
+interface CierreSnapshot {
+  anio: number;
+  mes: number;
+  corte: string; // yyyy-MM-dd (último día del mes)
+  fechaCierre: string; // ISO datetime
+  items: CierreCuenta[];
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const diasEnMes = (anio: number, mes: number) => new Date(anio, mes, 0).getDate();
+const corteDe = (anio: number, mes: number) => `${anio}-${pad2(mes)}-${pad2(diasEnMes(anio, mes))}`;
+const periodoActual = () => {
+  const hoy = new Date();
+  return { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 };
+};
+const mesSiguiente = (anio: number, mes: number) =>
+  mes === 12 ? { anio: anio + 1, mes: 1 } : { anio, mes: mes + 1 };
+// a es anterior a b (compara año-mes).
+const antesDe = (a: { anio: number; mes: number }, b: { anio: number; mes: number }) =>
+  a.anio < b.anio || (a.anio === b.anio && a.mes < b.mes);
+
+/** Congela la foto de un período: saldos de las CUENTAS con un factor de progresión (sin notas). */
+function fotoItems(factor: number): CierreCuenta[] {
+  return CUENTAS.map((c) => {
+    const saldoVencido = round2(c.saldoVencido * factor);
+    const saldoAVencer = round2(c.saldoAVencer * factor);
+    return {
+      cuenta: c.cuenta,
+      denominacion: c.denominacion,
+      vendedor: c.vendedor,
+      vendNro: c.vendNro,
+      saldoVencido,
+      saldoAVencer,
+      saldo: round2(saldoVencido + saldoAVencer),
+      devolucion: null as string | null,
+      observaciones: null as string | null,
+    };
+  }).sort((a, b) => a.vendedor.localeCompare(b.vendedor) || a.cuenta - b.cuenta);
+}
+
+// 2 meses sembrados con una leve progresión (para que el futuro tablero tenga de dónde comparar).
+const mayo = fotoItems(0.9);
+mayo[0].observaciones = "Refinanció el saldo vencido.";
+mayo[0].devolucion = "Firmó plan a 90 días.";
+const junio = fotoItems(0.95);
+junio[1].observaciones = "Prometió cancelar contra cosecha.";
+
+const CIERRES: CierreSnapshot[] = [
+  { anio: 2026, mes: 5, corte: corteDe(2026, 5), fechaCierre: "2026-06-01T10:00:00.000Z", items: mayo },
+  { anio: 2026, mes: 6, corte: corteDe(2026, 6), fechaCierre: "2026-07-01T10:00:00.000Z", items: junio },
+];
+
+const totalesDe = (items: CierreCuenta[]) => ({
+  cuentas: items.length,
+  vencido: round2(items.reduce((s, c) => s + c.saldoVencido, 0)),
+  aVencer: round2(items.reduce((s, c) => s + c.saldoAVencer, 0)),
+  saldo: round2(items.reduce((s, c) => s + c.saldo, 0)),
+});
+
+/** El período abierto = el primer mes NO cerrado (el siguiente al último cerrado). */
+function periodoAbierto() {
+  const ordenados = [...CIERRES].sort((a, b) => b.anio - a.anio || b.mes - a.mes);
+  const ult = ordenados[0];
+  const abierto = ult ? mesSiguiente(ult.anio, ult.mes) : periodoActual();
+  return { ...abierto, faltaCerrar: antesDe(abierto, periodoActual()) };
+}
+
+/** Congela el período abierto (upsert por período) y limpia las notas del mes en curso. */
+function cerrarMesEnCurso(): CierreSnapshot {
+  const { anio, mes } = periodoAbierto();
+  const items = CUENTAS.map((c) => ({
+    cuenta: c.cuenta,
+    denominacion: c.denominacion,
+    vendedor: c.vendedor,
+    vendNro: c.vendNro,
+    saldoVencido: c.saldoVencido,
+    saldoAVencer: c.saldoAVencer,
+    saldo: c.saldo,
+    devolucion: OBS[c.cuenta]?.devolucion ?? null,
+    observaciones: OBS[c.cuenta]?.observaciones ?? null,
+  })).sort((a, b) => a.vendedor.localeCompare(b.vendedor) || a.cuenta - b.cuenta);
+
+  const snap: CierreSnapshot = { anio, mes, corte: corteDe(anio, mes), fechaCierre: new Date().toISOString(), items };
+  const i = CIERRES.findIndex((s) => s.anio === anio && s.mes === mes);
+  if (i >= 0) CIERRES[i] = snap;
+  else CIERRES.push(snap);
+
+  // El mes nuevo arranca en blanco (la foto ya guardó lo del mes que cierra).
+  for (const k of Object.keys(OBS)) delete OBS[Number(k)];
+  return snap;
+}
+
 export const cuentasHandlers = [
   http.get(`${API}/cuentas`, ({ request }) => {
     const u = new URL(request.url);
@@ -339,6 +442,84 @@ export const cuentasHandlers = [
     return HttpResponse.json({
       url: `${location.origin}/devolucion/demo`,
       expiraUtc: new Date(Date.now() + 86400000).toISOString(),
+    });
+  }),
+
+  // ── Histórico mensual (cierre) ────────────────────────────────────────────────
+  // Estado del cierre: período abierto + si ya terminó y falta cerrarlo.
+  http.get(`${API}/cuentas/cierre/estado`, () => {
+    return HttpResponse.json(periodoAbierto());
+  }),
+
+  // Períodos cerrados (más nuevo primero) para el selector.
+  http.get(`${API}/cuentas/cierre/periodos`, () => {
+    const lista = [...CIERRES]
+      .sort((a, b) => b.anio - a.anio || b.mes - a.mes)
+      .map((s) => ({
+        anio: s.anio,
+        mes: s.mes,
+        cuentas: s.items.length,
+        saldo: totalesDe(s.items).saldo,
+        fechaCierre: s.fechaCierre,
+      }));
+    return HttpResponse.json(lista);
+  }),
+
+  // Cierra el mes en curso (idempotente: upsert por período).
+  http.post(`${API}/cuentas/cierre`, () => {
+    const snap = cerrarMesEnCurso();
+    return HttpResponse.json({
+      anio: snap.anio,
+      mes: snap.mes,
+      cuentas: snap.items.length,
+      saldo: totalesDe(snap.items).saldo,
+    });
+  }),
+
+  // Foto de un período cerrado (solo lectura).
+  http.get(`${API}/cuentas/cierre/:anio/:mes`, ({ params }) => {
+    const anio = Number(params.anio);
+    const mes = Number(params.mes);
+    const snap = CIERRES.find((s) => s.anio === anio && s.mes === mes);
+    if (!snap) return new HttpResponse("Período no encontrado.", { status: 404 });
+    return HttpResponse.json({
+      anio: snap.anio,
+      mes: snap.mes,
+      corte: snap.corte,
+      totales: totalesDe(snap.items),
+      items: snap.items,
+    });
+  }),
+
+  // Export .xlsx de la foto de un período (demo: mismo patrón que /cuentas/export).
+  http.get(`${API}/cuentas/cierre/:anio/:mes/export`, async ({ params }) => {
+    const anio = Number(params.anio);
+    const mes = Number(params.mes);
+    const snap = CIERRES.find((s) => s.anio === anio && s.mes === mes);
+    if (!snap) return new HttpResponse("Período no encontrado.", { status: 404 });
+
+    const { default: writeXlsxFile } = await import("write-excel-file/browser");
+    const FMT = '#,##0.00;(#,##0.00);"-"';
+    const num = (value: number) => ({ type: Number, value, format: FMT });
+    const blob = await writeXlsxFile(snap.items, {
+      sheet: "Cierre",
+      columns: [
+        { header: "Vendedor", width: 16, cell: (r: CierreCuenta) => ({ type: String, value: r.vendedor }) },
+        { header: "Cuenta", width: 8, cell: (r: CierreCuenta) => ({ type: Number, value: r.cuenta }) },
+        { header: "Cliente", width: 38, cell: (r: CierreCuenta) => ({ type: String, value: r.denominacion }) },
+        { header: "Vencido (USD)", width: 14, cell: (r: CierreCuenta) => num(r.saldoVencido) },
+        { header: "A vencer (USD)", width: 14, cell: (r: CierreCuenta) => num(r.saldoAVencer) },
+        { header: "Saldo (USD)", width: 13, cell: (r: CierreCuenta) => num(r.saldo) },
+        { header: "Devolución", width: 40, cell: (r: CierreCuenta) => ({ type: String, value: r.devolucion ?? undefined }) },
+        { header: "Observaciones", width: 25, cell: (r: CierreCuenta) => ({ type: String, value: r.observaciones ?? undefined }) },
+      ],
+    }).toBlob();
+
+    return new HttpResponse(blob, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="Cierre_${anio}${pad2(mes)}.xlsx"`,
+      },
     });
   }),
 ];
