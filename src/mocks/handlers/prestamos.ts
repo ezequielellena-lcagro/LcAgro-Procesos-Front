@@ -298,6 +298,20 @@ export const prestamosHandlers = [
     return HttpResponse.json(cuotas);
   }),
 
+  // Los .xlsx del modo mocks van vacíos: generar un Excel real en el browser no aporta nada
+  // (el formato lo cubren los tests del backend) y sí pesaría en el bundle.
+  http.get(`${API}/prestamos/plantilla`, () => new HttpResponse(new Blob(), { status: 200 })),
+  http.get(`${API}/prestamos/export`, () => new HttpResponse(new Blob(), { status: 200 })),
+  http.post(`${API}/prestamos/import`, ({ request }) =>
+    HttpResponse.json({
+      operacionesCreadas: 2,
+      operacionesActualizadas: 1,
+      cuotasCargadas: 7,
+      confirmado: new URL(request.url).searchParams.get("confirmar") === "true",
+      advertencias: [],
+    }),
+  ),
+
   // Las escrituras responden OK sin persistir: el modo mocks es para recorrer la pantalla.
   http.post(`${API}/prestamos`, () => HttpResponse.json(conDerivados(detalles[0]), { status: 201 })),
   http.put(`${API}/prestamos/:id`, () => HttpResponse.json(conDerivados(detalles[0]))),

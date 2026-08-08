@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Download, FileUp, Plus, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -8,12 +8,14 @@ import { useAuth } from "@/features/auth/auth-context";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
+import { ImportarDialog } from "../components/importar-dialog";
 import { OperacionesTable } from "../components/operaciones-table";
 import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
 import { PrestamoDialog } from "../components/prestamo-dialog";
 import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
 import { VencimientosTable } from "../components/vencimientos-table";
+import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
 import { usePrestamos, useVencimientos } from "../queries/use-prestamos";
 import type { Moneda, VencimientoDto } from "../types";
 
@@ -35,6 +37,10 @@ export function PrestamosPage() {
   const [incluirPagadas, setIncluirPagadas] = useState(false);
   const [editando, setEditando] = useState<number | null>(null);
   const [pagando, setPagando] = useState<VencimientoDto | null>(null);
+  const [importando, setImportando] = useState(false);
+
+  const exportarPlantilla = useExportarPlantilla();
+  const exportarReporte = useExportarReporte();
 
   const vencimientos = useVencimientos({ moneda, incluirPagadas });
   const operaciones = usePrestamos({ moneda });
@@ -53,11 +59,36 @@ export function PrestamosPage() {
         title="Préstamos Bancarios"
         subtitle="Qué se debe, a qué banco y cuándo vence cada cuota."
         actions={
-          puedeGestionar && (
-            <Button variant="accent" onClick={() => setEditando(0)}>
-              <Plus className="mr-1 size-4" /> Nuevo préstamo
+          <div className="no-print flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportarReporte.mutate()}
+              disabled={exportarReporte.isPending}
+            >
+              <Printer className="size-4" />
+              {exportarReporte.isPending ? "Generando…" : "Reporte"}
             </Button>
-          )
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => exportarPlantilla.mutate({ moneda })}
+              disabled={exportarPlantilla.isPending}
+            >
+              <Download className="size-4" />
+              {exportarPlantilla.isPending ? "Generando…" : "Exportar plantilla"}
+            </Button>
+            {puedeGestionar && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setImportando(true)}>
+                  <FileUp className="size-4" /> Importar
+                </Button>
+                <Button variant="accent" size="sm" onClick={() => setEditando(0)}>
+                  <Plus className="size-4" /> Nuevo préstamo
+                </Button>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -141,6 +172,7 @@ export function PrestamosPage() {
         monedaPorDefecto={moneda}
       />
       <PagarCuotaDialog cuota={pagando} onClose={() => setPagando(null)} />
+      <ImportarDialog open={importando} onClose={() => setImportando(false)} />
     </>
   );
 }
