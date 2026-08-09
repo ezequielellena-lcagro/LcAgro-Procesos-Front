@@ -38,6 +38,11 @@ interface DataTableProps<T> {
   rowClassName?: (row: T, index: number) => string;
   /** Si se pasa, las filas se muestran agrupadas. El orden por columna actúa dentro del grupo. */
   groupBy?: GroupBy<T>;
+  /**
+   * Orden con el que abre la tabla. Es sólo el punto de partida: se invierte y se suelta como
+   * cualquier otro, y al soltarlo queda el orden con el que vinieron los datos.
+   */
+  defaultSort?: { key: string; sentido?: Sentido };
 }
 
 type Sentido = "asc" | "desc";
@@ -72,8 +77,11 @@ export function DataTable<T>({
   onRowClick,
   rowClassName,
   groupBy,
+  defaultSort,
 }: DataTableProps<T>) {
-  const [orden, setOrden] = useState<{ key: string; sentido: Sentido } | null>(null);
+  const [orden, setOrden] = useState<{ key: string; sentido: Sentido } | null>(() =>
+    defaultSort ? { key: defaultSort.key, sentido: defaultSort.sentido ?? "asc" } : null,
+  );
 
   // Tres estados por columna: ascendente → descendente → como vino. El tercer clic devuelve el
   // orden natural (el calendario, en la tabla de vencimientos) sin tener que recargar.
@@ -114,8 +122,20 @@ export function DataTable<T>({
   const fila = (row: T, i: number) => (
     <tr
       key={getRowKey(row, i)}
+      // El tono se elige acá, pero el dato de "esta fila va pintada" se expone aparte: así se
+      // puede afirmar sobre el rayado sin atarse al color, que es presentación y va a cambiar.
+      data-franja={i % 2 === 1 ? "" : undefined}
       className={cn(
-        "border-b border-line-soft last:border-0 hover:bg-panel-soft/60",
+        "border-b border-line-soft last:border-0",
+        // Franjas alternadas: en una tabla de 30 filas y 12 columnas de números, seguir una fila
+        // con la vista es la mitad del trabajo de leerla. Con grupos el índice es local, así que
+        // la franja se reinicia en cada uno.
+        //
+        // `line-soft` y no `panel-soft`: este último está a 4 puntos de RGB del fondo del panel y
+        // en pantalla no se distingue. Al 45 % la franja se nota sin pesar.
+        i % 2 === 1 && "bg-line-soft/45",
+        // El hover tiene que quedar por encima de la franja, o en las filas pintadas no se notaría.
+        "hover:bg-line-soft/90",
         onRowClick && "cursor-pointer",
         rowClassName?.(row, i),
       )}
@@ -233,18 +253,20 @@ function Grupo<T>({
 }) {
   return (
     <>
-      <tr className="border-b border-line bg-panel-soft/80">
+      {/* Más marcado que la franja de las filas: si no, el título del grupo se leería como
+          una fila más en vez de como el corte entre dos. */}
+      <tr className="border-y border-line bg-line-soft">
         <th
           scope="colgroup"
           colSpan={columns.length}
-          className="px-3 py-1.5 text-left text-xs font-semibold uppercase tracking-wide text-ink"
+          className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-ink"
         >
           {titulo}
         </th>
       </tr>
       {children}
       {subtotal && (
-        <tr className="border-b border-line bg-panel-soft/40 text-ink">
+        <tr className="border-b border-line bg-line-soft/70 text-ink">
           {columns.map((c, i) => (
             <td
               key={c.key}

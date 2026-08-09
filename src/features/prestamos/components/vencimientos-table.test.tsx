@@ -144,10 +144,11 @@ describe("VencimientosTable", () => {
       />,
     );
 
-    // Los vacíos son la fila de subtotal con la que cierra cada grupo.
+    // Los vacíos son la fila de subtotal con la que cierra cada grupo. Los grupos salen por
+    // número de operación porque es el orden con el que abre la tabla.
     expect(columnaDelCuerpo(4)).toEqual([
-      "28078488", "28078488", "",
       "28078142", "28078142", "",
+      "28078488", "28078488", "",
     ]);
   });
 

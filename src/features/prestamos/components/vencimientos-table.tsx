@@ -144,6 +144,10 @@ export function VencimientosTable({ datos, onPagar, puedeGestionar, agrupacion }
       columns={columns}
       rows={datos.items}
       getRowKey={(v) => v.cuotaId}
+      // Abre por operación: así las cuotas de un mismo préstamo salen juntas, que es como se lee
+      // la planilla. El backend la manda por fecha (el calendario), y un clic en Vencimiento
+      // vuelve a eso.
+      defaultSort={{ key: "operacion" }}
       groupBy={agrupadorDe(agrupacion, datos.moneda)}
       empty="No hay vencimientos con esos filtros."
       footer={[

@@ -136,6 +136,70 @@ describe("DataTable · ordenamiento", () => {
     expect(encabezado()).toHaveAttribute("aria-sort", "descending");
   });
 
+  it("puede arrancar ordenada por una columna", () => {
+    render(
+      <DataTable
+        columns={COLUMNAS}
+        rows={FILAS}
+        getRowKey={(f) => f.id}
+        defaultSort={{ key: "banco" }}
+      />,
+    );
+
+    expect(columna(1)).toEqual(["GALICIA", "NACIÓN", "SANTANDER"]);
+    expect(screen.getByRole("columnheader", { name: /banco/i })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+  });
+
+  it("el orden inicial se puede invertir y soltar como cualquier otro", () => {
+    render(
+      <DataTable
+        columns={COLUMNAS}
+        rows={FILAS}
+        getRowKey={(f) => f.id}
+        defaultSort={{ key: "banco" }}
+      />,
+    );
+    const banco = screen.getByRole("button", { name: /banco/i });
+
+    fireEvent.click(banco);
+    expect(columna(1)).toEqual(["SANTANDER", "NACIÓN", "GALICIA"]);
+
+    // Y el siguiente clic devuelve el orden con el que vinieron los datos, no el inicial.
+    fireEvent.click(banco);
+    expect(columna(1)).toEqual(["NACIÓN", "GALICIA", "SANTANDER"]);
+  });
+
+  it("el orden inicial acepta empezar al revés", () => {
+    render(
+      <DataTable
+        columns={COLUMNAS}
+        rows={FILAS}
+        getRowKey={(f) => f.id}
+        defaultSort={{ key: "total", sentido: "desc" }}
+      />,
+    );
+
+    expect(columna(2)).toEqual(["30646027.4", "183300", "174463.69"]);
+  });
+
+  /** Las filas con el mismo valor conservan el orden en que vinieron: un sort estable. */
+  it("no reordena las filas empatadas", () => {
+    const filas = [
+      { id: 1, banco: "NACIÓN", vence: "2026-11-09", total: 1, tna: 1 },
+      { id: 2, banco: "NACIÓN", vence: "2027-05-10", total: 2, tna: 1 },
+      { id: 3, banco: "GALICIA", vence: "2026-10-15", total: 3, tna: 1 },
+    ];
+    render(<DataTable columns={COLUMNAS} rows={filas} getRowKey={(f) => f.id} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /banco/i }));
+
+    // Las dos de NACIÓN quedan en su orden cronológico original.
+    expect(columna(0)).toEqual(["2026-10-15", "2026-11-09", "2027-05-10"]);
+  });
+
   it("el pie de totales no se mueve al reordenar", () => {
     render(
       <DataTable
@@ -149,6 +213,46 @@ describe("DataTable · ordenamiento", () => {
     fireEvent.click(screen.getByRole("button", { name: /banco/i }));
 
     expect(screen.getByText("31.003.791,09")).toBeInTheDocument();
+  });
+});
+
+describe("DataTable · legibilidad", () => {
+  /**
+   * Franjas alternadas: en una tabla de 30 filas y 12 columnas de números, seguir una fila con la
+   * vista es la mitad del trabajo de leerla.
+   */
+  it("pinta las filas alternadas", () => {
+    render(<DataTable columns={COLUMNAS} rows={FILAS} getRowKey={(f) => f.id} />);
+
+    const filas = screen.getAllByRole("row").filter((tr) => tr.closest("tbody"));
+    expect(filas[0]).not.toHaveAttribute("data-franja");
+    expect(filas[1]).toHaveAttribute("data-franja");
+    expect(filas[2]).not.toHaveAttribute("data-franja");
+  });
+
+  it("la franja se reinicia en cada grupo", () => {
+    const filas = [
+      { id: 1, banco: "NACIÓN", vence: "2027-01-28", total: 1, tna: 1 },
+      { id: 2, banco: "NACIÓN", vence: "2027-02-28", total: 2, tna: 1 },
+      { id: 3, banco: "GALICIA", vence: "2027-03-28", total: 3, tna: 1 },
+    ];
+    render(
+      <DataTable
+        columns={COLUMNAS}
+        rows={filas}
+        getRowKey={(f) => f.id}
+        groupBy={{ clave: (f) => f.banco, titulo: (f) => f.banco }}
+      />,
+    );
+
+    const conDatos = screen
+      .getAllByRole("row")
+      .filter((tr) => within(tr).queryAllByRole("cell").length > 1);
+
+    // NACIÓN: sin franja, con franja. GALICIA arranca de nuevo: sin franja.
+    expect(conDatos[0]).not.toHaveAttribute("data-franja");
+    expect(conDatos[1]).toHaveAttribute("data-franja");
+    expect(conDatos[2]).not.toHaveAttribute("data-franja");
   });
 });
 
