@@ -14,4 +14,6 @@ export const prestamosKeys = {
   catalogos: () => [...prestamosKeys.all, "catalogos"] as const,
   /** Cruce contra MacroGest. */
   conciliacion: () => [...prestamosKeys.all, "conciliacion"] as const,
+  /** Débitos de cuota del banco, para imputar. */
+  pagosMacroGest: () => [...prestamosKeys.all, "pagos-macrogest"] as const,
 };

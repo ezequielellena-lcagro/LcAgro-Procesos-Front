@@ -5,6 +5,7 @@ import type {
   CuotaPropuesta,
   Moneda,
   PrestamoDetalleDto,
+  ConciliacionPagos,
   PrestamoListadoDto,
   ResumenPrestamos,
   VencimientosDto,
@@ -298,6 +299,66 @@ export const prestamosHandlers = [
       totalesPorPeriodo: periodos.map((_, i) => filas.reduce((s, f) => s + f.montos[i], 0)),
       totalGeneral: cuotas.reduce((s, c) => s + c.total, 0),
     } satisfies ResumenPrestamos);
+  }),
+
+  // Los pagos del banco: en mocks se devuelve un caso CON algo para imputar, más las dos listas
+  // informativas. Un "nada que imputar" no mostraría nada de la pantalla.
+  http.get(`${API}/prestamos/macrogest/pagos`, () => {
+    // Se propone contra la primera cuota pendiente del primer préstamo, para que el tilde y el
+    // botón de confirmar tengan un caso real que tocar.
+    const prestamo = detalles[0];
+    const cuota = prestamo.cuotas.find((c) => c.estado === "Pendiente") ?? prestamo.cuotas[0];
+
+    return HttpResponse.json({
+      desde: enMeses(-12),
+      sugeridos: [
+        {
+          prestamoId: prestamo.id,
+          cuotaId: cuota.id,
+          nroOperacion: prestamo.nroOperacion,
+          banco: prestamo.banco,
+          linea: prestamo.linea,
+          moneda: prestamo.moneda,
+          nroCuota: cuota.nroCuota,
+          cantidadCuotas: prestamo.cantidadCuotas,
+          fechaVencimiento: cuota.fechaVencimiento,
+          totalCuota: cuota.total,
+          fechaPago: cuota.fechaVencimiento,
+          importeDebitado: cuota.total,
+          concepto: "CAPITAL CUOTA DE PRÉSTAMO · FAC A 00004-28078488",
+          importeCoincide: true,
+          diferenciaArs: prestamo.moneda === "ARS" ? 0 : null,
+        },
+      ],
+      sinCuotaPendiente: [
+        {
+          nroComprobante: "28078488",
+          fecha: enMeses(-1),
+          importeArs: 31942465.74,
+          banco: "NACIÓN",
+          concepto: "CAPITAL CUOTA DE PRESTAMO · FAC A 00004-28078488",
+          prestamoId: prestamo.id,
+          nroOperacion: prestamo.nroOperacion,
+        },
+      ],
+      sinPrestamo: [
+        {
+          nroComprobante: "1766273",
+          fecha: enMeses(-8),
+          importeArs: 17129983.23,
+          banco: "CREDICOOP",
+          concepto: "CAPITAL CUOTA PRÉSTAMO",
+          prestamoId: null,
+          nroOperacion: null,
+        },
+      ],
+      hayPropuestas: true,
+    } satisfies ConciliacionPagos);
+  }),
+
+  http.post(`${API}/prestamos/macrogest/pagos/confirmar`, async ({ request }) => {
+    const body = (await request.json()) as { pagos: { cuotaId: number }[] };
+    return HttpResponse.json({ imputados: body.pagos.length });
   }),
 
   // Cruce contra MacroGest: en mocks se devuelve un caso CON diferencias, que es el que hay

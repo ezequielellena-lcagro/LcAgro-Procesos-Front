@@ -12,18 +12,20 @@ import { ConciliacionPanel } from "../components/conciliacion-panel";
 import { ImportarDialog } from "../components/importar-dialog";
 import { OperacionesTable } from "../components/operaciones-table";
 import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
+import { PagosPanel } from "../components/pagos-panel";
 import { PrestamoDialog } from "../components/prestamo-dialog";
 import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
 import { ResumenMatriz } from "../components/resumen-matriz";
 import { VencimientosTable } from "../components/vencimientos-table";
 import { useConciliacion } from "../queries/use-conciliacion";
+import { useConfirmarPagos, usePagosMacroGest } from "../queries/use-pagos-macrogest";
 import { useResumen } from "../queries/use-resumen";
 import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
 import { usePrestamos, useVencimientos } from "../queries/use-prestamos";
 import type { Agrupacion, Moneda, VencimientoDto } from "../types";
 
-type Pestania = "vencimientos" | "operaciones" | "resumen" | "conciliacion";
+type Pestania = "vencimientos" | "operaciones" | "resumen" | "conciliacion" | "pagos";
 
 /**
  * Préstamos y créditos bancarios. Reemplaza el Excel de Administración (`Prestamos La Clementina`),
@@ -49,6 +51,8 @@ export function PrestamosPage() {
   // Sólo se consulta al abrir la pestaña: va por VPN contra la base del cliente.
   const conciliacion = useConciliacion(pestania === "conciliacion");
   const resumen = useResumen({ moneda, incluirPagadas, agrupacion }, pestania === "resumen");
+  const pagos = usePagosMacroGest(pestania === "pagos");
+  const confirmarPagos = useConfirmarPagos();
 
   const vencimientos = useVencimientos({ moneda, incluirPagadas });
   const operaciones = usePrestamos({ moneda });
@@ -152,6 +156,7 @@ export function PrestamosPage() {
               </TabsTrigger>
               <TabsTrigger value="resumen">Resumen</TabsTrigger>
               <TabsTrigger value="conciliacion">MacroGest</TabsTrigger>
+              <TabsTrigger value="pagos">Pagos del banco</TabsTrigger>
             </TabsList>
 
             <TabsContent value="vencimientos">
@@ -179,6 +184,18 @@ export function PrestamosPage() {
                 agrupacion={agrupacion}
                 onAgrupacionChange={setAgrupacion}
                 cargando={resumen.isPending}
+              />
+            </TabsContent>
+
+            <TabsContent value="pagos">
+              <PagosPanel
+                datos={pagos.data}
+                cargando={pagos.isPending || pagos.isFetching}
+                error={pagos.error}
+                onReintentar={() => void pagos.refetch()}
+                onConfirmar={(items) => confirmarPagos.mutate(items)}
+                confirmando={confirmarPagos.isPending}
+                puedeGestionar={puedeGestionar}
               />
             </TabsContent>
 

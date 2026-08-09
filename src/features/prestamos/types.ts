@@ -284,3 +284,56 @@ export interface ResumenPrestamos {
   totalesPorPeriodo: number[];
   totalGeneral: number;
 }
+
+// ── Conciliación de pagos con MacroGest ─────────────────────────────────────
+
+/** Un débito del banco que se propone imputar a una cuota pendiente. */
+export interface PagoSugerido {
+  prestamoId: number;
+  cuotaId: number;
+  nroOperacion: string | null;
+  banco: string;
+  linea: string;
+  moneda: Moneda;
+  nroCuota: number;
+  cantidadCuotas: number;
+  fechaVencimiento: string;
+  totalCuota: number;
+  /** Fecha del débito: es la que queda como fecha de pago si se confirma. */
+  fechaPago: string;
+  /** Lo que debitó el banco, en pesos: capital + intereses + impuestos. */
+  importeDebitado: number;
+  concepto: string;
+  importeCoincide: boolean;
+  /** `null` en dólares: el banco debita pesos al cambio del día y comparar no significa nada. */
+  diferenciaArs: number | null;
+}
+
+/** Un débito que no se pudo proponer. */
+export interface PagoNoImputado {
+  nroComprobante: string;
+  fecha: string;
+  importeArs: number;
+  banco: string;
+  concepto: string;
+  prestamoId: number | null;
+  nroOperacion: string | null;
+}
+
+/**
+ * El cruce de los pagos del banco contra las cuotas pendientes. Todo es una **propuesta**: nada
+ * queda marcado como pagado hasta que alguien lo confirma.
+ */
+export interface ConciliacionPagos {
+  desde: string;
+  sugeridos: PagoSugerido[];
+  sinCuotaPendiente: PagoNoImputado[];
+  sinPrestamo: PagoNoImputado[];
+  hayPropuestas: boolean;
+}
+
+export interface ConfirmarPagoItem {
+  cuotaId: number;
+  fechaPago: string;
+  importePagado?: number | null;
+}
