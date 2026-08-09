@@ -8,6 +8,7 @@ import { useAuth } from "@/features/auth/auth-context";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
+import { ConciliacionPanel } from "../components/conciliacion-panel";
 import { ImportarDialog } from "../components/importar-dialog";
 import { OperacionesTable } from "../components/operaciones-table";
 import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
@@ -15,11 +16,12 @@ import { PrestamoDialog } from "../components/prestamo-dialog";
 import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
 import { VencimientosTable } from "../components/vencimientos-table";
+import { useConciliacion } from "../queries/use-conciliacion";
 import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
 import { usePrestamos, useVencimientos } from "../queries/use-prestamos";
 import type { Moneda, VencimientoDto } from "../types";
 
-type Pestania = "vencimientos" | "operaciones";
+type Pestania = "vencimientos" | "operaciones" | "conciliacion";
 
 /**
  * Préstamos y créditos bancarios. Reemplaza el Excel de Administración (`Prestamos La Clementina`),
@@ -41,6 +43,8 @@ export function PrestamosPage() {
 
   const exportarPlantilla = useExportarPlantilla();
   const exportarReporte = useExportarReporte();
+  // Sólo se consulta al abrir la pestaña: va por VPN contra la base del cliente.
+  const conciliacion = useConciliacion(pestania === "conciliacion");
 
   const vencimientos = useVencimientos({ moneda, incluirPagadas });
   const operaciones = usePrestamos({ moneda });
@@ -142,6 +146,7 @@ export function PrestamosPage() {
               <TabsTrigger value="operaciones">
                 Operaciones ({datos.operaciones.length})
               </TabsTrigger>
+              <TabsTrigger value="conciliacion">MacroGest</TabsTrigger>
             </TabsList>
 
             <TabsContent value="vencimientos">
@@ -160,6 +165,15 @@ export function PrestamosPage() {
                 puedeGestionar={puedeGestionar}
                 onEditar={setEditando}
                 onVer={setEditando}
+              />
+            </TabsContent>
+
+            <TabsContent value="conciliacion">
+              <ConciliacionPanel
+                datos={conciliacion.data}
+                cargando={conciliacion.isPending || conciliacion.isFetching}
+                error={conciliacion.error}
+                onReintentar={() => void conciliacion.refetch()}
               />
             </TabsContent>
           </Tabs>

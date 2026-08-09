@@ -221,3 +221,37 @@ export interface ImportacionPrestamos {
   confirmado: boolean;
   advertencias: string[];
 }
+
+// ── Conciliación con MacroGest ──────────────────────────────────────────────
+
+/** Una operación del sistema, en la vista de conciliación. */
+export interface FilaConciliacion {
+  prestamoId: number;
+  nroOperacion: string | null;
+  banco: string;
+  linea: string;
+  capital: number;
+}
+
+/** Un préstamo que el banco registró y el sistema no tiene, con lo que se pudo parsear del texto. */
+export interface FilaPropuesta {
+  nroOperacion: string;
+  banco: string;
+  capitalUsd: number | null;
+  tasaNominalAnual: number | null;
+  concepto: string;
+  fecha: string;
+}
+
+/**
+ * El cruce contra MacroGest. Es el control que el Excel nunca tuvo: en la primera corrida
+ * encontró préstamos cargados sin respaldo bancario y préstamos del banco sin cargar.
+ */
+export interface ConciliacionMacroGest {
+  desde: string;
+  conciliadas: FilaConciliacion[];
+  sinRespaldoBancario: FilaConciliacion[];
+  sinCargar: FilaPropuesta[];
+  sinNumeroDeOperacion: FilaConciliacion[];
+  hayDiferencias: boolean;
+}

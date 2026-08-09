@@ -260,6 +260,59 @@ export const prestamosHandlers = [
     } satisfies VencimientosDto);
   }),
 
+  // Cruce contra MacroGest: en mocks se devuelve un caso CON diferencias, que es el que hay
+  // que poder mirar. Un "todo conciliado" no muestra nada de la pantalla.
+  http.get(`${API}/prestamos/macrogest/conciliacion`, () =>
+    HttpResponse.json({
+      desde: enMeses(-36),
+      conciliadas: [
+        {
+          prestamoId: 1,
+          nroOperacion: "39646384",
+          banco: "NACIÓN",
+          linea: "AGRO BAYER",
+          capital: 120000,
+        },
+        {
+          prestamoId: 2,
+          nroOperacion: "808130097682",
+          banco: "GALICIA",
+          linea: "BUNGE",
+          capital: 110000,
+        },
+      ],
+      sinRespaldoBancario: [
+        {
+          prestamoId: 3,
+          nroOperacion: "972180700",
+          banco: "SANTA FE",
+          linea: "CAPITAL DE TRABAJO",
+          capital: 150000,
+        },
+      ],
+      sinCargar: [
+        {
+          nroOperacion: "00058050",
+          banco: "NACIÓN",
+          capitalUsd: 225377.02,
+          tasaNominalAnual: 2.75,
+          concepto: "Préstamo Agronación Agro Bayer TNA 2,75 %",
+          fecha: enMeses(-3),
+        },
+      ],
+      sinNumeroDeOperacion: [
+        {
+          prestamoId: 4,
+          nroOperacion: null,
+          banco: "MACRO",
+          linea: "AGRO BAYER",
+          capital: 62212.65,
+        },
+      ],
+      hayDiferencias: true,
+    }),
+  ),
+
   http.get(`${API}/prestamos/catalogos`, () =>
     HttpResponse.json({ bancos: BANCOS, lineas: LINEAS } satisfies CatalogosPrestamos),
   ),
@@ -313,7 +366,9 @@ export const prestamosHandlers = [
   ),
 
   // Las escrituras responden OK sin persistir: el modo mocks es para recorrer la pantalla.
-  http.post(`${API}/prestamos`, () => HttpResponse.json(conDerivados(detalles[0]), { status: 201 })),
+  http.post(`${API}/prestamos`, () =>
+    HttpResponse.json(conDerivados(detalles[0]), { status: 201 }),
+  ),
   http.put(`${API}/prestamos/:id`, () => HttpResponse.json(conDerivados(detalles[0]))),
   http.delete(`${API}/prestamos/:id`, () => new HttpResponse(null, { status: 204 })),
   http.post(`${API}/prestamos/cuotas/:id/pagar`, () => new HttpResponse(null, { status: 204 })),

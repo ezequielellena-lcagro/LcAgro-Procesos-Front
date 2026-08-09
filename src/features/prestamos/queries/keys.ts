@@ -10,4 +10,6 @@ export const prestamosKeys = {
   vencimiento: (f: VencimientoFiltros) => [...prestamosKeys.vencimientos(), f] as const,
   /** Bancos y líneas: no dependen de ningún filtro. */
   catalogos: () => [...prestamosKeys.all, "catalogos"] as const,
+  /** Cruce contra MacroGest. */
+  conciliacion: () => [...prestamosKeys.all, "conciliacion"] as const,
 };
