@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/shared/components/error-state";
 import { KpiCard } from "@/shared/components/kpi-card";
 import { PageHeader } from "@/shared/components/page-header";
-import { numero, tn, usd } from "@/shared/format/format";
+import { ars, fecha, numero, oDash, tn, usd } from "@/shared/format/format";
 import { useDashboard } from "../queries/use-dashboard";
 
 export function DashboardPage() {
@@ -11,7 +11,10 @@ export function DashboardPage() {
 
   return (
     <>
-      <PageHeader title="Dashboard" subtitle="Resumen de Posición de Cereal y Cuentas Corrientes." />
+      <PageHeader
+        title="Dashboard"
+        subtitle="Resumen de Posición de Cereal, Cuentas Corrientes y deuda bancaria."
+      />
 
       {isError ? (
         <ErrorState error={error} onRetry={() => void refetch()} />
@@ -42,6 +45,12 @@ export function DashboardPage() {
               hint={`${data.cuentas.cuentasConVencido} con vencido`}
               tone="rojo"
             />
+            <KpiCard
+              label="Deuda bancaria"
+              value={usd(data.prestamos.saldoUsd)}
+              hint={`${data.prestamos.operacionesVigentes} operaciones · ${ars(data.prestamos.saldoArs)}`}
+              tone={data.prestamos.cuotasVencidas > 0 ? "rojo" : undefined}
+            />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -59,6 +68,17 @@ export function DashboardPage() {
               <DefRow k="Vencido" v={usd(data.cuentas.saldoVencidoUsd)} />
               <DefRow k="A vencer" v={usd(data.cuentas.saldoAVencerUsd)} />
               <DefRow k="Cuentas con vencido" v={String(data.cuentas.cuentasConVencido)} />
+            </Panel>
+
+            <Panel title="Préstamos Bancarios">
+              <DefRow k="Operaciones vigentes" v={String(data.prestamos.operacionesVigentes)} />
+              <DefRow k="Saldo en dólares" v={usd(data.prestamos.saldoUsd)} />
+              <DefRow k="Saldo en pesos" v={ars(data.prestamos.saldoArs)} />
+              <DefRow
+                k="Próximo vencimiento"
+                v={oDash(data.prestamos.proximoVencimiento, fecha)}
+              />
+              <DefRow k="Cuotas vencidas e impagas" v={String(data.prestamos.cuotasVencidas)} />
             </Panel>
           </div>
         </div>
@@ -89,11 +109,12 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: 5 }).map((_, i) => (
           <Skeleton key={i} className="h-24 rounded-card" />
         ))}
       </div>
       <div className="grid gap-3 md:grid-cols-2">
+        <Skeleton className="h-56 rounded-card" />
         <Skeleton className="h-56 rounded-card" />
         <Skeleton className="h-56 rounded-card" />
       </div>

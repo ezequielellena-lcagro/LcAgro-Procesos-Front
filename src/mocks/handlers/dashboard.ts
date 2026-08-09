@@ -22,6 +22,13 @@ const DASHBOARD: DashboardDto = {
     saldoAVencerUsd: 72650.25,
     cuentasConVencido: 11,
   },
+  prestamos: {
+    saldoUsd: 2601402.3,
+    saldoArs: 149551485.68,
+    operacionesVigentes: 23,
+    proximoVencimiento: "2026-09-10",
+    cuotasVencidas: 0,
+  },
 };
 
 export const dashboardHandlers = [http.get(`${API}/dashboard`, () => HttpResponse.json(DASHBOARD))];

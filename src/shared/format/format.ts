@@ -4,6 +4,8 @@ const usdFmt = new Intl.NumberFormat("es-AR", { minimumFractionDigits: 2, maximu
 const pctFmt = new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 });
 
 export const usd = (n: number) => `US$ ${usdFmt.format(n)}`;
+/** Pesos. Mismo formato que `usd`: en las pantallas que mezclan monedas el símbolo es lo único que cambia. */
+export const ars = (n: number) => `$ ${usdFmt.format(n)}`;
 export const tn = (n: number) => `${tnFmt.format(n)} tn`;
 export const pct = (n: number) => `${pctFmt.format(n)} %`;
 export const numero = (n: number) => tnFmt.format(n);
@@ -20,3 +22,11 @@ export const fecha = (iso: string) => {
 export function oDash<T>(value: T | null | undefined, fmt: (v: T) => string): string {
   return value == null ? "—" : fmt(value);
 }
+
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+/** Nombre largo de un mes (1–12) con su año, ej. `mesAnio(2026, 7)` → "Julio 2026". */
+export const mesAnio = (anio: number, mes: number) => `${MESES[mes - 1] ?? mes} ${anio}`;

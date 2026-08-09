@@ -15,13 +15,15 @@ import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
 import { PrestamoDialog } from "../components/prestamo-dialog";
 import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
+import { ResumenMatriz } from "../components/resumen-matriz";
 import { VencimientosTable } from "../components/vencimientos-table";
 import { useConciliacion } from "../queries/use-conciliacion";
+import { useResumen } from "../queries/use-resumen";
 import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
 import { usePrestamos, useVencimientos } from "../queries/use-prestamos";
-import type { Moneda, VencimientoDto } from "../types";
+import type { Agrupacion, Moneda, VencimientoDto } from "../types";
 
-type Pestania = "vencimientos" | "operaciones" | "conciliacion";
+type Pestania = "vencimientos" | "operaciones" | "resumen" | "conciliacion";
 
 /**
  * Préstamos y créditos bancarios. Reemplaza el Excel de Administración (`Prestamos La Clementina`),
@@ -40,11 +42,13 @@ export function PrestamosPage() {
   const [editando, setEditando] = useState<number | null>(null);
   const [pagando, setPagando] = useState<VencimientoDto | null>(null);
   const [importando, setImportando] = useState(false);
+  const [agrupacion, setAgrupacion] = useState<Agrupacion>("mes");
 
   const exportarPlantilla = useExportarPlantilla();
   const exportarReporte = useExportarReporte();
   // Sólo se consulta al abrir la pestaña: va por VPN contra la base del cliente.
   const conciliacion = useConciliacion(pestania === "conciliacion");
+  const resumen = useResumen({ moneda, incluirPagadas, agrupacion }, pestania === "resumen");
 
   const vencimientos = useVencimientos({ moneda, incluirPagadas });
   const operaciones = usePrestamos({ moneda });
@@ -146,6 +150,7 @@ export function PrestamosPage() {
               <TabsTrigger value="operaciones">
                 Operaciones ({datos.operaciones.length})
               </TabsTrigger>
+              <TabsTrigger value="resumen">Resumen</TabsTrigger>
               <TabsTrigger value="conciliacion">MacroGest</TabsTrigger>
             </TabsList>
 
@@ -165,6 +170,15 @@ export function PrestamosPage() {
                 puedeGestionar={puedeGestionar}
                 onEditar={setEditando}
                 onVer={setEditando}
+              />
+            </TabsContent>
+
+            <TabsContent value="resumen">
+              <ResumenMatriz
+                datos={resumen.data}
+                agrupacion={agrupacion}
+                onAgrupacionChange={setAgrupacion}
+                cargando={resumen.isPending}
               />
             </TabsContent>
 

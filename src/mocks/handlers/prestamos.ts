@@ -6,6 +6,7 @@ import type {
   Moneda,
   PrestamoDetalleDto,
   PrestamoListadoDto,
+  ResumenPrestamos,
   VencimientosDto,
 } from "@/features/prestamos/types";
 import { env } from "@/lib/env";
@@ -258,6 +259,45 @@ export const prestamosHandlers = [
       totalIva: items.reduce((s, i) => s + i.iva, 0),
       totalTotal: items.reduce((s, i) => s + i.total, 0),
     } satisfies VencimientosDto);
+  }),
+
+  // El resumen se arma del mismo mock que el calendario, igual que en el backend: si se armara
+  // de una lista aparte, los mocks reproducirían justo el bug que el módulo viene a resolver.
+  http.get(`${API}/prestamos/resumen`, ({ request }) => {
+    const url = new URL(request.url);
+    const moneda = (url.searchParams.get("moneda") ?? "USD") as Moneda;
+    const incluirPagadas = url.searchParams.get("incluirPagadas") === "true";
+    const porFecha = url.searchParams.get("agrupacion") === "fecha";
+
+    const cuotas = detalles
+      .filter((p) => p.moneda === moneda)
+      .flatMap((p) =>
+        p.cuotas
+          .filter((c) => incluirPagadas || c.estado === "Pendiente")
+          .map((c) => ({
+            banco: p.banco,
+            periodo: porFecha ? c.fechaVencimiento : c.fechaVencimiento.slice(0, 7),
+            total: c.total,
+          })),
+      );
+
+    const periodos = [...new Set(cuotas.map((c) => c.periodo))].sort();
+    const bancos = [...new Set(cuotas.map((c) => c.banco))].sort();
+
+    const filas = bancos.map((banco) => {
+      const montos = periodos.map((p) =>
+        cuotas.filter((c) => c.banco === banco && c.periodo === p).reduce((s, c) => s + c.total, 0),
+      );
+      return { banco, montos, total: montos.reduce((s, m) => s + m, 0) };
+    });
+
+    return HttpResponse.json({
+      moneda,
+      periodos,
+      filas,
+      totalesPorPeriodo: periodos.map((_, i) => filas.reduce((s, f) => s + f.montos[i], 0)),
+      totalGeneral: cuotas.reduce((s, c) => s + c.total, 0),
+    } satisfies ResumenPrestamos);
   }),
 
   // Cruce contra MacroGest: en mocks se devuelve un caso CON diferencias, que es el que hay

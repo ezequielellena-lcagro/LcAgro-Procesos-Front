@@ -255,3 +255,32 @@ export interface ConciliacionMacroGest {
   sinNumeroDeOperacion: FilaConciliacion[];
   hayDiferencias: boolean;
 }
+
+// ── Resumen banco × período ─────────────────────────────────────────────────
+
+/** `mes` = una columna por mes (planificar caja); `fecha` = una por vencimiento (ver el detalle). */
+export type Agrupacion = "mes" | "fecha";
+
+export interface ResumenFiltros extends VencimientoFiltros {
+  agrupacion?: Agrupacion;
+}
+
+/** Un banco y lo que le vence en cada período. `montos` está alineado índice a índice con `periodos`. */
+export interface FilaResumen {
+  banco: string;
+  montos: number[];
+  total: number;
+}
+
+/**
+ * La matriz banco × período: el reemplazo de la tabla dinámica del Excel. La diferencia es que
+ * sale del mismo dato que el calendario, así que no puede quedar desactualizada respecto de él.
+ */
+export interface ResumenPrestamos {
+  moneda: Moneda;
+  /** Claves ordenables: `yyyy-MM` o `yyyy-MM-dd` según la agrupación. */
+  periodos: string[];
+  filas: FilaResumen[];
+  totalesPorPeriodo: number[];
+  totalGeneral: number;
+}
