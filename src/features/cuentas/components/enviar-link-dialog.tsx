@@ -66,7 +66,6 @@ export function EnviarLinkDialog({ open, onClose }: EnviarLinkDialogProps) {
           <Label htmlFor="vendedor-link">Vendedor</Label>
           <Select
             id="vendedor-link"
-            className="w-full"
             value={vendNro ?? ""}
             onChange={(e) => onSelectVendedor(e.target.value)}
             disabled={vendedores.isPending}

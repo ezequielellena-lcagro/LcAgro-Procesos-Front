@@ -111,7 +111,6 @@ export function SemillaTable({ filas, cultivo, puedeEditar, sugerencias, conteoA
               value={m.categoria}
               onChange={(e) => m.setCategoria(e.target.value as CategoriaValue)}
               disabled={m.guardando}
-              className="w-full"
             >
               <option value="">Elegí…</option>
               {CATEGORIAS.map((c) => (

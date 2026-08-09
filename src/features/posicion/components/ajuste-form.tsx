@@ -81,7 +81,7 @@ export function AjusteForm({ campania, edit, submitting, onSubmit, onCancel }: P
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="cereal">Cereal</Label>
-          <Select id="cereal" className="w-full" {...form.register("cereal")}>
+          <Select id="cereal" {...form.register("cereal")}>
             {CEREALES.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -93,7 +93,7 @@ export function AjusteForm({ campania, edit, submitting, onSubmit, onCancel }: P
 
         <div className="space-y-1.5">
           <Label htmlFor="tipo">Tipo</Label>
-          <Select id="tipo" className="w-full" {...form.register("tipo")}>
+          <Select id="tipo" {...form.register("tipo")}>
             {TIPOS_AJUSTE_MANUAL.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -105,7 +105,7 @@ export function AjusteForm({ campania, edit, submitting, onSubmit, onCancel }: P
 
         <div className="space-y-1.5">
           <Label htmlFor="signo">Signo</Label>
-          <Select id="signo" className="w-full" {...form.register("signo")}>
+          <Select id="signo" {...form.register("signo")}>
             <option value="+">+ (suma)</option>
             <option value="-">− (resta)</option>
           </Select>

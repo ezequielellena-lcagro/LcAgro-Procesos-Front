@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Wand2 } from "lucide-react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch, type Control } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
+import { cn } from "@/lib/utils";
 import type { FilaCuota } from "../cronograma";
 import {
   useActualizarPrestamo,
@@ -84,6 +85,95 @@ function aValues(p: PrestamoDetalleDto): Values {
     tasaNominalAnual: p.tasaNominalAnual === null ? "" : String(p.tasaNominalAnual),
     observaciones: p.observaciones ?? "",
   };
+}
+
+/**
+ * Un campo del formulario: rótulo, control y una sola línea debajo — el error si lo hay, la ayuda
+ * si no. Que sea siempre la misma pieza es lo que hace que la grilla quede pareja.
+ */
+function Campo({
+  label,
+  htmlFor,
+  hint,
+  error,
+  children,
+  className,
+}: {
+  label: string;
+  htmlFor: string;
+  hint?: string;
+  error?: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-1.5", className)}>
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+      {error ? (
+        <p className="text-xs font-medium text-rojo">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-ink-soft">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Un tramo del formulario, con su título. Ordena la carga en pasos legibles. */
+function Bloque({
+  titulo,
+  ayuda,
+  children,
+}: {
+  titulo: string;
+  ayuda?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline gap-3 border-b border-line pb-1.5">
+        <h3 className="font-display text-sm font-semibold text-ink">{titulo}</h3>
+        {ayuda ? <p className="text-xs text-ink-soft">{ayuda}</p> : null}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Campo de importe o porcentaje: el símbolo va dentro del control y el número alineado a la
+ * derecha, en tabular. Es la misma convención que las tablas de la app — una columna de plata
+ * se lee por la coma, no por el borde izquierdo.
+ */
+function CampoNumerico({
+  simbolo,
+  posicion,
+  className,
+  ...props
+}: InputHTMLAttributes<HTMLInputElement> & { simbolo: ReactNode; posicion: "izq" | "der" }) {
+  return (
+    <div className="relative">
+      <span
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute top-1/2 -translate-y-1/2 text-sm text-ink-soft",
+          posicion === "izq" ? "left-3" : "right-3",
+        )}
+      >
+        {simbolo}
+      </span>
+      <Input
+        inputMode="decimal"
+        className={cn("tabular text-right", posicion === "izq" ? "pl-12" : "pr-8", className)}
+        {...props}
+      />
+    </div>
+  );
+}
+
+/** El símbolo del capital sigue a la moneda elegida, sin re-renderizar el formulario entero. */
+function SimboloMoneda({ control }: { control: Control<Values> }) {
+  return <>{useWatch({ control, name: "moneda" }) === "ARS" ? "$" : "U$S"}</>;
 }
 
 interface Props {
@@ -245,143 +335,156 @@ function PrestamoForm({
   const { errors } = form.formState;
 
   return (
-    <form onSubmit={submit} className="space-y-5" noValidate>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="bancoId">Banco</Label>
-          <Select id="bancoId" {...form.register("bancoId")} disabled={catalogos.isPending}>
-            <option value="">Elegí…</option>
-            {catalogos.data?.bancos.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </Select>
-          {errors.bancoId && <p className="text-xs text-rojo">{errors.bancoId.message}</p>}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="sucursal">Sucursal</Label>
-          <Input id="sucursal" placeholder="SAN JORGE" {...form.register("sucursal")} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="lineaCreditoId">Línea de crédito</Label>
-          <Select
-            id="lineaCreditoId"
-            {...form.register("lineaCreditoId")}
-            disabled={catalogos.isPending}
-          >
-            <option value="">Elegí…</option>
-            {catalogos.data?.lineas.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.nombre}
-              </option>
-            ))}
-          </Select>
-          {errors.lineaCreditoId && (
-            <p className="text-xs text-rojo">{errors.lineaCreditoId.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="nroOperacion">N° de operación</Label>
-          <Input id="nroOperacion" {...form.register("nroOperacion")} />
-          <p className="text-xs text-ink-soft">Opcional: no todas las operaciones lo traen.</p>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="moneda">Moneda</Label>
-          <Select id="moneda" {...form.register("moneda")}>
-            <option value="USD">Dólares (U$S)</option>
-            <option value="ARS">Pesos ($)</option>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="tipo">Tipo</Label>
-          <Select id="tipo" {...form.register("tipo")}>
-            {TIPOS.map((t) => (
-              <option key={t.valor} value={t.valor}>
-                {t.etiqueta}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="capitalOriginal">Capital original</Label>
-          <Input id="capitalOriginal" inputMode="decimal" {...form.register("capitalOriginal")} />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="fechaOtorgamiento">Fecha de otorgamiento</Label>
-          {/* Controller y no `watch()`: el compilador de React no puede memoizar `watch`, y con
-                un campo controlado eso deriva en UI desactualizada. */}
-          <Controller
-            control={form.control}
-            name="fechaOtorgamiento"
-            render={({ field }) => (
-              <DateField id="fechaOtorgamiento" value={field.value} onChange={field.onChange} />
-            )}
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="tasaNominalAnual">TNA (%)</Label>
-          <Input id="tasaNominalAnual" inputMode="decimal" {...form.register("tasaNominalAnual")} />
-        </div>
-      </div>
-
-      {/* Asistente de cronograma */}
-      <fieldset className="space-y-3 rounded-card border border-line bg-panel-soft p-3">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
-          Cronograma
-        </legend>
-        <div className="grid items-end gap-3 sm:grid-cols-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="cantidadCuotas">Cantidad de cuotas</Label>
-            <Input
-              id="cantidadCuotas"
-              type="number"
-              min="1"
-              max="360"
-              {...form.register("cantidadCuotas")}
-            />
-            <p className="text-xs text-ink-soft">
-              Total del préstamo, aunque cargues sólo las que faltan pagar.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="periodicidad">Periodicidad</Label>
-            <Select id="periodicidad" {...form.register("periodicidad")}>
-              {PERIODICIDADES.map((p) => (
-                <option key={p.valor} value={p.valor}>
-                  {p.etiqueta}
+    <form onSubmit={submit} className="space-y-6" noValidate>
+      <Bloque titulo="La operación" ayuda="Con quién y de qué tipo.">
+        <div className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Campo label="Banco" htmlFor="bancoId" error={errors.bancoId?.message}>
+            <Select id="bancoId" {...form.register("bancoId")} disabled={catalogos.isPending}>
+              <option value="">Elegí…</option>
+              {catalogos.data?.bancos.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
                 </option>
               ))}
             </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="primerVto">Primer vencimiento</Label>
-            <DateField id="primerVto" value={primerVto} onChange={setPrimerVto} />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={generar}
-            disabled={simular.isPending || guardando}
-          >
-            <Wand2 className="mr-1 size-4" />
-            {simular.isPending ? "Generando…" : "Generar cuotas"}
-          </Button>
-        </div>
+          </Campo>
 
-        <p className="text-xs text-ink-soft">
-          El asistente reparte el capital y avanza por periodicidad. Es una propuesta: ajustá las
-          fechas y cargá el interés y el IVA del cuadro de marcha del banco. El IVA se completa solo
-          al 12 % (10,5 % + 1,5 %) y podés pisarlo.
-        </p>
+          <Campo label="Sucursal" htmlFor="sucursal">
+            <Input id="sucursal" placeholder="SAN JORGE" {...form.register("sucursal")} />
+          </Campo>
+
+          <Campo
+            label="Línea de crédito"
+            htmlFor="lineaCreditoId"
+            error={errors.lineaCreditoId?.message}
+          >
+            <Select
+              id="lineaCreditoId"
+              {...form.register("lineaCreditoId")}
+              disabled={catalogos.isPending}
+            >
+              <option value="">Elegí…</option>
+              {catalogos.data?.lineas.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nombre}
+                </option>
+              ))}
+            </Select>
+          </Campo>
+
+          <Campo
+            label="N° de operación"
+            htmlFor="nroOperacion"
+            hint="Con esto se cruza contra MacroGest."
+          >
+            <Input id="nroOperacion" placeholder="28078488" {...form.register("nroOperacion")} />
+          </Campo>
+
+          <Campo label="Moneda" htmlFor="moneda">
+            <Select id="moneda" {...form.register("moneda")}>
+              <option value="USD">Dólares (U$S)</option>
+              <option value="ARS">Pesos ($)</option>
+            </Select>
+          </Campo>
+
+          <Campo label="Tipo" htmlFor="tipo">
+            <Select id="tipo" {...form.register("tipo")}>
+              {TIPOS.map((t) => (
+                <option key={t.valor} value={t.valor}>
+                  {t.etiqueta}
+                </option>
+              ))}
+            </Select>
+          </Campo>
+        </div>
+      </Bloque>
+
+      <Bloque titulo="Condiciones" ayuda="Lo que dice el contrato. Todo opcional.">
+        <div className="grid items-start gap-x-4 gap-y-3 sm:grid-cols-3">
+          <Campo label="Capital original" htmlFor="capitalOriginal">
+            <CampoNumerico
+              id="capitalOriginal"
+              posicion="izq"
+              simbolo={<SimboloMoneda control={form.control} />}
+              placeholder="0,00"
+              {...form.register("capitalOriginal")}
+            />
+          </Campo>
+
+          <Campo label="Fecha de otorgamiento" htmlFor="fechaOtorgamiento">
+            {/* Controller y no `watch()`: el compilador de React no puede memoizar `watch`, y con
+                un campo controlado eso deriva en UI desactualizada. */}
+            <Controller
+              control={form.control}
+              name="fechaOtorgamiento"
+              render={({ field }) => (
+                <DateField id="fechaOtorgamiento" value={field.value} onChange={field.onChange} />
+              )}
+            />
+          </Campo>
+
+          <Campo label="Tasa nominal anual" htmlFor="tasaNominalAnual">
+            <CampoNumerico
+              id="tasaNominalAnual"
+              posicion="der"
+              simbolo="%"
+              placeholder="0,00"
+              {...form.register("tasaNominalAnual")}
+            />
+          </Campo>
+        </div>
+      </Bloque>
+
+      <Bloque
+        titulo="Cronograma"
+        ayuda="El asistente propone; los números finales son los del banco."
+      >
+        <div className="rounded-card border border-line bg-panel-soft p-3.5">
+          <div className="grid items-end gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Campo label="Cantidad de cuotas" htmlFor="cantidadCuotas">
+              <Input
+                id="cantidadCuotas"
+                type="number"
+                min="1"
+                max="360"
+                placeholder="8"
+                className="tabular text-right"
+                {...form.register("cantidadCuotas")}
+              />
+            </Campo>
+
+            <Campo label="Periodicidad" htmlFor="periodicidad">
+              <Select id="periodicidad" {...form.register("periodicidad")}>
+                {PERIODICIDADES.map((p) => (
+                  <option key={p.valor} value={p.valor}>
+                    {p.etiqueta}
+                  </option>
+                ))}
+              </Select>
+            </Campo>
+
+            <Campo label="Primer vencimiento" htmlFor="primerVto">
+              <DateField id="primerVto" value={primerVto} onChange={setPrimerVto} />
+            </Campo>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={generar}
+              disabled={simular.isPending || guardando}
+            >
+              <Wand2 className="mr-1 size-4" />
+              {simular.isPending ? "Generando…" : "Generar cuotas"}
+            </Button>
+          </div>
+
+          <p className="mt-2.5 text-xs text-ink-soft">
+            Reparte el capital y avanza por periodicidad. Después ajustá las fechas y cargá el
+            interés del cuadro de marcha; el <strong>IVA se completa solo al 12 %</strong> (10,5 % +
+            1,5 %) y se puede pisar. La cantidad incluye las cuotas ya pagadas, aunque cargues sólo
+            las que faltan.
+          </p>
+        </div>
 
         <CronogramaEditor
           cuotas={cuotas}
@@ -389,14 +492,14 @@ function PrestamoForm({
           bloqueadas={pagadas}
           disabled={guardando}
         />
-      </fieldset>
+      </Bloque>
 
-      <div className="space-y-1.5">
-        <Label htmlFor="observaciones">Observaciones</Label>
+      <Campo label="Observaciones" htmlFor="observaciones">
         <Textarea id="observaciones" rows={2} {...form.register("observaciones")} />
-      </div>
+      </Campo>
 
-      <div className="flex justify-end gap-2">
+      {/* Pegado al pie: el formulario es largo y Guardar no se tiene que ir de la vista. */}
+      <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end gap-2 border-t border-line bg-panel px-5 py-3.5">
         <Button type="button" variant="outline" onClick={onClose} disabled={guardando}>
           Cancelar
         </Button>
