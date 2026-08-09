@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
+import { CampaniaSelect } from "@/shared/components/campania-select";
+import { resolverCampania } from "@/shared/format/campania";
 import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { ExportButtons } from "@/shared/components/export-buttons";
@@ -40,12 +42,8 @@ export function PosicionPage() {
   const [ajustesOpen, setAjustesOpen] = useState(false);
   const [tab, setTab] = useState<"resumen" | "detalle" | "arrastre">("resumen");
 
-  // Campaña por defecto: el año en curso define la campaña (año-1)-(año). Ej.: 2026 → "2025-2026".
-  // Si esa campaña no está en la lista, cae a la más reciente (derivado, sin efecto).
-  const anioActual = new Date().getFullYear();
-  const campaniaActual = `${anioActual - 1}-${anioActual}`;
-  const campania =
-    campaniaSel ?? (campanias.data?.includes(campaniaActual) ? campaniaActual : campanias.data?.[0]);
+  // Campaña por defecto: la vigente si está en la lista, si no la más reciente (derivado, sin efecto).
+  const campania = resolverCampania(campaniaSel, campanias.data);
 
   const posicion = usePosicion(campania, cereal || undefined, precioMin, precioMax);
   const detalle = usePosicionDetalle(cereal || undefined, precioMin, precioMax, tab === "detalle");
@@ -107,17 +105,12 @@ export function PosicionPage() {
 
       <FilterBar>
         <FilterField label="Campaña">
-          <Select
-            value={campania ?? ""}
-            onChange={(e) => setCampaniaSel(e.target.value)}
-            disabled={tab !== "resumen" || !campanias.data}
-          >
-            {campanias.data?.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
+          <CampaniaSelect
+            value={campania}
+            campanias={campanias.data}
+            onChange={setCampaniaSel}
+            disabled={tab !== "resumen"}
+          />
         </FilterField>
         <FilterField label="Cereal">
           <Select value={cereal} onChange={(e) => setCereal(e.target.value)}>

@@ -3,6 +3,7 @@ import type {
   ComisionDetalleDto,
   ComisionGeneracionDto,
   ComisionResumenDto,
+  CostoArticuloDto,
 } from "@/features/comisiones/types";
 import { env } from "@/lib/env";
 import type { PagedResult } from "@/shared/types/paged";
@@ -51,11 +52,19 @@ const VENTAS: Venta[] = [
   { anio: 2026, mes: 6, dia: 22, comprobante: "FAC A 0007-0038270", codigoCliente: 3033, razonSocial: "Agro Don Pedro", cuit: "30-70223344-7", codigoArticulo: 10080, producto: "HERBICIDA SIGMA X 20L", rubro: 200, vendedorNro: 3, cantidad: 18, precioUnitario: 75, costoUnitario: 55, porcentajeComision: 2, origenPorcentaje: "articulo" },
 ];
 
+// Correcciones manuales de costo por artículo (nuestra BD, no MacroGest). Arranca vacío: la demo
+// muestra el caso "costo 0" hasta que el usuario lo corrige desde la pantalla.
+const COSTOS = new Map<number, CostoArticuloDto>();
+
 function calcularFila(v: Venta): ComisionDetalleDto {
+  // El costo EFECTIVO es la corrección manual si existe; si no, el de MacroGest (igual que el backend).
+  const correccion = COSTOS.get(v.codigoArticulo);
+  const costoUnitario = correccion ? correccion.costoUsd : v.costoUnitario;
   const factNeta = Math.round(v.cantidad * v.precioUnitario * 100) / 100;
-  const rentabilidad = Math.round((v.precioUnitario - v.costoUnitario) * v.cantidad * 100) / 100;
-  const margenBrutoPct = factNeta !== 0 ? Math.round((rentabilidad / factNeta) * 1000) / 10 : null;
-  const comision = Math.round(factNeta * (v.porcentajeComision / 100) * 100) / 100;
+  const rentabilidad = Math.round((v.precioUnitario - costoUnitario) * v.cantidad * 100) / 100;
+  const margenBrutoPct = factNeta !== 0 ? Math.round((rentabilidad / factNeta) * 10000) / 100 : null;
+  // La comisión va sobre la RENTABILIDAD (no sobre la facturación), igual que el backend.
+  const comision = Math.round(rentabilidad * (v.porcentajeComision / 100) * 100) / 100;
   const sinVendedor = v.vendedorNro === 0;
   return {
     fecha: new Date(v.anio, v.mes - 1, v.dia).toISOString().slice(0, 10),
@@ -70,7 +79,7 @@ function calcularFila(v: Venta): ComisionDetalleDto {
     vendedor: sinVendedor ? "Sin vendedor" : (VENDEDORES[v.vendedorNro] ?? `Vendedor ${v.vendedorNro}`),
     cantidad: v.cantidad,
     precioUnitario: v.precioUnitario,
-    costoUnitario: v.costoUnitario,
+    costoUnitario,
     factNeta,
     rentabilidad,
     margenBrutoPct,
@@ -78,14 +87,13 @@ function calcularFila(v: Venta): ComisionDetalleDto {
     origenPorcentaje: v.origenPorcentaje,
     comision,
     alertaMargenNegativo: rentabilidad < 0,
-    alertaCostoCero: v.costoUnitario === 0,
+    alertaCostoCero: costoUnitario === 0,
     alertaComisionCero: v.porcentajeComision === 0,
     alertaMontoFijo: v.alertaMontoFijo ?? false,
+    costoCorregido: correccion !== undefined,
     sinVendedor,
   };
 }
-
-const FILAS: ComisionDetalleDto[] = VENTAS.map(calcularFila);
 
 // Estado en memoria de los períodos ya "generados" (congelados). Junio 2026 arranca generado para
 // poder ver el badge y el flujo de conflicto (409) al reintentar sin `forzar`.
@@ -96,11 +104,9 @@ function claveDePeriodo(anio: number, mes: number): string {
   return `${anio}-${mes}`;
 }
 
+/** Se recalcula en cada request (no se cachea) para reflejar las correcciones de costo ya guardadas. */
 function filasDelPeriodo(anio: number, mes: number): ComisionDetalleDto[] {
-  return FILAS.filter((f) => {
-    const [y, m] = f.fecha.split("-").map(Number);
-    return y === anio && m === mes;
-  });
+  return VENTAS.filter((v) => v.anio === anio && v.mes === mes).map(calcularFila);
 }
 
 function aplicarFiltros(rows: ComisionDetalleDto[], u: URL): ComisionDetalleDto[] {
@@ -147,7 +153,7 @@ function calcularResumen(anio: number, mes: number, vendNroFiltro: number | null
   }
   const vendedores = [...porVend.values()].map((g) => ({
     ...g,
-    margenBrutoPct: g.factNeta !== 0 ? Math.round((g.rentabilidad / g.factNeta) * 1000) / 10 : null,
+    margenBrutoPct: g.factNeta !== 0 ? Math.round((g.rentabilidad / g.factNeta) * 10000) / 100 : null,
   }));
 
   const totalRows = vendNroFiltro !== null ? rows.filter((r) => r.vendedorNro === vendNroFiltro) : rows;
@@ -203,6 +209,39 @@ export const comisionesHandlers = [
     const vendNroParam = u.searchParams.get("vendNro");
     const vendNro = vendNroParam ? Number(vendNroParam) : null;
     return HttpResponse.json(calcularResumen(anio, mes, vendNro));
+  }),
+
+  // Correcciones manuales de costo por artículo (declarado ANTES de /comisiones/:algo para que no
+  // se lo coma otro handler más genérico si en el futuro se agrega uno).
+  http.get(`${API}/comisiones/costos`, () => {
+    const body = [...COSTOS.values()].sort((a, b) => a.codigoArticulo - b.codigoArticulo);
+    return HttpResponse.json(body);
+  }),
+
+  http.put(`${API}/comisiones/costos/:codigoArticulo`, async ({ request, params }) => {
+    const codigoArticulo = Number(params.codigoArticulo);
+    const body = (await request.json()) as { costoUsd: number; nota: string | null };
+
+    // Espeja el validator del backend (ProblemDetails con `errors` por campo, en PascalCase).
+    if (typeof body.costoUsd !== "number" || !Number.isFinite(body.costoUsd) || body.costoUsd < 0) {
+      return HttpResponse.json(
+        {
+          title: "Datos inválidos",
+          status: 400,
+          errors: { CostoUsd: ["El costo no puede ser negativo."] },
+        },
+        { status: 400 },
+      );
+    }
+
+    const dto: CostoArticuloDto = {
+      codigoArticulo,
+      costoUsd: body.costoUsd,
+      nota: body.nota?.trim() ? body.nota.trim() : null,
+      fechaActualizacion: new Date().toISOString(),
+    };
+    COSTOS.set(codigoArticulo, dto);
+    return HttpResponse.json(dto);
   }),
 
   // Generar (congelar) el % de comisión del período: 409 si ya estaba generado y no se manda forzar.

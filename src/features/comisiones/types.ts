@@ -12,6 +12,7 @@ export interface ComisionDetalleDto {
   vendedor: string;
   cantidad: number;
   precioUnitario: number;
+  /** Costo EFECTIVO usado en el cálculo: el de MacroGest, o el corregido a mano si el artículo tiene uno. */
   costoUnitario: number;
   factNeta: number;
   rentabilidad: number;
@@ -25,6 +26,8 @@ export interface ComisionDetalleDto {
   alertaComisionCero: boolean;
   /** La tasa en MacroGest tiene un monto fijo que este informe NO aplica (sigue siendo % × FactNeta). */
   alertaMontoFijo: boolean;
+  /** `costoUnitario` viene de una corrección manual nuestra, no del precio_costo de MacroGest. */
+  costoCorregido: boolean;
   sinVendedor: boolean;
 }
 
@@ -69,4 +72,23 @@ export interface ComisionesFiltros {
   q?: string;
   page: number;
   pageSize: number;
+}
+
+/**
+ * Corrección manual del costo de un artículo (espeja CostoArticuloDto). MacroGest es solo lectura y
+ * trae `precio_costo = 0` en muchos renglones; la corrección vive en nuestra BD y es **por artículo**
+ * (no por comprobante ni por período), así que pisa el costo en todos los meses.
+ */
+export interface CostoArticuloDto {
+  codigoArticulo: number;
+  costoUsd: number;
+  nota: string | null;
+  fechaActualizacion: string;
+}
+
+/** Payload del upsert de costo corregido: PUT /comisiones/costos/{codigoArticulo}. */
+export interface CostoArticuloInput {
+  codigoArticulo: number;
+  costoUsd: number;
+  nota: string | null;
 }

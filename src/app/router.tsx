@@ -16,7 +16,10 @@ const ProveedoresPage = lazy(() => import("@/features/proveedores/pages/proveedo
 const SemillaPage = lazy(() => import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })));
 const StockPage = lazy(() => import("@/features/stock/pages/stock-insumos-page").then((m) => ({ default: m.StockInsumosPage })));
 const StockFisicoPage = lazy(() => import("@/features/stockfisico/pages/stockfisico-page").then((m) => ({ default: m.StockFisicoPage })));
+const ProduccionPropiaPage = lazy(() => import("@/features/produccionpropia/pages/produccion-propia-page").then((m) => ({ default: m.ProduccionPropiaPage })));
+const VolumenAcopiadoPage = lazy(() => import("@/features/volumenacopiado/pages/volumen-acopiado-page").then((m) => ({ default: m.VolumenAcopiadoPage })));
 const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
+const PrestamosPage = lazy(() => import("@/features/prestamos/pages/prestamos-page").then((m) => ({ default: m.PrestamosPage })));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })));
 const ConfigPage = lazy(() => import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })));
 const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/auditoria-page").then((m) => ({ default: m.AuditoriaPage })));
@@ -58,6 +61,10 @@ export const router = createBrowserRouter([
             children: [{ path: "cuentas", element: <CuentasPage /> }],
           },
           {
+            element: <ProtectedRoute roles={["prestamos"]} />,
+            children: [{ path: "prestamos", element: <PrestamosPage /> }],
+          },
+          {
             element: <ProtectedRoute roles={["proveedores"]} />,
             children: [{ path: "proveedores", element: <ProveedoresPage /> }],
           },
@@ -72,6 +79,14 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={["stockfisico"]} />,
             children: [{ path: "stock-fisico", element: <StockFisicoPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["produccionpropia"]} />,
+            children: [{ path: "produccion-propia", element: <ProduccionPropiaPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["volumenacopiado"]} />,
+            children: [{ path: "volumen-acopiado", element: <VolumenAcopiadoPage /> }],
           },
           {
             element: <ProtectedRoute roles={["comisiones"]} />,

@@ -14,10 +14,12 @@ import { Pagination } from "@/shared/components/pagination";
 import { ComisionesResumen } from "../components/comisiones-resumen";
 import { ComisionesSkeleton } from "../components/comisiones-skeleton";
 import { ComisionesTable } from "../components/comisiones-table";
+import { CostoDialog } from "../components/costo-dialog";
 import { useComisiones } from "../queries/use-comisiones";
 import { useExportarComisiones } from "../queries/use-exportar-comisiones";
 import { useGenerarComision } from "../queries/use-generar-comision";
 import { useResumenComisiones } from "../queries/use-resumen-comisiones";
+import type { ComisionDetalleDto } from "../types";
 
 const PAGE_SIZE = 50;
 
@@ -37,6 +39,8 @@ export function ComisionesPage() {
   // Mensaje de conflicto (409) del último intento de "Generar": mientras esté seteado, se ofrece
   // "Regenerar" (reintenta con forzar:true). Se limpia al cambiar de período o al tener éxito.
   const [conflicto, setConflicto] = useState<string | null>(null);
+  // Renglón cuyo costo se está corrigiendo (la fila entera, no un id): null = diálogo cerrado.
+  const [corregirCosto, setCorregirCosto] = useState<ComisionDetalleDto | null>(null);
 
   const anioNum = Number(anio) || HOY.getFullYear();
 
@@ -60,6 +64,7 @@ export function ComisionesPage() {
     setMes(nuevoMes);
     setPage(1);
     setConflicto(null);
+    setCorregirCosto(null);
   };
 
   const handleGenerar = (forzar: boolean) => {
@@ -199,12 +204,23 @@ export function ComisionesPage() {
         <ComisionesSkeleton />
       ) : (
         <div className="space-y-4">
-          <ComisionesResumen resumen={resumen.data} />
+          <ComisionesResumen
+            resumen={resumen.data}
+            vendedorSeleccionado={vendNro}
+            onSeleccionarVendedor={(nro) => {
+              setVendNro((prev) => (prev === nro ? "" : nro));
+              setPage(1);
+            }}
+          />
           {comisiones.data.items.length === 0 ? (
             <EmptyState mensaje="No hay comisiones con esos filtros." />
           ) : (
             <>
-              <ComisionesTable filas={comisiones.data.items} />
+              <ComisionesTable
+                filas={comisiones.data.items}
+                puedeCorregirCosto={puedeGestionar}
+                onCorregirCosto={setCorregirCosto}
+              />
               <Pagination
                 page={comisiones.data.page}
                 totalPages={comisiones.data.totalPages}
@@ -215,6 +231,9 @@ export function ComisionesPage() {
           )}
         </div>
       )}
+
+      {/* Montado siempre (fuera de isPending/isError): el Modal devuelve null si `fila` es null. */}
+      <CostoDialog fila={corregirCosto} onClose={() => setCorregirCosto(null)} />
     </>
   );
 }

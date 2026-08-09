@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { fecha, oDash, pct, usd } from "@/shared/format/format";
@@ -16,7 +17,15 @@ function celda(row: ComisionDetalleDto, content: ReactNode): ReactNode {
   return <span className="-mx-3 -my-2 block bg-clementina/15 px-3 py-2">{content}</span>;
 }
 
-export function ComisionesTable({ filas }: { filas: ComisionDetalleDto[] }) {
+export function ComisionesTable({
+  filas,
+  puedeCorregirCosto,
+  onCorregirCosto,
+}: {
+  filas: ComisionDetalleDto[];
+  puedeCorregirCosto: boolean;
+  onCorregirCosto: (fila: ComisionDetalleDto) => void;
+}) {
   const columns: Column<ComisionDetalleDto>[] = [
     {
       key: "fecha",
@@ -41,6 +50,13 @@ export function ComisionesTable({ filas }: { filas: ComisionDetalleDto[] }) {
             {r.razonSocial ?? "—"}
           </span>,
         ),
+    },
+    {
+      key: "articulo",
+      header: "Artículo",
+      align: "right",
+      className: "whitespace-nowrap",
+      cell: (r) => celda(r, r.codigoArticulo),
     },
     {
       key: "producto",
@@ -93,8 +109,29 @@ export function ComisionesTable({ filas }: { filas: ComisionDetalleDto[] }) {
       cell: (r) =>
         celda(
           r,
-          <span className={cn(r.alertaCostoCero && "font-medium text-clementina-deep")}>
-            {usd(r.costoUnitario)}
+          <span className="inline-flex items-center justify-end gap-1">
+            <span
+              className={cn(
+                r.alertaCostoCero && "font-medium text-clementina-deep",
+                r.costoCorregido && "font-medium text-verde",
+              )}
+              title={r.costoCorregido ? "Costo corregido manualmente" : undefined}
+            >
+              {usd(r.costoUnitario)}
+              {r.costoCorregido && "*"}
+            </span>
+            {puedeCorregirCosto && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7 shrink-0"
+                aria-label={`Corregir costo de ${r.producto}`}
+                onClick={() => onCorregirCosto(r)}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+            )}
           </span>,
         ),
     },

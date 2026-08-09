@@ -4,8 +4,18 @@ import { oDash, pct, usd } from "@/shared/format/format";
 import type { ComisionResumenDto, ComisionVendedorResumenDto } from "../types";
 import { MesCongeladoBadge } from "./mes-congelado-badge";
 
-/** Panel de resumen por vendedor del período + fila TOTAL GENERAL (molde de CuentasSubtotales). */
-export function ComisionesResumen({ resumen }: { resumen: ComisionResumenDto }) {
+/** Panel de resumen por vendedor del período + fila TOTAL GENERAL (molde de CuentasSubtotales).
+ *  Al tocar una fila se filtra el detalle de abajo por ese vendedor (drill-down); tocar el vendedor
+ *  ya seleccionado vuelve a "todos". */
+export function ComisionesResumen({
+  resumen,
+  onSeleccionarVendedor,
+  vendedorSeleccionado,
+}: {
+  resumen: ComisionResumenDto;
+  onSeleccionarVendedor?: (vendedorNro: number) => void;
+  vendedorSeleccionado?: number | "";
+}) {
   const filas = [...resumen.vendedores].sort((a, b) => b.factNeta - a.factNeta);
 
   const columns: Column<ComisionVendedorResumenDto>[] = [
@@ -56,6 +66,9 @@ export function ComisionesResumen({ resumen }: { resumen: ComisionResumenDto }) 
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">Resumen por vendedor</h2>
         {resumen.generado && <MesCongeladoBadge />}
+        {onSeleccionarVendedor && filas.length > 0 && (
+          <span className="text-xs text-ink-soft">· Tocá un vendedor para ver su detalle</span>
+        )}
       </div>
       <DataTable
         columns={columns}
@@ -63,6 +76,10 @@ export function ComisionesResumen({ resumen }: { resumen: ComisionResumenDto }) 
         getRowKey={(r) => r.vendedorNro}
         footer={footer}
         empty="No hay comisiones para este período."
+        onRowClick={onSeleccionarVendedor ? (r) => onSeleccionarVendedor(r.vendedorNro) : undefined}
+        rowClassName={(r) =>
+          r.vendedorNro === vendedorSeleccionado ? "bg-clementina/15 hover:bg-clementina/20" : ""
+        }
       />
       {resumen.sinVendedorComprobantes > 0 && (
         <p className="text-xs text-ink-soft">
