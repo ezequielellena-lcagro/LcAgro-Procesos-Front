@@ -17,7 +17,10 @@ import { PrestamoDialog } from "../components/prestamo-dialog";
 import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
 import { ResumenMatriz } from "../components/resumen-matriz";
-import { VencimientosTable } from "../components/vencimientos-table";
+import {
+  VencimientosTable,
+  type AgrupacionVencimientos,
+} from "../components/vencimientos-table";
 import { useConciliacion } from "../queries/use-conciliacion";
 import { useConfirmarPagos, usePagosMacroGest } from "../queries/use-pagos-macrogest";
 import { useResumen } from "../queries/use-resumen";
@@ -45,6 +48,7 @@ export function PrestamosPage() {
   const [pagando, setPagando] = useState<VencimientoDto | null>(null);
   const [importando, setImportando] = useState(false);
   const [agrupacion, setAgrupacion] = useState<Agrupacion>("mes");
+  const [agrupaVto, setAgrupaVto] = useState<AgrupacionVencimientos>("ninguna");
 
   const exportarPlantilla = useExportarPlantilla();
   const exportarReporte = useExportarReporte();
@@ -126,6 +130,22 @@ export function PrestamosPage() {
             <option value="todas">Todas (con las pagadas)</option>
           </Select>
         </FilterField>
+        {/* Sólo aplica al calendario; en las otras pestañas confundiría más de lo que ayuda. */}
+        {pestania === "vencimientos" ? (
+          <FilterField
+            label="Agrupar"
+            title="Junta las cuotas de un mismo préstamo, que en el calendario quedan intercaladas."
+          >
+            <Select
+              value={agrupaVto}
+              onChange={(e) => setAgrupaVto(e.target.value as AgrupacionVencimientos)}
+            >
+              <option value="ninguna">Sin agrupar (calendario)</option>
+              <option value="operacion">Por operación</option>
+              <option value="banco">Por banco</option>
+            </Select>
+          </FilterField>
+        ) : null}
       </FilterBar>
 
       {error ? (
@@ -162,6 +182,7 @@ export function PrestamosPage() {
             <TabsContent value="vencimientos">
               <VencimientosTable
                 datos={datos.vencimientos}
+                agrupacion={agrupaVto}
                 puedeGestionar={puedeGestionar}
                 onPagar={(cuotaId) =>
                   setPagando(datos.vencimientos.items.find((v) => v.cuotaId === cuotaId) ?? null)

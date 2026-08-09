@@ -18,26 +18,29 @@ interface Props {
  */
 export function OperacionesTable({ filas, onEditar, onVer, puedeGestionar }: Props) {
   const columns: Column<PrestamoListadoDto>[] = [
-    { key: "banco", header: "Banco", cell: (p) => p.banco },
-    { key: "sucursal", header: "Sucursal", cell: (p) => p.sucursal ?? "—" },
-    { key: "linea", header: "Línea", cell: (p) => p.linea },
+    { key: "banco", header: "Banco", cell: (p) => p.banco, sortBy: (p) => p.banco },
+    { key: "sucursal", header: "Sucursal", cell: (p) => p.sucursal ?? "—", sortBy: (p) => p.sucursal },
+    { key: "linea", header: "Línea", cell: (p) => p.linea, sortBy: (p) => p.linea },
     {
       key: "operacion",
       header: "N° operación",
       cell: (p) => p.nroOperacion ?? "—",
       className: "whitespace-nowrap",
+      sortBy: (p) => p.nroOperacion,
     },
     {
       key: "otorgamiento",
       header: "Otorgado",
       cell: (p) => oDash(p.fechaOtorgamiento, fecha),
       className: "whitespace-nowrap",
+      sortBy: (p) => p.fechaOtorgamiento,
     },
     {
       key: "capitalOriginal",
       header: "Capital original",
       align: "right",
       cell: (p) => oDash(p.capitalOriginal, importe),
+      sortBy: (p) => p.capitalOriginal,
     },
     {
       key: "cuotas",
@@ -46,19 +49,23 @@ export function OperacionesTable({ filas, onEditar, onVer, puedeGestionar }: Pro
       // Formato "03/08", igual que el informe viejo de deuda bancaria.
       cell: (p) =>
         `${String(p.cuotasPagadas).padStart(2, "0")}/${String(p.cantidadCuotas).padStart(2, "0")}`,
+      // Por lo que falta pagar, que es la lectura útil: "quién está más cerca de terminar".
+      sortBy: (p) => p.cantidadCuotas - p.cuotasPagadas,
     },
-    { key: "tna", header: "TNA", align: "right", cell: (p) => oDash(p.tasaNominalAnual, pct) },
+    { key: "tna", header: "TNA", align: "right", cell: (p) => oDash(p.tasaNominalAnual, pct), sortBy: (p) => p.tasaNominalAnual },
     {
       key: "saldo",
       header: "Saldo",
       align: "right",
       cell: (p) => <span className="font-semibold">{importe(p.saldoTotal)}</span>,
+      sortBy: (p) => p.saldoTotal,
     },
     {
       key: "proximo",
       header: "Próximo vto.",
       cell: (p) => oDash(p.proximoVencimiento, fecha),
       className: "whitespace-nowrap",
+      sortBy: (p) => p.proximoVencimiento,
     },
     {
       key: "acciones",

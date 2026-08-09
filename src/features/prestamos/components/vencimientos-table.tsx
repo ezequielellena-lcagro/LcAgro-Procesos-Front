@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { DataTable, type Column } from "@/shared/components/data-table";
+import { DataTable, type Column, type GroupBy } from "@/shared/components/data-table";
 import { fecha, oDash, pct } from "@/shared/format/format";
 import { importe, monedaLabel } from "../format";
 import type { VencimientoDto, VencimientosDto } from "../types";
@@ -9,6 +9,55 @@ interface Props {
   datos: VencimientosDto;
   onPagar: (cuotaId: number) => void;
   puedeGestionar: boolean;
+  /** Cómo se juntan las cuotas. `ninguna` = el calendario puro, ordenado por fecha. */
+  agrupacion: AgrupacionVencimientos;
+}
+
+/**
+ * Un préstamo puede tener varias cuotas, y en el calendario quedan intercaladas con las de los
+ * demás — que es lo correcto para planificar caja, pero no para mirar una operación. Agrupar
+ * resuelve lo segundo sin romper lo primero.
+ */
+export type AgrupacionVencimientos = "ninguna" | "operacion" | "banco";
+
+/** Las celdas del subtotal de un grupo: los cuatro importes, alineados con sus columnas. */
+function subtotalDe(filas: VencimientoDto[], moneda: VencimientosDto["moneda"]): string[] {
+  const sumar = (f: (v: VencimientoDto) => number) => importe(filas.reduce((s, v) => s + f(v), 0));
+  return [
+    `Subtotal ${monedaLabel(moneda)}`,
+    "", "", "", "",
+    `${filas.length} cuota(s)`,
+    sumar((v) => v.capital),
+    sumar((v) => v.interes),
+    sumar((v) => v.iva),
+    sumar((v) => v.total),
+    "",
+    "",
+  ];
+}
+
+function agrupadorDe(
+  agrupacion: AgrupacionVencimientos,
+  moneda: VencimientosDto["moneda"],
+): GroupBy<VencimientoDto> | undefined {
+  if (agrupacion === "banco") {
+    return {
+      clave: (v) => v.banco,
+      titulo: (v, filas) => `${v.banco} · ${filas.length} cuota(s)`,
+      subtotal: (filas) => subtotalDe(filas, moneda),
+    };
+  }
+  if (agrupacion === "operacion") {
+    return {
+      // Sin número de operación cada préstamo es su propio grupo: dos operaciones distintas del
+      // mismo banco no se pueden fusionar sólo porque a las dos les falta el dato.
+      clave: (v) => v.nroOperacion ?? `prestamo-${v.prestamoId}`,
+      titulo: (v, filas) =>
+        `${v.banco} · ${v.nroOperacion ?? "sin n° de operación"} · ${v.linea} — ${filas.length} cuota(s)`,
+      subtotal: (filas) => subtotalDe(filas, moneda),
+    };
+  }
+  return undefined;
 }
 
 /**
@@ -18,11 +67,12 @@ interface Props {
  *   y las dinámicas daban números distintos porque se cargaban por separado);
  * - la cuota pagada no desaparece: queda con su fecha.
  */
-export function VencimientosTable({ datos, onPagar, puedeGestionar }: Props) {
+export function VencimientosTable({ datos, onPagar, puedeGestionar, agrupacion }: Props) {
   const columns: Column<VencimientoDto>[] = [
     {
       key: "fecha",
       header: "Vencimiento",
+      sortBy: (v) => v.fechaVencimiento,
       cell: (v) => (
         <span className="flex items-center gap-1.5 whitespace-nowrap">
           {v.vencida && (
@@ -39,14 +89,15 @@ export function VencimientosTable({ datos, onPagar, puedeGestionar }: Props) {
         </span>
       ),
     },
-    { key: "banco", header: "Banco", cell: (v) => v.banco },
-    { key: "sucursal", header: "Sucursal", cell: (v) => v.sucursal ?? "—" },
-    { key: "linea", header: "Línea", cell: (v) => v.linea },
+    { key: "banco", header: "Banco", cell: (v) => v.banco, sortBy: (v) => v.banco },
+    { key: "sucursal", header: "Sucursal", cell: (v) => v.sucursal ?? "—", sortBy: (v) => v.sucursal },
+    { key: "linea", header: "Línea", cell: (v) => v.linea, sortBy: (v) => v.linea },
     {
       key: "operacion",
       header: "N° operación",
       cell: (v) => v.nroOperacion ?? "—",
       className: "whitespace-nowrap",
+      sortBy: (v) => v.nroOperacion,
     },
     {
       key: "cuota",
@@ -54,21 +105,24 @@ export function VencimientosTable({ datos, onPagar, puedeGestionar }: Props) {
       align: "center",
       // "1/10" es el dato que el Excel no podía dar: ahí cada vencimiento era una fila suelta.
       cell: (v) => `${v.nroCuota}/${v.cantidadCuotas}`,
+      sortBy: (v) => v.nroCuota,
     },
-    { key: "capital", header: "Capital", align: "right", cell: (v) => importe(v.capital) },
-    { key: "interes", header: "Interés", align: "right", cell: (v) => importe(v.interes) },
-    { key: "iva", header: "IVA", align: "right", cell: (v) => importe(v.iva) },
+    { key: "capital", header: "Capital", align: "right", cell: (v) => importe(v.capital), sortBy: (v) => v.capital },
+    { key: "interes", header: "Interés", align: "right", cell: (v) => importe(v.interes), sortBy: (v) => v.interes },
+    { key: "iva", header: "IVA", align: "right", cell: (v) => importe(v.iva), sortBy: (v) => v.iva },
     {
       key: "total",
       header: "Total",
       align: "right",
       cell: (v) => <span className="font-semibold">{importe(v.total)}</span>,
+      sortBy: (v) => v.total,
     },
     {
       key: "tna",
       header: "TNA",
       align: "right",
       cell: (v) => oDash(v.tasaNominalAnual, pct),
+      sortBy: (v) => v.tasaNominalAnual,
     },
     {
       key: "estado",
@@ -90,6 +144,7 @@ export function VencimientosTable({ datos, onPagar, puedeGestionar }: Props) {
       columns={columns}
       rows={datos.items}
       getRowKey={(v) => v.cuotaId}
+      groupBy={agrupadorDe(agrupacion, datos.moneda)}
       empty="No hay vencimientos con esos filtros."
       footer={[
         <span key="t" className="font-semibold">

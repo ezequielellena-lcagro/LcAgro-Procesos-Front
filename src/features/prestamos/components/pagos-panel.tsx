@@ -17,10 +17,27 @@ interface Props {
 }
 
 const COLUMNAS_NO_IMPUTADOS: Column<PagoNoImputado>[] = [
-  { key: "fecha", header: "Fecha", cell: (p) => fecha(p.fecha), className: "whitespace-nowrap" },
-  { key: "banco", header: "Banco", cell: (p) => p.banco },
-  { key: "comp", header: "Comprobante", cell: (p) => p.nroComprobante },
-  { key: "importe", header: "Debitado", align: "right", cell: (p) => importe(p.importeArs) },
+  {
+    key: "fecha",
+    header: "Fecha",
+    cell: (p) => fecha(p.fecha),
+    className: "whitespace-nowrap",
+    sortBy: (p) => p.fecha,
+  },
+  { key: "banco", header: "Banco", cell: (p) => p.banco, sortBy: (p) => p.banco },
+  {
+    key: "comp",
+    header: "Comprobante",
+    cell: (p) => p.nroComprobante,
+    sortBy: (p) => p.nroComprobante,
+  },
+  {
+    key: "importe",
+    header: "Debitado",
+    align: "right",
+    cell: (p) => importe(p.importeArs),
+    sortBy: (p) => p.importeArs,
+  },
   { key: "concepto", header: "Concepto en MacroGest", cell: (p) => p.concepto },
 ];
 
