@@ -10,11 +10,15 @@ import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { KpiCard } from "@/shared/components/kpi-card";
+import { MiniBarChart } from "@/shared/components/mini-bar-chart";
 import { PageHeader } from "@/shared/components/page-header";
+import { Sparkline } from "@/shared/components/sparkline";
 import { numero, oDash, pct } from "@/shared/format/format";
+import { CarteraAccionable } from "../components/cartera-accionable";
 import { EstadoClienteBadge } from "../components/estado-cliente-badge";
 import { ObjetivoDialog } from "../components/objetivo-dialog";
 import { SeguimientoDialog } from "../components/seguimiento-dialog";
+import { historiaValores, sparkToneDeEstado } from "../lib/historia";
 import { useAnalisisVendedor, useVolumenAcopiado } from "../queries/use-volumen-acopiado";
 import type {
   AnalisisVendedorDto,
@@ -234,25 +238,85 @@ function Vendedor({
   const [seguimientoOpen, setSeguimientoOpen] = useState(false);
   const r = data.resumen;
 
+  const dormidos = data.clientes.filter((c) => c.estado === "Dormido");
+  const declinantes = data.clientes.filter((c) => c.estado === "Declinante");
+  const maxTn = Math.max(1, ...data.clientes.map((c) => c.tn));
+  const objetivoTn = r.objetivoAcordado ?? r.objetivoSugerido;
+
+  const evolucionRows = data.evolucion.map((s) => ({
+    label: s.campania,
+    value: s.tn,
+    sub: `${s.productores} prod.`,
+    highlight: s.campania === campania,
+  }));
+
   const clientes: Column<ClienteCartera>[] = [
-    { key: "cliente", header: "Cliente", cell: (c) => c.cliente },
-    { key: "tn", header: `${campania} (tn)`, align: "right", cell: (c) => numero(c.tn) },
-    { key: "pico", header: "Mejor año", align: "right", cell: (c) => numero(c.tnPico) },
-    { key: "campaniaPico", header: "En", cell: (c) => c.campaniaPico },
+    {
+      key: "cliente",
+      header: "Cliente",
+      cell: (c) => (
+        <span className="block max-w-[16rem] truncate" title={c.cliente}>
+          {c.cliente}
+        </span>
+      ),
+    },
+    {
+      key: "tn",
+      header: `${campania} (tn)`,
+      align: "right",
+      cell: (c) => (
+        <div className="flex items-center justify-end gap-2">
+          <div className="hidden h-2 w-20 overflow-hidden rounded bg-panel-soft sm:block">
+            <div
+              className="h-full rounded bg-clementina"
+              style={{ width: `${Math.max(c.tn > 0 ? 3 : 0, (c.tn / maxTn) * 100)}%` }}
+            />
+          </div>
+          <span className="tabular">{numero(c.tn)}</span>
+        </div>
+      ),
+    },
+    {
+      key: "tendencia",
+      header: "Tendencia",
+      cell: (c) => <Sparkline values={historiaValores(c.historia)} tone={sparkToneDeEstado(c.estado)} />,
+    },
+    {
+      key: "pico",
+      header: "Mejor año",
+      align: "right",
+      cell: (c) => (
+        <span className="tabular">
+          {numero(c.tnPico)} <span className="text-xs text-ink-soft">{c.campaniaPico}</span>
+        </span>
+      ),
+    },
     { key: "estado", header: "Estado", cell: (c) => <EstadoClienteBadge estado={c.estado} /> },
   ];
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-3">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
         <KpiCard label="Acopiado" value={`${numero(r.tn)} tn`} hint={`${r.activos} clientes activos`} />
         <KpiCard
           label="Penetración"
           value={pct(r.penetracion * 100)}
           hint={`${r.activos} de ${r.universo} de su cartera`}
         />
-        <KpiCard label="tn por cliente" value={numero(r.tnPorActivo)} />
+        <KpiCard label="tn por cliente" value={numero(r.tnPorActivo)} hint="promedio del activo" />
         <KpiCard label="Dormidos" tone="rojo" value={String(r.dormidos)} hint="con historia, hoy en cero" />
+        <KpiCard
+          label="Objetivo"
+          tone={r.cumplimiento != null && r.cumplimiento >= 100 ? "verde" : "default"}
+          value={`${numero(objetivoTn)} tn`}
+          hint={
+            r.objetivoAcordado == null
+              ? "sugerido, sin acordar"
+              : r.cumplimiento != null
+                ? `acordado · ${pct(r.cumplimiento)} cumplido`
+                : "acordado"
+          }
+        />
       </div>
 
       <div className="rounded-card border border-line bg-panel p-4 shadow-card">
@@ -292,10 +356,18 @@ function Vendedor({
         </p>
       </div>
 
-      <SerieTabla titulo="Evolución del vendedor" filas={data.evolucion} />
+      <section className="rounded-card border border-line bg-panel p-4 shadow-card">
+        <h2 className="mb-3 font-display text-lg font-semibold text-ink">Evolución del vendedor</h2>
+        <MiniBarChart rows={evolucionRows} unit="tn" />
+      </section>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <CarteraAccionable variante="reactivar" clientes={dormidos} />
+        <CarteraAccionable variante="defender" clientes={declinantes} />
+      </div>
 
       <section>
-        <h2 className="mb-2 font-display text-lg font-semibold text-ink">Cartera de clientes</h2>
+        <h2 className="mb-2 font-display text-lg font-semibold text-ink">Cartera completa</h2>
         <DataTable
           columns={clientes}
           rows={data.clientes}
@@ -303,8 +375,9 @@ function Vendedor({
           empty="Sin clientes en la ventana analizada."
         />
         <p className="mt-2 text-xs text-ink-soft">
-          Los <b>dormidos</b> son clientes con historia que este año no entregaron: reactivarlos pesa más
-          que exigirle más a los activos. Se listan los clientes por encima del piso de toneladas.
+          Ordenada por volumen de la campaña. La <b>tendencia</b> muestra la trayectoria del cliente; el{" "}
+          <b>mejor año</b> es el techo al que se puede volver. Se listan los clientes por encima del piso de
+          toneladas.
         </p>
       </section>
 
