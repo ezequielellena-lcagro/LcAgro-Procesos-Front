@@ -6,7 +6,10 @@ import { KpiCard } from "@/shared/components/kpi-card";
 import { PageHeader } from "@/shared/components/page-header";
 import { fecha as fmtFecha, numero, oDash } from "@/shared/format/format";
 import { FijacionBadge } from "../components/fijacion-badge";
+import { FijacionVencidaCard } from "../components/fijacion-vencida-card";
 import { PlantaCard } from "../components/planta-card";
+import { PorCompradorCard } from "../components/por-comprador-card";
+import { porRiesgo } from "../lib/a-fijar";
 import { useStockCereal } from "../queries/use-stock-cereal";
 import { useStockCerealExport } from "../queries/use-stock-cereal-export";
 import type { AFijarDetalleDto, AlertaDescargaDto, ConsolidadoCerealDto, StockCerealDto } from "../types";
@@ -149,17 +152,27 @@ function Reporte({ data }: { data: StockCerealDto }) {
         />
       </section>
 
+      {data.detallePlanta10.length > 0 && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <PorCompradorCard filas={data.detallePlanta10} />
+          <FijacionVencidaCard filas={data.detallePlanta10} />
+        </div>
+      )}
+
       <section>
         <h2 className="mb-2 font-display text-lg font-semibold text-ink">
           Planta 10 — a fijar por contrato
         </h2>
         <DataTable
           columns={detalleCols}
-          rows={data.detallePlanta10}
+          rows={porRiesgo(data.detallePlanta10)}
           getRowKey={(r) => `${r.contrato}-${r.cereal}`}
           footer={["TOTAL PLANTA 10", "", "", "", numero(t.p10), "", "", ""]}
           empty="Sin contratos a fijar."
         />
+        <p className="mt-2 text-xs text-ink-soft">
+          Ordenado por riesgo de fijación: primero lo vencido, después lo que vence antes.
+        </p>
       </section>
 
       {data.alertasDescarga.length > 0 && (
