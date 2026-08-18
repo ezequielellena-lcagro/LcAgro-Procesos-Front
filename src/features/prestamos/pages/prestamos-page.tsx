@@ -21,7 +21,7 @@ import {
   VencimientosTable,
   type AgrupacionVencimientos,
 } from "../components/vencimientos-table";
-import { useConciliacion } from "../queries/use-conciliacion";
+import { useConciliacion, useDescartar, useQuitarDescarte } from "../queries/use-conciliacion";
 import { useConfirmarPagos, usePagosMacroGest } from "../queries/use-pagos-macrogest";
 import { useResumen } from "../queries/use-resumen";
 import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
@@ -54,6 +54,8 @@ export function PrestamosPage() {
   const exportarReporte = useExportarReporte();
   // Sólo se consulta al abrir la pestaña: va por VPN contra la base del cliente.
   const conciliacion = useConciliacion(pestania === "conciliacion");
+  const descartar = useDescartar();
+  const quitarDescarte = useQuitarDescarte();
   const resumen = useResumen({ moneda, incluirPagadas, agrupacion }, pestania === "resumen");
   const pagos = usePagosMacroGest(pestania === "pagos");
   const confirmarPagos = useConfirmarPagos();
@@ -226,6 +228,9 @@ export function PrestamosPage() {
                 cargando={conciliacion.isPending || conciliacion.isFetching}
                 error={conciliacion.error}
                 onReintentar={() => void conciliacion.refetch()}
+                onDescartar={(input) => descartar.mutate(input)}
+                onQuitarDescarte={(id) => quitarDescarte.mutate(id)}
+                puedeGestionar={puedeGestionar}
               />
             </TabsContent>
           </Tabs>

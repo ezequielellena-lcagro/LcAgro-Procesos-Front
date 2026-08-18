@@ -301,6 +301,13 @@ export const prestamosHandlers = [
     } satisfies ResumenPrestamos);
   }),
 
+  http.post(`${API}/prestamos/macrogest/descartes`, async ({ request }) => {
+    const body = (await request.json()) as { nroOperacion: string; motivo: string };
+    return HttpResponse.json({ id: 99, ...body, usuario: "Administrador", fecha: enMeses(0) });
+  }),
+
+  http.delete(`${API}/prestamos/macrogest/descartes/:id`, () => new HttpResponse(null, { status: 204 })),
+
   // Los pagos del banco: en mocks se devuelve un caso CON algo para imputar, más las dos listas
   // informativas. Un "nada que imputar" no mostraría nada de la pantalla.
   http.get(`${API}/prestamos/macrogest/pagos`, () => {
@@ -408,6 +415,15 @@ export const prestamosHandlers = [
           banco: "MACRO",
           linea: "AGRO BAYER",
           capital: 62212.65,
+        },
+      ],
+      descartados: [
+        {
+          id: 1,
+          nroOperacion: "02660953",
+          motivo: "Cancelado en abril de 2025; el alta no declara el importe en dolares.",
+          usuario: "Administrador",
+          fecha: enMeses(0),
         },
       ],
       hayDiferencias: true,

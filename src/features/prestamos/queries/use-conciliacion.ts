@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
-import type { ConciliacionMacroGest } from "../types";
+import type { ConciliacionMacroGest, Descarte, DescartarInput } from "../types";
 import { prestamosKeys } from "./keys";
 
 /**
@@ -22,5 +23,35 @@ export function useConciliacion(activa: boolean) {
     // La VPN se cae seguido: reintentar en cadena sólo alarga la espera del usuario, que ya
     // tiene el botón de reintentar a la vista.
     retry: false,
+  });
+}
+
+/**
+ * Marca un movimiento del banco como "no corresponde". Pide motivo porque dentro de un año la
+ * pregunta no va a ser qué está oculto, sino por qué.
+ */
+export function useDescartar() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: DescartarInput) => {
+      const { data } = await apiClient.post<Descarte>("/prestamos/macrogest/descartes", input);
+      return data;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: prestamosKeys.conciliacion() });
+      toast.success("Movimiento descartado del cruce.");
+    },
+  });
+}
+
+/** Deshace un descarte: el movimiento vuelve a aparecer. */
+export function useQuitarDescarte() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiClient.delete(`/prestamos/macrogest/descartes/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: prestamosKeys.conciliacion() });
+      toast.success("Descarte deshecho: vuelve al cruce.");
+    },
   });
 }

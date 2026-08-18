@@ -253,6 +253,8 @@ export interface ConciliacionMacroGest {
   sinRespaldoBancario: FilaConciliacion[];
   sinCargar: FilaPropuesta[];
   sinNumeroDeOperacion: FilaConciliacion[];
+  /** Revisados y marcados como "no corresponde": no cuentan como diferencia. */
+  descartados: Descarte[];
   hayDiferencias: boolean;
 }
 
@@ -336,4 +338,18 @@ export interface ConfirmarPagoItem {
   cuotaId: number;
   fechaPago: string;
   importePagado?: number | null;
+}
+
+/** Un movimiento del banco descartado del cruce, con el motivo y quién lo puso. */
+export interface Descarte {
+  id: number;
+  nroOperacion: string;
+  motivo: string;
+  usuario: string;
+  fecha: string;
+}
+
+export interface DescartarInput {
+  nroOperacion: string;
+  motivo: string;
 }

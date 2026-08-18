@@ -1,17 +1,102 @@
-import type { ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, HelpCircle } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, EyeOff, HelpCircle, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
+import { Textarea } from "@/components/ui/textarea";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { fecha, oDash, pct } from "@/shared/format/format";
 import { importe } from "../format";
-import type { ConciliacionMacroGest, FilaConciliacion, FilaPropuesta } from "../types";
+import type {
+  ConciliacionMacroGest,
+  DescartarInput,
+  Descarte,
+  FilaConciliacion,
+  FilaPropuesta,
+} from "../types";
 
 interface Props {
   datos: ConciliacionMacroGest | undefined;
   cargando: boolean;
   error: unknown;
   onReintentar: () => void;
+  onDescartar: (input: DescartarInput) => void;
+  onQuitarDescarte: (id: number) => void;
+  puedeGestionar: boolean;
 }
+
+/**
+ * Pide el motivo antes de sacar un movimiento del cruce. Es obligatorio a propósito: dentro de un
+ * año la pregunta no va a ser qué está oculto, sino por qué se ocultó.
+ */
+function DescartarDialog({
+  nroOperacion,
+  onClose,
+  onConfirmar,
+}: {
+  nroOperacion: string | null;
+  onClose: () => void;
+  onConfirmar: (input: DescartarInput) => void;
+}) {
+  const [motivo, setMotivo] = useState("");
+
+  return (
+    <Modal
+      open={nroOperacion !== null}
+      onClose={onClose}
+      title={`Descartar la operación ${nroOperacion ?? ""}`}
+      className="max-w-lg"
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-ink-soft">
+          El movimiento deja de aparecer en el cruce. No se borra nada del banco ni del sistema, y
+          se puede deshacer cuando quieras.
+        </p>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="motivo-descarte">Motivo</Label>
+          <Textarea
+            id="motivo-descarte"
+            rows={3}
+            value={motivo}
+            placeholder="Ej.: cancelado en abril de 2025, el alta no declara el importe en dólares."
+            onChange={(e) => setMotivo(e.target.value)}
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="accent"
+            disabled={motivo.trim().length === 0}
+            onClick={() => {
+              onConfirmar({ nroOperacion: nroOperacion ?? "", motivo: motivo.trim() });
+              onClose();
+            }}
+          >
+            Descartar
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+const COLUMNAS_DESCARTADOS: Column<Descarte>[] = [
+  { key: "op", header: "N° operación", cell: (d) => d.nroOperacion, sortBy: (d) => d.nroOperacion },
+  { key: "motivo", header: "Motivo", cell: (d) => d.motivo },
+  { key: "quien", header: "Lo descartó", cell: (d) => d.usuario || "—" },
+  {
+    key: "cuando",
+    header: "Cuándo",
+    cell: (d) => fecha(d.fecha),
+    className: "whitespace-nowrap",
+    sortBy: (d) => d.fecha,
+  },
+];
 
 /** Sección con título, contador y su tabla. Fuera del componente: no se redefine en cada render. */
 function Seccion({
@@ -79,7 +164,17 @@ const COLUMNAS_BANCO: Column<FilaPropuesta>[] = [
  * Las conciliadas sólo se cuentan: son la mayoría y no requieren acción. Lo que ocupa la pantalla
  * es lo que hay que resolver.
  */
-export function ConciliacionPanel({ datos, cargando, error, onReintentar }: Props) {
+export function ConciliacionPanel({
+  datos,
+  cargando,
+  error,
+  onReintentar,
+  onDescartar,
+  onQuitarDescarte,
+  puedeGestionar,
+}: Props) {
+  const [descartando, setDescartando] = useState<string | null>(null);
+
   if (error) {
     return (
       <div className="rounded-card border border-rojo/30 bg-rojo-bg p-6 text-center">
@@ -108,6 +203,28 @@ export function ConciliacionPanel({ datos, cargando, error, onReintentar }: Prop
 
   const diferencias =
     datos.sinRespaldoBancario.length + datos.sinCargar.length + datos.sinNumeroDeOperacion.length;
+
+  // La acción va al final de la fila, y sólo si la persona puede gestionar.
+  const columnasBanco: Column<FilaPropuesta>[] = puedeGestionar
+    ? [
+        ...COLUMNAS_BANCO,
+        {
+          key: "descartar",
+          header: "",
+          align: "right",
+          cell: (f) => (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDescartando(f.nroOperacion)}
+              title="Sacarlo del cruce dejando registrado por qué"
+            >
+              <EyeOff className="size-3.5" /> No corresponde
+            </Button>
+          ),
+        },
+      ]
+    : COLUMNAS_BANCO;
 
   return (
     <div className="space-y-5">
@@ -148,7 +265,7 @@ export function ConciliacionPanel({ datos, cargando, error, onReintentar }: Prop
         cantidad={datos.sinCargar.length}
       >
         <DataTable
-          columns={COLUMNAS_BANCO}
+          columns={columnasBanco}
           rows={datos.sinCargar}
           getRowKey={(f) => f.nroOperacion}
         />
@@ -166,6 +283,44 @@ export function ConciliacionPanel({ datos, cargando, error, onReintentar }: Prop
           getRowKey={(f) => f.prestamoId}
         />
       </Seccion>
+
+      {datos.descartados.length > 0 ? (
+        <section aria-label="Descartados" className="space-y-2">
+          <h3 className="font-display text-lg font-semibold text-ink">
+            Descartados ({datos.descartados.length})
+          </h3>
+          <p className="text-xs text-ink-soft">
+            Movimientos que alguien ya revisó y sacó del cruce. No cuentan como diferencia.
+          </p>
+          <DataTable
+            columns={
+              puedeGestionar
+                ? [
+                    ...COLUMNAS_DESCARTADOS,
+                    {
+                      key: "deshacer",
+                      header: "",
+                      align: "right" as const,
+                      cell: (d: Descarte) => (
+                        <Button variant="ghost" size="sm" onClick={() => onQuitarDescarte(d.id)}>
+                          <Undo2 className="size-3.5" /> Deshacer
+                        </Button>
+                      ),
+                    },
+                  ]
+                : COLUMNAS_DESCARTADOS
+            }
+            rows={datos.descartados}
+            getRowKey={(d) => d.id}
+          />
+        </section>
+      ) : null}
+
+      <DescartarDialog
+        nroOperacion={descartando}
+        onClose={() => setDescartando(null)}
+        onConfirmar={onDescartar}
+      />
 
       <p className="flex items-start gap-1.5 text-xs text-ink-soft">
         <HelpCircle className="mt-0.5 size-3.5 shrink-0" />
