@@ -139,6 +139,15 @@ export const NAV: Area[] = [
         to: "/comisiones",
         roles: ["comisiones"],
       },
+      {
+        // MOCKUP con datos inventados, para acordar el diseño con el cliente antes de
+        // construirlo. Sin Pantalla propia en el backend todavía: reusa el rol de dashboard.
+        kind: "activo",
+        label: "Planificación de Vendedores (mockup)",
+        title: "Planificación de Ventas por Vendedor",
+        to: "/planificacion-vendedores",
+        roles: ["dashboard"],
+      },
       { kind: "futuro", label: "Resumen de cuenta a clientes" },
       { kind: "futuro", label: "Cotizador de presupuestos" },
       { kind: "futuro", label: "Mercadería pendiente de recibir" },

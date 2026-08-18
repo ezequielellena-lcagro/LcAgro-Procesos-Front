@@ -19,6 +19,9 @@ const StockFisicoPage = lazy(() => import("@/features/stockfisico/pages/stockfis
 const ProduccionPropiaPage = lazy(() => import("@/features/produccionpropia/pages/produccion-propia-page").then((m) => ({ default: m.ProduccionPropiaPage })));
 const VolumenAcopiadoPage = lazy(() => import("@/features/volumenacopiado/pages/volumen-acopiado-page").then((m) => ({ default: m.VolumenAcopiadoPage })));
 const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
+// Pantalla MOCKUP (datos inventados, sin API): sirve para acordar el diseño con el cliente.
+// Todavía no tiene Pantalla/rol propio en el backend, así que reusa el permiso de dashboard.
+const PlanificacionPage = lazy(() => import("@/features/planificacion/pages/planificacion-page").then((m) => ({ default: m.PlanificacionPage })));
 const PrestamosPage = lazy(() => import("@/features/prestamos/pages/prestamos-page").then((m) => ({ default: m.PrestamosPage })));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })));
 const ConfigPage = lazy(() => import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })));
@@ -92,6 +95,7 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute roles={["comisiones"]} />,
             children: [{ path: "comisiones", element: <ComisionesPage /> }],
           },
+          { path: "planificacion-vendedores", element: <PlanificacionPage /> },
           {
             element: <ProtectedRoute roles={["usuarios"]} />,
             children: [{ path: "usuarios", element: <UsuariosPage /> }],
