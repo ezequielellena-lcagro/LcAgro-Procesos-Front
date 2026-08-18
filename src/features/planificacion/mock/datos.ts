@@ -1,137 +1,211 @@
 /**
- * ⚠️ DATOS INVENTADOS — no salen de MacroGest ni de ninguna planilla real.
+ * ⚠️ DATOS DE EJEMPLO — los nombres de productor son INVENTADOS.
  *
- * Existen para poder mostrarle la pantalla al cliente y acordar QUÉ tiene que mostrar,
- * antes de construir el backend. Cuando exista el endpoint, este archivo se borra.
+ * La economía sí es fiel: hectáreas, mercado potencial, facturación LC y Bayer, mix y score
+ * salen de una muestra estratificada del `PLAN DE VENTAS.xlsx` real (42 de 425 productores,
+ * respetando la proporción de segmentos y canales). Los nombres se reemplazaron porque el
+ * repo se versiona y no subimos datos de clientes (ver CLAUDE.md).
  *
- * Lo único que NO es inventado son los vendedores: la lista sale de cruzar las dos
- * decisiones que ya están tomadas en `appsettings.json` del backend:
- *
- *   Cuentas:VendedoresHabilitados          [2,3,5,8,10,16,18,20,22,23,26,36,37,38,39]
- *   − VolumenAcopiado:VendedoresExcluidos  [3 Trucco, 10 Galeotti, 20 ASL]
+ * Los VENDEDORES sí son los reales: son empleados y ya están en la config del backend.
+ * Cuando exista el endpoint, este archivo se borra.
  */
-import type { BayerSinCruzar, Vendedor } from "../types";
-
-/** Fecha de corte fija: el mockup se ve siempre igual, no cambia según el día que se abra. */
-export const FECHA_CORTE = new Date(2026, 7, 17); // 17-ago-2026
-
-export const VENDEDORES: Vendedor[] = [
-  {
-    cod: 5, nombre: "MASSETTI FERNANDO", penetracion: 0.78,
-    objetivoInsumos: 690000, realInsumos: 244800, previoInsumos: 588400,
-    notaInsumos: "Suma la zona norte que dejó Hilaert.", estadoInsumos: "acordado",
-    objetivoGranos: 18000, realGranos: 1180, previoGranos: 15240, notaGranos: "", estadoGranos: "acordado",
-    bayer: 148300, bayerPrevio: 212900, siembra: 18400,
-  },
-  {
-    cod: 2, nombre: "LC AGRO", penetracion: 0.85,
-    objetivoInsumos: 583000, realInsumos: 201700, previoInsumos: 512400,
-    notaInsumos: "", estadoInsumos: "acordado",
-    objetivoGranos: 15500, realGranos: 1340, previoGranos: 13480, notaGranos: "", estadoGranos: "acordado",
-    bayer: 112500, bayerPrevio: 98600, siembra: 14200, dudoso: true,
-  },
-  {
-    cod: 16, nombre: "FARIAS, EDUARDO", penetracion: 0.61,
-    objetivoInsumos: 512000, realInsumos: 118000, previoInsumos: 425300,
-    notaInsumos: "Pendiente de reunión — cartera con mucho dormido.", estadoInsumos: "borrador",
-    objetivoGranos: 13500, realGranos: 520, previoGranos: 11350, notaGranos: "", estadoGranos: "acordado",
-    bayer: 91600, bayerPrevio: 84300, siembra: 12100,
-  },
-  {
-    cod: 8, nombre: "MARTINEZ, NAHUEL", penetracion: 0.74,
-    objetivoInsumos: 460000, realInsumos: 188900, previoInsumos: 388600,
-    notaInsumos: "", estadoInsumos: "acordado",
-    objetivoGranos: 12000, realGranos: 890, previoGranos: 10120, notaGranos: "", estadoGranos: "acordado",
-    bayer: 74200, bayerPrevio: 69900, siembra: 9800,
-  },
-  {
-    cod: 23, nombre: "GUERRERO RAMIRO", penetracion: 0.56,
-    objetivoInsumos: 442000, realInsumos: 116800, previoInsumos: 361200,
-    notaInsumos: "", estadoInsumos: "borrador",
-    objetivoGranos: 11200, realGranos: 410, previoGranos: 9280, notaGranos: "", estadoGranos: "acordado",
-    bayer: 68400, bayerPrevio: 71200, siembra: null,
-  },
-  {
-    cod: 18, nombre: "ROSSO HORACIO", penetracion: 0.69,
-    objetivoInsumos: 396000, realInsumos: 167300, previoInsumos: 334700,
-    notaInsumos: "", estadoInsumos: "acordado",
-    objetivoGranos: 10300, realGranos: 1050, previoGranos: 8640, notaGranos: "", estadoGranos: "acordado",
-    bayer: 55800, bayerPrevio: 49100, siembra: 10300,
-  },
-  {
-    cod: 22, nombre: "FERREYRA MARIANO", penetracion: 0.81,
-    objetivoInsumos: 345000, realInsumos: 153600, previoInsumos: 298500,
-    notaInsumos: "Cartera muy penetrada, poco lugar para crecer.", estadoInsumos: "acordado",
-    objetivoGranos: 8700, realGranos: 720, previoGranos: 7510, notaGranos: "", estadoGranos: "acordado",
-    bayer: 47600, bayerPrevio: 52300, siembra: 6900,
-  },
-  {
-    // Objetivo POR DEBAJO del cierre anterior: dispara el aviso rojo en la carga.
-    cod: 26, nombre: "ELADIO CERINO", penetracion: 0.64,
-    objetivoInsumos: 268000, realInsumos: 134200, previoInsumos: 276900,
-    notaInsumos: "", estadoInsumos: "acordado",
-    objetivoGranos: 8300, realGranos: 640, previoGranos: 6940, notaGranos: "", estadoGranos: "acordado",
-    bayer: 41300, bayerPrevio: 36800, siembra: 7600,
-  },
-  {
-    cod: 38, nombre: "GUILLERMO BRAVIN", penetracion: 0.47,
-    objetivoInsumos: 302000, realInsumos: 66400, previoInsumos: 241800,
-    notaInsumos: "", estadoInsumos: "borrador",
-    objetivoGranos: 7600, realGranos: 210, previoGranos: 6120, notaGranos: "", estadoGranos: "acordado",
-    bayer: 24700, bayerPrevio: 31500, siembra: 5400,
-  },
-  {
-    cod: 37, nombre: "GERMAN DEMARCHI", penetracion: 0.58,
-    objetivoInsumos: 251000, realInsumos: 113900, previoInsumos: 205600,
-    notaInsumos: "Arrancó en octubre, campaña anterior parcial.", estadoInsumos: "acordado",
-    objetivoGranos: 7300, realGranos: 590, previoGranos: 5980, notaGranos: "", estadoGranos: "acordado",
-    bayer: 29400, bayerPrevio: 22800, siembra: null,
-  },
-  {
-    cod: 36, nombre: "Q + AGRO SRL", penetracion: 0.72,
-    objetivoInsumos: 220000, realInsumos: 58900, previoInsumos: 187300,
-    notaInsumos: "", estadoInsumos: "acordado",
-    objetivoGranos: 5000, realGranos: 280, previoGranos: 4210, notaGranos: "", estadoGranos: "borrador",
-    bayer: 18900, bayerPrevio: 16400, siembra: null, dudoso: true,
-  },
-  {
-    // Objetivo copiado casi tal cual del año anterior: dispara el aviso ámbar.
-    cod: 39, nombre: "SAN FRANCISCO", penetracion: 0.69,
-    objetivoInsumos: 165000, realInsumos: 71300, previoInsumos: 163500,
-    notaInsumos: "", estadoInsumos: "acordado",
-    objetivoGranos: 4600, realGranos: 260, previoGranos: 3890, notaGranos: "", estadoGranos: "borrador",
-    bayer: 21300, bayerPrevio: 19700, siembra: 4100, dudoso: true,
-  },
-
-  // Excluidos por decisión ya documentada en el backend. Siguen facturando y suman al total
-  // de la empresa, pero no llevan objetivo ni entran en el seguimiento comercial.
-  {
-    cod: 3, nombre: "TRUCCO JUAN JOSE", penetracion: 0,
-    objetivoInsumos: 0, realInsumos: 428600, previoInsumos: 496200, notaInsumos: "", estadoInsumos: "borrador",
-    objetivoGranos: 0, realGranos: 0, previoGranos: 0, notaGranos: "", estadoGranos: "borrador",
-    bayer: 0, bayerPrevio: 0, siembra: null, excluido: "sociedades vinculadas",
-  },
-  {
-    cod: 10, nombre: "GALEOTTI JUAN PABLO", penetracion: 0,
-    objetivoInsumos: 0, realInsumos: 87200, previoInsumos: 214800, notaInsumos: "", estadoInsumos: "borrador",
-    objetivoGranos: 0, realGranos: 0, previoGranos: 0, notaGranos: "", estadoGranos: "borrador",
-    bayer: 0, bayerPrevio: 0, siembra: null, excluido: "ya no trabaja",
-  },
-  {
-    cod: 20, nombre: "ASL", penetracion: 0,
-    objetivoInsumos: 0, realInsumos: 63400, previoInsumos: 151700, notaInsumos: "", estadoInsumos: "borrador",
-    objetivoGranos: 0, realGranos: 0, previoGranos: 0, notaGranos: "", estadoGranos: "borrador",
-    bayer: 0, bayerPrevio: 0, siembra: null, excluido: "canal discontinuado",
-  },
-];
+import type { Cultivo, CostoCultivo, ObjetivoLinea, Productor } from "../types";
 
 /**
- * Filas de la planilla de Bayer que no cruzaron con `viajantes.descripcion`.
- * El cruce es por NOMBRE de texto libre porque esa planilla no trae el código de vendedor:
- * si el nombre no coincide letra por letra, la facturación no se imputa y nadie se entera.
+ * Fecha de corte fija: el mockup se ve siempre igual.
+ * Cae DENTRO de la campaña 2025/2026 (1-abr-2025 a 31-mar-2026), que es la campaña de la que
+ * salen los datos. Si se pusiera "hoy" quedaría parado en la 2026/2027 y el acumulado real
+ * de la 25/26 se leería como avance de una campaña que todavía no arrancó.
  */
-export const BAYER_SIN_CRUZAR: BayerSinCruzar[] = [
-  { nombre: "F. Massetti", monto: 18700 },
-  { nombre: "Galeotti, Juan P.", monto: 12400 },
-  { nombre: "N. Martinez", monto: 7300 },
+export const FECHA_CORTE = new Date(2026, 1, 17); // 17-feb-2026
+
+/**
+ * Costos de insumo por hectárea, de la hoja `Market Share.`.
+ * costo USD/ha = quintales de insumo × precio estimado del grano ÷ 10.
+ * Es lo que convierte el plan de siembra en "cuánto va a gastar este productor".
+ */
+export const COSTOS: Record<Cultivo, CostoCultivo> = {
+  soja:  { cultivo: "soja",  qqInsumo: 9,  precioTn: 325, rindeTnHa: 4 },
+  maiz:  { cultivo: "maiz",  qqInsumo: 34, precioTn: 180, rindeTnHa: 8 },
+  trigo: { cultivo: "trigo", qqInsumo: 15, precioTn: 220, rindeTnHa: 3 },
+  otro:  { cultivo: "otro",  qqInsumo: 12, precioTn: 250, rindeTnHa: 3 },
+};
+
+/** Objetivos de campaña, hoja `Objetivos`. Son PORCENTAJES que el sistema baja a cada vendedor. */
+export const OBJETIVOS_LINEA: ObjetivoLinea[] = [
+  { id: "facturacionLc", nombre: "Facturación La Clementina", unidad: "USD", crecimiento: 0.13, base: "lc" },
+  { id: "facturacionGral", nombre: "Facturación general (LC + Bayer)", unidad: "USD", crecimiento: 0.20, base: "total" },
+  { id: "semillaMaiz", nombre: "Semilla de maíz", unidad: "USD", crecimiento: 0.08, base: "bayer" },
+  { id: "adengo", nombre: "Adengo / ventas de semilla", unidad: "USD", crecimiento: 0.50, base: "bayer" },
+];
+
+export const PRODUCTORES: Productor[] = [
+  { id: 1, nombre: "ARROYO HONDO S.A.", vendedor: "TRUCCO JUAN JOSE", segmento: "A", canal: "Ambos",
+    has: { soja: 5000, maiz: 3000, trigo: 1500, otro: 0 }, mix: 7,
+    lc: 2252305, bayer: 1168734, lcPrev: 1972538, bayerPrev: 419954,
+    pts: { lc: 25.0, bayer: 20.0, mix: 15.0, has: 10.0, canje: 10.0 } },
+  { id: 2, nombre: "LA MERCED S.R.L.", vendedor: "TRUCCO JUAN JOSE", segmento: "A", canal: "Ambos",
+    has: { soja: 3000, maiz: 2000, trigo: 1000, otro: 0 }, mix: 6,
+    lc: 224350, bayer: 434233, lcPrev: 333676, bayerPrev: 291564,
+    pts: { lc: 25.0, bayer: 20.0, mix: 15.0, has: 10.0, canje: 10.0 } },
+  { id: 3, nombre: "DON ELPIDIO S.A.", vendedor: "GUILLERMO BRAVIN", segmento: "A", canal: "Ambos",
+    has: { soja: 2500, maiz: 1600, trigo: 1000, otro: 0 }, mix: 5,
+    lc: 205560, bayer: 69812, lcPrev: 261016, bayerPrev: 161224,
+    pts: { lc: 25.0, bayer: 15.0, mix: 15.0, has: 10.0, canje: 10.0 } },
+  { id: 4, nombre: "SAN ANDRES SRL", vendedor: "MARTINEZ, NAHUEL", segmento: "A", canal: "Ambos",
+    has: { soja: 3000, maiz: 1000, trigo: 800, otro: 0 }, mix: 7,
+    lc: 515763, bayer: 296729, lcPrev: 117781, bayerPrev: 79195,
+    pts: { lc: 25.0, bayer: 20.0, mix: 15.0, has: 10.0, canje: 10.0 } },
+  { id: 5, nombre: "EL CEIBAL S.A.", vendedor: "GERMAN DEMARCHI", segmento: "A", canal: "Ambos",
+    has: { soja: 900, maiz: 400, trigo: 400, otro: 0 }, mix: 5,
+    lc: 132725, bayer: 53417, lcPrev: 65762, bayerPrev: 978,
+    pts: { lc: 25.0, bayer: 15.0, mix: 15.0, has: 10.0, canje: 0.0 } },
+  { id: 6, nombre: "LOS TRES ROBLES y CIA S.A.", vendedor: "ROSSO HORACIO", segmento: "A", canal: "Ambos",
+    has: { soja: 770, maiz: 330, trigo: 450, otro: 0 }, mix: 3,
+    lc: 102875, bayer: 79417, lcPrev: 134556, bayerPrev: 13972,
+    pts: { lc: 25.0, bayer: 15.0, mix: 11.25, has: 10.0, canje: 0.0 } },
+  { id: 7, nombre: "LA ESPERANZA HNOS S.R.L.", vendedor: "MARTINEZ, NAHUEL", segmento: "A", canal: "Ambos",
+    has: { soja: 700, maiz: 300, trigo: 300, otro: 0 }, mix: 7,
+    lc: 137275, bayer: 72279, lcPrev: 25761, bayerPrev: 6626,
+    pts: { lc: 25.0, bayer: 15.0, mix: 15.0, has: 10.0, canje: 10.0 } },
+  { id: 8, nombre: "EL RETIRO S.A.", vendedor: "GERMAN DEMARCHI", segmento: "A", canal: "Ambos",
+    has: { soja: 600, maiz: 300, trigo: 300, otro: 0 }, mix: 6,
+    lc: 182725, bayer: 86952, lcPrev: 21707, bayerPrev: 28660,
+    pts: { lc: 25.0, bayer: 15.0, mix: 15.0, has: 10.0, canje: 10.0 } },
+  { id: 9, nombre: "SANTA ROSA S.A.S.", vendedor: "MARTINEZ, NAHUEL", segmento: "B", canal: "Solo LC",
+    has: { soja: 9000, maiz: 7000, trigo: 1800, otro: 0 }, mix: 2,
+    lc: 82205, bayer: 0, lcPrev: 224191, bayerPrev: 0,
+    pts: { lc: 18.75, bayer: 0.0, mix: 7.5, has: 10.0, canje: 7.5 } },
+  { id: 10, nombre: "LA CAROLINA S.R.L.", vendedor: "LC AGRO", segmento: "B", canal: "Solo LC",
+    has: { soja: 2500, maiz: 1500, trigo: 1000, otro: 0 }, mix: 3,
+    lc: 339665, bayer: 0, lcPrev: 276510, bayerPrev: 0,
+    pts: { lc: 25.0, bayer: 0.0, mix: 11.25, has: 10.0, canje: 0.0 } },
+  { id: 11, nombre: "DON SEVERO S.A.", vendedor: "GERMAN DEMARCHI", segmento: "B", canal: "Solo LC",
+    has: { soja: 1500, maiz: 500, trigo: 500, otro: 0 }, mix: 4,
+    lc: 367993, bayer: 0, lcPrev: 170700, bayerPrev: 0,
+    pts: { lc: 25.0, bayer: 0.0, mix: 15.0, has: 10.0, canje: 5.0 } },
+  { id: 12, nombre: "EL ALGARROBO S.R.L.", vendedor: "ROSSO HORACIO", segmento: "B", canal: "Ambos",
+    has: { soja: 460, maiz: 650, trigo: 250, otro: 90 }, mix: 5,
+    lc: 51604, bayer: 17630, lcPrev: 27263, bayerPrev: 0,
+    pts: { lc: 18.75, bayer: 5.0, mix: 15.0, has: 10.0, canje: 0.0 } },
+  { id: 13, nombre: "LA PRIMAVERA S.A.", vendedor: "GUILLERMO BRAVIN", segmento: "B", canal: "Ambos",
+    has: { soja: 1000, maiz: 250, trigo: 500, otro: 0 }, mix: 3,
+    lc: 38645, bayer: 160828, lcPrev: 14625, bayerPrev: 109005,
+    pts: { lc: 12.5, bayer: 20.0, mix: 11.25, has: 10.0, canje: 5.0 } },
+  { id: 14, nombre: "LOS NOGALES SRL", vendedor: "MARTINEZ, NAHUEL", segmento: "B", canal: "Ambos",
+    has: { soja: 300, maiz: 150, trigo: 150, otro: 0 }, mix: 4,
+    lc: 3113, bayer: 110084, lcPrev: 2970, bayerPrev: 14615,
+    pts: { lc: 6.25, bayer: 20.0, mix: 15.0, has: 5.0, canje: 5.0 } },
+  { id: 15, nombre: "EL PORVENIR S.A.", vendedor: "GERMAN DEMARCHI", segmento: "B", canal: "Solo LC",
+    has: { soja: 350, maiz: 200, trigo: 0, otro: 0 }, mix: 3,
+    lc: 88807, bayer: 0, lcPrev: 94940, bayerPrev: 6579,
+    pts: { lc: 18.75, bayer: 0.0, mix: 11.25, has: 7.5, canje: 7.5 } },
+  { id: 16, nombre: "SAN GREGORIO y CIA S.A.", vendedor: "ROSSO HORACIO", segmento: "B", canal: "Ambos",
+    has: { soja: 70, maiz: 280, trigo: 90, otro: 0 }, mix: 4,
+    lc: 38571, bayer: 6549, lcPrev: 36985, bayerPrev: 0,
+    pts: { lc: 12.5, bayer: 5.0, mix: 15.0, has: 5.0, canje: 7.5 } },
+  { id: 17, nombre: "LA ISABEL HNOS S.R.L.", vendedor: "GUILLERMO BRAVIN", segmento: "B", canal: "Ambos",
+    has: { soja: 400, maiz: 100, trigo: 100, otro: 0 }, mix: 4,
+    lc: 18163, bayer: 23276, lcPrev: 86627, bayerPrev: 736,
+    pts: { lc: 6.25, bayer: 10.0, mix: 15.0, has: 7.5, canje: 7.5 } },
+  { id: 18, nombre: "EL DESCANSO S.A.", vendedor: "ROSSO HORACIO", segmento: "B", canal: "Ambos",
+    has: { soja: 45, maiz: 275, trigo: 50, otro: 0 }, mix: 4,
+    lc: 54169, bayer: 2506, lcPrev: 27417, bayerPrev: 0,
+    pts: { lc: 18.75, bayer: 5.0, mix: 15.0, has: 5.0, canje: 5.0 } },
+  { id: 19, nombre: "DOÑA MARTA S.A.S.", vendedor: "GERMAN DEMARCHI", segmento: "C", canal: "Solo LC",
+    has: { soja: 8500, maiz: 2000, trigo: 350, otro: 3200 }, mix: 1,
+    lc: 5369, bayer: 0, lcPrev: 2898, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 10.0, canje: 0.0 } },
+  { id: 20, nombre: "LOS TALAS S.R.L.", vendedor: "MARTINEZ, NAHUEL", segmento: "C", canal: "Solo Bayer",
+    has: { soja: 3000, maiz: 3000, trigo: 0, otro: 0 }, mix: 2,
+    lc: 0, bayer: 38961, lcPrev: 12050, bayerPrev: 107681,
+    pts: { lc: 0.0, bayer: 10.0, mix: 7.5, has: 10.0, canje: 7.5 } },
+  { id: 21, nombre: "LA ADELA S.A.", vendedor: "LC AGRO", segmento: "C", canal: "Solo LC",
+    has: { soja: 979, maiz: 3062, trigo: 804, otro: 1986 }, mix: 1,
+    lc: 209937, bayer: 0, lcPrev: 437864, bayerPrev: 0,
+    pts: { lc: 25.0, bayer: 0.0, mix: 3.75, has: 10.0, canje: 0.0 } },
+  { id: 22, nombre: "EL QUEBRACHO S.R.L.", vendedor: "MARTINEZ, NAHUEL", segmento: "C", canal: "Solo Bayer",
+    has: { soja: 2000, maiz: 300, trigo: 500, otro: 0 }, mix: 2,
+    lc: 0, bayer: 29429, lcPrev: 2850, bayerPrev: 0,
+    pts: { lc: 0.0, bayer: 10.0, mix: 7.5, has: 10.0, canje: 5.0 } },
+  { id: 23, nombre: "SAN CAYETANO S.A.", vendedor: "MARTINEZ, NAHUEL", segmento: "C", canal: "Solo LC",
+    has: { soja: 1500, maiz: 500, trigo: 500, otro: 0 }, mix: 2,
+    lc: 31302, bayer: 0, lcPrev: 252, bayerPrev: 0,
+    pts: { lc: 12.5, bayer: 0.0, mix: 7.5, has: 10.0, canje: 0.0 } },
+  { id: 24, nombre: "LA ALIANZA SRL", vendedor: "GUILLERMO BRAVIN", segmento: "C", canal: "Solo Bayer",
+    has: { soja: 800, maiz: 800, trigo: 500, otro: 0 }, mix: 1,
+    lc: 0, bayer: 65860, lcPrev: 39340, bayerPrev: 0,
+    pts: { lc: 0.0, bayer: 15.0, mix: 3.75, has: 10.0, canje: 0.0 } },
+  { id: 25, nombre: "EL MIRADOR S.A.", vendedor: "GERMAN DEMARCHI", segmento: "C", canal: "Ambos",
+    has: { soja: 1300, maiz: 500, trigo: 500, otro: 0 }, mix: 2,
+    lc: 7852, bayer: 29009, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 10.0, mix: 7.5, has: 10.0, canje: 0.0 } },
+  { id: 26, nombre: "LOS AROMOS y CIA S.A.", vendedor: "GERMAN DEMARCHI", segmento: "C", canal: "Ambos",
+    has: { soja: 1000, maiz: 500, trigo: 500, otro: 0 }, mix: 2,
+    lc: 10560, bayer: 57616, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 15.0, mix: 7.5, has: 10.0, canje: 0.0 } },
+  { id: 27, nombre: "DON ANIBAL HNOS S.R.L.", vendedor: "ROSSO HORACIO", segmento: "C", canal: "Solo LC",
+    has: { soja: 200, maiz: 50, trigo: 60, otro: 0 }, mix: 3,
+    lc: 11712, bayer: 0, lcPrev: 8659, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 11.25, has: 5.0, canje: 5.0 } },
+  { id: 28, nombre: "LA ELVIRA S.A.", vendedor: "MARTINEZ, NAHUEL", segmento: "C", canal: "Ambos",
+    has: { soja: 200, maiz: 50, trigo: 50, otro: 0 }, mix: 2,
+    lc: 212, bayer: 804, lcPrev: 2706, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 5.0, mix: 7.5, has: 5.0, canje: 0.0 } },
+  { id: 29, nombre: "EL TRIUNFO S.A.S.", vendedor: "GUILLERMO BRAVIN", segmento: "C", canal: "Solo LC",
+    has: { soja: 200, maiz: 50, trigo: 50, otro: 0 }, mix: 3,
+    lc: 9300, bayer: 0, lcPrev: 1788, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 11.25, has: 5.0, canje: 0.0 } },
+  { id: 30, nombre: "SANTA CLARA S.R.L.", vendedor: "GERMAN DEMARCHI", segmento: "C", canal: "Solo LC",
+    has: { soja: 120, maiz: 80, trigo: 60, otro: 0 }, mix: 3,
+    lc: 13794, bayer: 0, lcPrev: 3255, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 11.25, has: 5.0, canje: 0.0 } },
+  { id: 31, nombre: "LA GUARDIA S.A.", vendedor: "GERMAN DEMARCHI", segmento: "C", canal: "Solo LC",
+    has: { soja: 120, maiz: 80, trigo: 60, otro: 0 }, mix: 3,
+    lc: 19540, bayer: 0, lcPrev: 1276, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 11.25, has: 5.0, canje: 0.0 } },
+  { id: 32, nombre: "EL SAUCE S.R.L.", vendedor: "MARTINEZ, NAHUEL", segmento: "C", canal: "Ambos",
+    has: { soja: 200, maiz: 30, trigo: 80, otro: 0 }, mix: 2,
+    lc: 11894, bayer: 6872, lcPrev: 9640, bayerPrev: 9771,
+    pts: { lc: 6.25, bayer: 5.0, mix: 7.5, has: 5.0, canje: 0.0 } },
+  { id: 33, nombre: "LOS MOLINOS S.A.", vendedor: "MARTINEZ, NAHUEL", segmento: "C", canal: "Ambos",
+    has: { soja: 150, maiz: 50, trigo: 80, otro: 0 }, mix: 2,
+    lc: 5145, bayer: 1899, lcPrev: 20107, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 5.0, mix: 7.5, has: 5.0, canje: 2.5 } },
+  { id: 34, nombre: "DOÑA PETRONA SRL", vendedor: "GERMAN DEMARCHI", segmento: "C", canal: "Ambos",
+    has: { soja: 120, maiz: 80, trigo: 50, otro: 0 }, mix: 3,
+    lc: 1764, bayer: 14055, lcPrev: 10243, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 5.0, mix: 11.25, has: 5.0, canje: 0.0 } },
+  { id: 35, nombre: "LA VICTORIA S.A.", vendedor: "MASSETTI FERNANDO", segmento: "D", canal: "Solo LC",
+    has: { soja: 1000, maiz: 250, trigo: 500, otro: 0 }, mix: 1,
+    lc: 4145, bayer: 0, lcPrev: 16848, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 0.0, canje: 5.0 } },
+  { id: 36, nombre: "EL CARDAL y CIA S.A.", vendedor: "MARTINEZ, NAHUEL", segmento: "D", canal: "Solo LC",
+    has: { soja: 300, maiz: 80, trigo: 200, otro: 0 }, mix: 1,
+    lc: 14260, bayer: 0, lcPrev: 23500, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 5.0, canje: 0.0 } },
+  { id: 37, nombre: "SAN ROQUE HNOS S.R.L.", vendedor: "MARTINEZ, NAHUEL", segmento: "D", canal: "Solo LC",
+    has: { soja: 300, maiz: 100, trigo: 100, otro: 0 }, mix: 1,
+    lc: 2670, bayer: 0, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 5.0, canje: 0.0 } },
+  { id: 38, nombre: "LA FORTUNA S.A.", vendedor: "MARTINEZ, NAHUEL", segmento: "D", canal: "Solo Bayer",
+    has: { soja: 300, maiz: 100, trigo: 100, otro: 0 }, mix: 0,
+    lc: 0, bayer: 6573, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 0.0, bayer: 5.0, mix: 0.0, has: 5.0, canje: 2.5 } },
+  { id: 39, nombre: "EL OMBU S.A.S.", vendedor: "ROSSO HORACIO", segmento: "D", canal: "Solo LC",
+    has: { soja: 0, maiz: 0, trigo: 0, otro: 0 }, mix: 1,
+    lc: 794, bayer: 0, lcPrev: 2100, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 0.0, canje: 0.0 } },
+  { id: 40, nombre: "LOS ZORZALES S.R.L.", vendedor: "MARTINEZ, NAHUEL", segmento: "D", canal: "Solo LC",
+    has: { soja: 0, maiz: 0, trigo: 0, otro: 0 }, mix: 1,
+    lc: 866, bayer: 0, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 0.0, canje: 0.0 } },
+  { id: 41, nombre: "DON HORACIO S.A.", vendedor: "GUILLERMO BRAVIN", segmento: "D", canal: "Solo LC",
+    has: { soja: 0, maiz: 0, trigo: 0, otro: 0 }, mix: 2,
+    lc: 912, bayer: 0, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 7.5, has: 0.0, canje: 0.0 } },
+  { id: 42, nombre: "LA MATILDE S.R.L.", vendedor: "ROSSO HORACIO", segmento: "D", canal: "Solo LC",
+    has: { soja: 0, maiz: 0, trigo: 0, otro: 0 }, mix: 1,
+    lc: 945, bayer: 0, lcPrev: 0, bayerPrev: 0,
+    pts: { lc: 6.25, bayer: 0.0, mix: 3.75, has: 0.0, canje: 0.0 } },
 ];

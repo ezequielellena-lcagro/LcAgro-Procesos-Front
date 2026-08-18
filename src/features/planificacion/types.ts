@@ -1,81 +1,99 @@
 /**
- * Planificación de Ventas por Vendedor — tipos del feature.
+ * Planificación de Ventas — tipos del feature.
  *
- * ⚠️ PANTALLA MOCKUP: hoy se alimenta de datos inventados (`mock/datos.ts`), sin API.
- * Existe para acordar con el negocio QUÉ muestra la pantalla antes de construirla.
- * Cuando exista el endpoint, estos tipos son el contrato a espejar.
+ * ⚠️ PANTALLA MOCKUP: hoy se alimenta de `mock/datos.ts`, sin API. Existe para acordar con
+ * el negocio QUÉ muestra la pantalla antes de construirla.
+ *
+ * La unidad de análisis es el **PRODUCTOR**, no el vendedor. El modelo es participación de
+ * bolsillo: del plan de siembra sale cuánto va a gastar el productor en insumos (su mercado),
+ * contra eso se pone lo que le vendimos (La Clementina + Bayer), y la diferencia es la
+ * oportunidad. La lectura por vendedor es una agregación de esto, no al revés.
  */
 
-/** Cada línea de negocio corre con su propio almanaque. Nunca se suman entre sí. */
-export type LineaCalendario = "insumos" | "granos" | "bayer";
+export type Cultivo = "soja" | "maiz" | "trigo" | "otro";
 
-/** Línea que admite objetivo comercial (Bayer y plan de siembra son informativos). */
-export type LineaObjetivo = "insumos" | "granos";
+/** A = premium, B = clave, C = estándar, D = marginal. Sale del score, no se carga a mano. */
+export type Segmento = "A" | "B" | "C" | "D";
 
-/** Un objetivo se propone (borrador) y recién después se acuerda con el gerente comercial. */
-export type EstadoObjetivo = "acordado" | "borrador";
+/** Por dónde le compra el productor. Es donde se lee la oportunidad de venta cruzada. */
+export type Canal = "Solo LC" | "Solo Bayer" | "Ambos";
 
-export interface Calendario {
-  linea: LineaCalendario;
-  nombre: string;
-  rango: string;
-  /** Mes en que arranca la campaña (1–12). 1 = año calendario. */
-  mesInicio: number;
-  fuente: string;
-  /** Peso de cada mes dentro de la campaña, desde `mesInicio`. Suma 1. */
-  curva: number[] | null;
-  esMacroGest: boolean;
+/**
+ * Costo de insumos de un cultivo. `costo USD/ha = qqInsumo × precioTn ÷ 10`.
+ * Es lo que convierte hectáreas en dinero: sin esto no hay potencial que calcular.
+ */
+export interface CostoCultivo {
+  cultivo: Cultivo;
+  /** Quintales de insumo que consume una hectárea de este cultivo. */
+  qqInsumo: number;
+  /** Precio estimado del grano, USD por tonelada. */
+  precioTn: number;
+  /** Rinde esperado, toneladas por hectárea. */
+  rindeTnHa: number;
 }
 
-export interface ContextoCampania {
-  clave: string;
-  /** Fracción transcurrida contando DÍAS. */
-  lineal: number;
-  /** Fracción transcurrida contando VENTA esperada según la curva estacional. */
-  estacional: number;
-}
-
-export interface Vendedor {
-  /** `viajantes.codigo` de MacroGest. */
-  cod: number;
-  /** `viajantes.descripcion`. */
+export interface Productor {
+  id: number;
   nombre: string;
-  /** Penetración de cartera: qué proporción de sus productores le operó. */
-  penetracion: number;
-
-  objetivoInsumos: number;
-  realInsumos: number;
-  previoInsumos: number;
-  notaInsumos: string;
-  estadoInsumos: EstadoObjetivo;
-
-  objetivoGranos: number;
-  realGranos: number;
-  previoGranos: number;
-  notaGranos: string;
-  estadoGranos: EstadoObjetivo;
-
-  /** Facturación Bayer del año calendario en curso y del anterior. Informativa. */
+  /** `viajantes.descripcion` de MacroGest. */
+  vendedor: string;
+  segmento: Segmento;
+  canal: Canal;
+  /** Plan de siembra: hectáreas por cultivo. Se carga a mano — MacroGest no lo tiene. */
+  has: Record<Cultivo, number>;
+  /** Cantidad de sub-rubros distintos que compró. Criterio de la matriz. */
+  mix: number;
+  /** Facturación de La Clementina en la campaña vigente (USD). */
+  lc: number;
+  /** Facturación de Bayer por nuestro canal en la campaña vigente (USD). */
   bayer: number;
-  bayerPrevio: number;
-
-  /** Toneladas potenciales del plan de siembra. `null` = no se cargó. */
-  siembra: number | null;
-
-  /** Motivo por el que no se le fija objetivo. Espeja `VolumenAcopiado:VendedoresExcluidos`. */
-  excluido?: string;
-  /** Falta confirmar con el cliente si es una persona con cartera o una boca/entidad. */
-  dudoso?: boolean;
+  lcPrev: number;
+  bayerPrev: number;
+  /** Puntos ya asignados por criterio (en la app los calcula la matriz). */
+  pts: { lc: number; bayer: number; mix: number; has: number; canje: number };
 }
 
-/** Fila de la planilla de Bayer cuyo nombre no cruzó con `viajantes.descripcion`. */
-export interface BayerSinCruzar {
+/** Un criterio de la matriz de segmentación, con su peso. */
+export interface CriterioMatriz {
+  id: keyof Productor["pts"] | "rentabilidad";
   nombre: string;
-  monto: number;
+  /** Peso en puntos. El score se normaliza sobre la suma de los criterios activos. */
+  peso: number;
+  /** Etiquetas de las cuatro bandas, de mayor a menor. */
+  bandas: [string, string, string, string];
+  /**
+   * `false` = definido en la matriz del cliente pero **no calculado** en el Excel de hoy.
+   * La app sí puede calcularlo: la rentabilidad por línea ya sale del módulo de Comisiones.
+   */
+  activo: boolean;
 }
 
-/** Aviso de validación sobre un objetivo cargado. */
-export interface AvisoObjetivo {
-  nivel: "error" | "warn";
-  texto: string;
+/**
+ * Objetivo de campaña. El cliente NO carga un número por vendedor: carga un porcentaje de
+ * crecimiento por línea y el sistema lo baja a cada uno sobre su cierre anterior.
+ */
+export interface ObjetivoLinea {
+  id: string;
+  nombre: string;
+  unidad: string;
+  /** Crecimiento pedido sobre la campaña anterior (0,13 = +13 %). */
+  crecimiento: number;
+  /** Sobre qué facturación se aplica. */
+  base: "lc" | "bayer" | "total";
+}
+
+/** Productor con todo lo derivado ya calculado. */
+export interface ProductorCalculado extends Productor {
+  hasTotal: number;
+  /** Cuánto va a gastar en insumos esta campaña, según su plan de siembra. */
+  mercado: number;
+  total: number;
+  totalPrev: number;
+  /** (LC + Bayer) ÷ mercado. La participación de bolsillo. */
+  participacion: number;
+  /** Mercado − vendido: lo que se le podría vender y no se le vende. */
+  oportunidad: number;
+  score: number;
+  segmentoCalculado: Segmento;
+  variacion: number | null;
 }

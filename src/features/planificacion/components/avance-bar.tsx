@@ -1,6 +1,17 @@
 import { cn } from "@/lib/utils";
 import { pct } from "@/shared/format/format";
-import { tonoAvance } from "../lib/objetivo";
+
+/**
+ * Semáforo del avance. Se compara contra el **ritmo esperado a la fecha**, no contra el 100 %:
+ * en agosto nadie lleva vendida la campaña entera, y pintar todo de rojo no informa nada.
+ */
+function tonoAvance(avance: number, esperado: number): "ok" | "medio" | "malo" {
+  if (esperado <= 0) return "ok";
+  const relativo = avance / esperado;
+  if (relativo >= 1) return "ok";
+  if (relativo >= 0.8) return "medio";
+  return "malo";
+}
 
 /**
  * Barra de avance con la marca del **ritmo esperado a la fecha**.
