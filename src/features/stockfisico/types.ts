@@ -36,7 +36,10 @@ export interface AFijarDetalleDto {
   vtoFijacion: string | null;
   diasParaVto: number | null;
   estado: EstadoFijacion;
+  /** Venta directa con la exportadora (sin corredor que intervenga). */
   directo: boolean;
+  /** Corredor que intervino, o null si es directo: cuando hay corredor, el a fijar se gestiona con él. */
+  corredor: string | null;
 }
 
 /** Una línea de la alerta "descarga sin pasar". */

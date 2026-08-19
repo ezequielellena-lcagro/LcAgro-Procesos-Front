@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AFijarDetalleDto } from "../types";
-import { porCanal, porComprador, porRiesgo } from "./a-fijar";
+import { porCanal, porComprador, porExportador, porRiesgo } from "./a-fijar";
 
 function fila(p: Partial<AFijarDetalleDto> & Pick<AFijarDetalleDto, "comprador" | "aFijarTn">): AFijarDetalleDto {
   return {
@@ -11,6 +11,7 @@ function fila(p: Partial<AFijarDetalleDto> & Pick<AFijarDetalleDto, "comprador" 
     diasParaVto: null,
     estado: "Verde",
     directo: true,
+    corredor: null,
     ...p,
   };
 }
@@ -49,5 +50,24 @@ describe("porRiesgo", () => {
     ]).map((f) => f.comprador);
 
     expect(orden).toEqual(["vencido-grande", "vencido-chico", "naranja", "verde"]);
+  });
+});
+
+describe("porExportador", () => {
+  it("agrupa por cereal, exportador y via, y toma el vencimiento mas proximo", () => {
+    const grupos = porExportador([
+      fila({ comprador: "ADM", cereal: "Maiz", aFijarTn: 1000, corredor: "GRANAR S.A.", directo: false, vtoFijacion: "2026-12-30", estado: "Verde" }),
+      fila({ comprador: "ADM", cereal: "Maiz", aFijarTn: 900, corredor: "GRANAR S.A.", directo: false, vtoFijacion: "2026-08-16", estado: "Naranja" }),
+      // Mismo exportador y cereal pero SIN corredor: es otra via, no se mezcla.
+      fila({ comprador: "ADM", cereal: "Maiz", aFijarTn: 500, directo: true, vtoFijacion: "2027-01-31" }),
+    ]);
+
+    expect(grupos).toHaveLength(2);
+    const conCorredor = grupos.find((g) => g.via === "GRANAR S.A.")!;
+    expect(conCorredor.tn).toBe(1900);
+    expect(conCorredor.contratos).toBe(2);
+    expect(conCorredor.proximoVto).toBe("2026-08-16");
+    expect(conCorredor.estado).toBe("Naranja");
+    expect(grupos.find((g) => g.esDirecto)!.tn).toBe(500);
   });
 });

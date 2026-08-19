@@ -33,6 +33,50 @@ export function porCanal(filas: AFijarDetalleDto[]): { directoTn: number; corred
   );
 }
 
+export interface GrupoAFijar {
+  cereal: string;
+  exportador: string;
+  /** Con quién se gestiona la fijación: el corredor, o "Directo" si se hizo con la exportadora. */
+  via: string;
+  esDirecto: boolean;
+  contratos: number;
+  tn: number;
+  /** Vencimiento más próximo del grupo; null si ningún contrato tiene fecha. */
+  proximoVto: string | null;
+  /** Peor estado del grupo: es el que manda para el semáforo. */
+  estado: AFijarDetalleDto["estado"];
+}
+
+/**
+ * Agrupa el "a fijar" por cereal × exportador × vía, como pide la skill. La vía es el eje real de
+ * gestión: cuando interviene un corredor la fijación se hace con él, no con la exportadora.
+ */
+export function porExportador(filas: AFijarDetalleDto[]): GrupoAFijar[] {
+  const map = new Map<string, GrupoAFijar>();
+  for (const f of filas) {
+    const via = f.directo ? "Directo" : (f.corredor ?? "Corredor");
+    const clave = `${f.cereal}|${f.comprador}|${via}`;
+    const acc = map.get(clave) ?? {
+      cereal: f.cereal,
+      exportador: f.comprador,
+      via,
+      esDirecto: f.directo,
+      contratos: 0,
+      tn: 0,
+      proximoVto: null,
+      estado: "SinFecha" as AFijarDetalleDto["estado"],
+    };
+    acc.contratos += 1;
+    acc.tn += f.aFijarTn;
+    // El vencimiento del grupo es el más próximo: es la fecha que obliga a actuar.
+    if (f.vtoFijacion && (acc.proximoVto === null || f.vtoFijacion < acc.proximoVto))
+      acc.proximoVto = f.vtoFijacion;
+    if (ORDEN_ESTADO[f.estado] < ORDEN_ESTADO[acc.estado]) acc.estado = f.estado;
+    map.set(clave, acc);
+  }
+  return [...map.values()].sort((a, b) => b.tn - a.tn);
+}
+
 /** Peso de severidad del semáforo, para ordenar la tabla por riesgo (lo vencido primero). */
 const ORDEN_ESTADO: Record<AFijarDetalleDto["estado"], number> = {
   Vencido: 0,

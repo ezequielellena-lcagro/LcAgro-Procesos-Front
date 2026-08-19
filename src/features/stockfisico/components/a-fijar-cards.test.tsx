@@ -13,6 +13,7 @@ function fila(p: Partial<AFijarDetalleDto> & Pick<AFijarDetalleDto, "comprador" 
     diasParaVto: null,
     estado: "Verde",
     directo: true,
+    corredor: null,
     ...p,
   };
 }

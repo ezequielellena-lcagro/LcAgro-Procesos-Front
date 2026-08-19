@@ -20,12 +20,12 @@ const DATA: StockCerealDto = {
     proximo30Tn: 6100, proximo30Contratos: 1,
   },
   detallePlanta10: [
-    { comprador: "EXPORTADORA DEMO S.A.", cereal: "Soja", contrato: "C-1001", campania: "20252026", aFijarTn: 10000, vtoFijacion: "2026-11-30", diasParaVto: 126, estado: "Verde", directo: true },
-    { comprador: "ACOPIO DEMO S.R.L.", cereal: "Soja", contrato: "C-1002", campania: "20252026", aFijarTn: 5552, vtoFijacion: "2026-09-10", diasParaVto: 45, estado: "Amarillo", directo: false },
-    { comprador: "MOLINO DEMO S.A.", cereal: "Maíz", contrato: "C-2001", campania: "20252026", aFijarTn: 6100, vtoFijacion: "2026-08-16", diasParaVto: 20, estado: "Naranja", directo: true },
-    { comprador: "TRADER DEMO", cereal: "Maíz", contrato: "C-2002", campania: "20242025", aFijarTn: 4281, vtoFijacion: "2026-07-17", diasParaVto: -10, estado: "Vencido", directo: false },
-    { comprador: "TRADER DEMO", cereal: "Trigo", contrato: "C-3002", campania: "20242025", aFijarTn: 1500, vtoFijacion: "2026-06-20", diasParaVto: -37, estado: "Vencido", directo: false },
-    { comprador: "MOLINERA DEMO S.A.", cereal: "Trigo", contrato: "C-3001", campania: "20252026", aFijarTn: 8803, vtoFijacion: "2027-02-15", diasParaVto: 203, estado: "Verde", directo: true },
+    { comprador: "EXPORTADORA DEMO S.A.", cereal: "Soja", contrato: "C-1001", campania: "20252026", aFijarTn: 10000, vtoFijacion: "2026-11-30", diasParaVto: 126, estado: "Verde", directo: true, corredor: null },
+    { comprador: "ACOPIO DEMO S.R.L.", cereal: "Soja", contrato: "C-1002", campania: "20252026", aFijarTn: 5552, vtoFijacion: "2026-09-10", diasParaVto: 45, estado: "Amarillo", directo: false, corredor: "GRASSI S.A." },
+    { comprador: "MOLINO DEMO S.A.", cereal: "Maíz", contrato: "C-2001", campania: "20252026", aFijarTn: 6100, vtoFijacion: "2026-08-16", diasParaVto: 20, estado: "Naranja", directo: true, corredor: null },
+    { comprador: "TRADER DEMO", cereal: "Maíz", contrato: "C-2002", campania: "20242025", aFijarTn: 4281, vtoFijacion: "2026-07-17", diasParaVto: -10, estado: "Vencido", directo: false, corredor: "GRASSI S.A." },
+    { comprador: "TRADER DEMO", cereal: "Trigo", contrato: "C-3002", campania: "20242025", aFijarTn: 1500, vtoFijacion: "2026-06-20", diasParaVto: -37, estado: "Vencido", directo: false, corredor: "GRASSI S.A." },
+    { comprador: "MOLINERA DEMO S.A.", cereal: "Trigo", contrato: "C-3001", campania: "20252026", aFijarTn: 8803, vtoFijacion: "2027-02-15", diasParaVto: 203, estado: "Verde", directo: true, corredor: null },
   ],
   alertasDescarga: [
     { contrato: "vital2025", comprador: "VITALCROPS DEMO SA", cereal: "Soja", campania: "20252026", fijadoTn: 320.5 },

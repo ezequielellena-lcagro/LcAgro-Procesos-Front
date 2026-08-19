@@ -9,7 +9,7 @@ import { FijacionBadge } from "../components/fijacion-badge";
 import { FijacionVencidaCard } from "../components/fijacion-vencida-card";
 import { PlantaCard } from "../components/planta-card";
 import { PorCompradorCard } from "../components/por-comprador-card";
-import { porRiesgo } from "../lib/a-fijar";
+import { porExportador, porRiesgo, type GrupoAFijar } from "../lib/a-fijar";
 import { useStockCereal } from "../queries/use-stock-cereal";
 import { useStockCerealExport } from "../queries/use-stock-cereal-export";
 import type { AFijarDetalleDto, AlertaDescargaDto, ConsolidadoCerealDto, StockCerealDto } from "../types";
@@ -71,6 +71,21 @@ function Reporte({ data }: { data: StockCerealDto }) {
     { key: "via", header: "Vía", cell: (r) => (r.directo ? "Directo" : "Corredor") },
     { key: "vto", header: "Vto. fijación", align: "right", cell: (r) => oDash(r.vtoFijacion, fmtFecha) },
     { key: "estado", header: "Estado", cell: (r) => <FijacionBadge estado={r.estado} /> },
+  ];
+
+  const grupoCols: Column<GrupoAFijar>[] = [
+    { key: "cereal", header: "Cereal", cell: (g) => g.cereal },
+    { key: "exportador", header: "Exportador", cell: (g) => g.exportador },
+    {
+      key: "via",
+      header: "Vía",
+      cell: (g) =>
+        g.esDirecto ? <span className="text-ink-soft">Directo</span> : g.via,
+    },
+    { key: "contratos", header: "Contratos", align: "right", cell: (g) => g.contratos },
+    { key: "tn", header: "A fijar (tn)", align: "right", cell: (g) => numero(g.tn) },
+    { key: "vto", header: "Próx. vto.", align: "right", cell: (g) => oDash(g.proximoVto, fmtFecha) },
+    { key: "estado", header: "Estado", cell: (g) => <FijacionBadge estado={g.estado} /> },
   ];
 
   const alertaCols: Column<AlertaDescargaDto>[] = [
@@ -173,6 +188,31 @@ function Reporte({ data }: { data: StockCerealDto }) {
         <p className="mt-2 text-xs text-ink-soft">
           Ordenado por riesgo de fijación: primero lo vencido, después lo que vence antes.
         </p>
+      </section>
+
+      <section>
+        <h2 className="mb-1 font-display text-lg font-semibold text-ink">
+          A fijar por exportador y corredor
+        </h2>
+        <p className="mb-2 text-sm text-ink-soft">
+          Con quién hay que gestionar cada fijación: cuando interviene un corredor, la fijación se hace
+          con él y no con la exportadora.
+        </p>
+        <DataTable
+          columns={grupoCols}
+          rows={porExportador(data.detallePlanta10)}
+          getRowKey={(g) => `${g.cereal}-${g.exportador}-${g.via}`}
+          footer={[
+            "TOTAL",
+            "",
+            "",
+            String(data.detallePlanta10.length),
+            numero(t.p10),
+            "",
+            "",
+          ]}
+          empty="Sin contratos a fijar."
+        />
       </section>
 
       {data.alertasDescarga.length > 0 && (
