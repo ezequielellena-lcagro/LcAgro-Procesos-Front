@@ -44,6 +44,27 @@ function drawKpiCards(doc: JsPdf, kpis: ExportKpi[], startY: number, margin: num
   return startY + Math.ceil(kpis.length / perRow) * (cardH + gap);
 }
 
+// Párrafos de criterio (objetivo, palanca) entre los KPIs y la tabla. Devuelve la Y siguiente.
+function drawNotas(doc: JsPdf, notas: string[], startY: number, margin: number, pageWidth: number): number {
+  const usable = pageWidth - margin * 2;
+  let y = startY + 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(90, 100, 108);
+
+  for (const nota of notas) {
+    // Sin cortar por ancho, un párrafo largo se dibuja en una sola línea y se sale de la hoja.
+    for (const linea of doc.splitTextToSize(nota, usable) as string[]) {
+      y += 12;
+      doc.text(linea, margin, y);
+    }
+    y += 4;
+  }
+
+  return y + 8;
+}
+
 function comoTexto<T>(col: ExportColumn<T>, v: string | number | null): string {
   if (v == null) return "—";
   switch (col.format) {
@@ -81,6 +102,9 @@ export async function exportToPdf<T>(spec: ExportSpec<T>): Promise<void> {
   let tableStartY = spec.subtitle ? 72 : 54;
   if (spec.kpis?.length) {
     tableStartY = drawKpiCards(doc, spec.kpis, tableStartY, margin, doc.internal.pageSize.getWidth()) + 4;
+  }
+  if (spec.notas?.length) {
+    tableStartY = drawNotas(doc, spec.notas, tableStartY, margin, doc.internal.pageSize.getWidth());
   }
 
   const head = [columns.map((c) => c.header)];

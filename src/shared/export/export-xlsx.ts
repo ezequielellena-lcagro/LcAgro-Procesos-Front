@@ -13,12 +13,12 @@ const TOTAL_BG = "#EEF1F3"; // fila de totales
 const BORDER = "#D8DEE3";
 
 // Bloque "Resumen por cereal" (KPIs) que va arriba de la tabla de detalle.
-function bloqueKpis(kpis: ExportKpi[] | undefined, titulo: string) {
+function bloqueKpis(kpis: ExportKpi[] | undefined, titulo: string, etiqueta: string) {
   if (!kpis?.length) return [];
   const labels = kpis[0].metricas.map((m) => m.label);
   const tituloRow = [{ value: titulo, fontWeight: "bold" as const, fontSize: 13 }];
   const headerRow = [
-    { value: "Cereal", fontWeight: "bold" as const, backgroundColor: CLEMENTINA, color: SLATE, align: "left" as const },
+    { value: etiqueta, fontWeight: "bold" as const, backgroundColor: CLEMENTINA, color: SLATE, align: "left" as const },
     ...labels.map((l) => ({
       value: l,
       fontWeight: "bold" as const,
@@ -81,8 +81,11 @@ export async function exportToXlsx<T>(spec: ExportSpec<T>): Promise<void> {
           }),
         ];
 
+  const notas = (spec.notas ?? []).flatMap((n) => [[{ value: n, wrap: true as const }]]);
+
   const data = [
-    ...bloqueKpis(spec.kpis, spec.kpisTitulo ?? "Resumen por cereal"),
+    ...bloqueKpis(spec.kpis, spec.kpisTitulo ?? "Resumen por cereal", spec.kpisEtiqueta ?? "Cereal"),
+    ...(notas.length ? [...notas, [{ value: undefined }]] : []),
     header,
     ...cuerpo,
     ...filaTotales,

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -9,11 +10,15 @@ import { DataTable, type Column } from "@/shared/components/data-table";
 import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
+import { ExportButtons } from "@/shared/components/export-buttons";
 import { KpiCard } from "@/shared/components/kpi-card";
 import { MiniBarChart } from "@/shared/components/mini-bar-chart";
 import { PageHeader } from "@/shared/components/page-header";
 import { Sparkline } from "@/shared/components/sparkline";
+import { exportToPdf } from "@/shared/export/export-pdf";
+import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { numero, oDash, pct } from "@/shared/format/format";
+import { specFichaVendedor, specObjetivosPorVendedor } from "../lib/export-vendedores";
 import { CarteraAccionable } from "../components/cartera-accionable";
 import { EstadoClienteBadge } from "../components/estado-cliente-badge";
 import { ObjetivoDialog } from "../components/objetivo-dialog";
@@ -42,6 +47,21 @@ export function VolumenAcopiadoPage() {
 
   const puedeAcordar = hasAnyRole(["volumenacopiado"]);
 
+  // En "Por vendedor" se exporta la ficha del vendedor elegido; en "Resumen", los objetivos de todos.
+  const hayQueExportar =
+    tab === "vendedor" ? analisis.data != null && campania != null : resumen.data != null;
+
+  // Cada rama llama al exportador con su propio tipo de fila: unificarlas antes de llamar dejaría un
+  // ExportSpec de dos filas distintas, que no tipa.
+  function exportarCon(exportador: typeof exportToPdf) {
+    const fallo = () => toast.error("No se pudo generar el archivo.");
+    if (tab === "vendedor") {
+      if (analisis.data && campania) void exportador(specFichaVendedor(analisis.data, campania)).catch(fallo);
+      return;
+    }
+    if (resumen.data) void exportador(specObjetivosPorVendedor(resumen.data)).catch(fallo);
+  }
+
   return (
     <div>
       <PageHeader
@@ -50,6 +70,14 @@ export function VolumenAcopiadoPage() {
           campania
             ? `Certificados de depósito 1116 A · campaña ${campania}`
             : "Cuánto grano trae la cartera de cada vendedor"
+        }
+        actions={
+          <ExportButtons
+            onExcel={() => exportarCon(exportToXlsx)}
+            onPdf={() => exportarCon(exportToPdf)}
+            excelDisabled={!hayQueExportar}
+            pdfDisabled={!hayQueExportar}
+          />
         }
       />
 

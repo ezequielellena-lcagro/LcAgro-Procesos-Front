@@ -32,6 +32,13 @@ export interface ExportSpec<T> {
   /** KPIs (tarjetas) que se muestran arriba de la tabla de detalle. */
   kpis?: ExportKpi[];
   kpisTitulo?: string; // por defecto "Resumen por cereal"
+  /** Encabezado de la primera columna del bloque de KPIs en el Excel. Por defecto "Cereal". */
+  kpisEtiqueta?: string;
+  /**
+   * Párrafos que van entre los KPIs y la tabla: el "por qué" del reporte (cómo se llegó al objetivo,
+   * qué palanca le corresponde). Sin esto el PDF sale con los números pero sin el criterio.
+   */
+  notas?: string[];
 }
 
 /** Indica si la columna es numérica (alineada a la derecha en ambos exportadores). */
