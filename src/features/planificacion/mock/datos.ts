@@ -31,12 +31,35 @@ export const COSTOS: Record<Cultivo, CostoCultivo> = {
   otro:  { cultivo: "otro",  qqInsumo: 12, precioTn: 250, rindeTnHa: 3 },
 };
 
-/** Objetivos de campaña, hoja `Objetivos`. Son PORCENTAJES que el sistema baja a cada vendedor. */
+/**
+ * Objetivos de campaña, hoja `Objetivos`. Son PORCENTAJES que el sistema baja a cada vendedor.
+ *
+ * `proporcionBase` existe porque dos de las lineas son un subconjunto de la facturacion de
+ * Bayer, no el total: sin eso las dos mostraban la misma base y el objetivo salia inflado.
+ * La proporcion de semilla de maiz se saco del Excel y **reconcilia entre dos hojas**
+ * independientes, que es lo que la hace confiable. La de Adengo no existe desagregada en
+ * USD en ninguna hoja: queda en null y la linea se muestra como no medible, en vez de
+ * inventarle una base.
+ */
 export const OBJETIVOS_LINEA: ObjetivoLinea[] = [
-  { id: "facturacionLc", nombre: "Facturación La Clementina", unidad: "USD", crecimiento: 0.13, base: "lc" },
-  { id: "facturacionGral", nombre: "Facturación general (LC + Bayer)", unidad: "USD", crecimiento: 0.20, base: "total" },
-  { id: "semillaMaiz", nombre: "Semilla de maíz", unidad: "USD", crecimiento: 0.08, base: "bayer" },
-  { id: "adengo", nombre: "Adengo / ventas de semilla", unidad: "USD", crecimiento: 0.50, base: "bayer" },
+  {
+    id: "facturacionLc", nombre: "Facturación La Clementina", unidad: "USD",
+    crecimiento: 0.13, base: "lc", proporcionBase: 1,
+  },
+  {
+    id: "facturacionGral", nombre: "Facturación general (LC + Bayer)", unidad: "USD",
+    crecimiento: 0.20, base: "total", proporcionBase: 1, esAgregada: true,
+  },
+  {
+    id: "semillaMaiz", nombre: "Semilla de maíz", unidad: "USD",
+    crecimiento: 0.08, base: "bayer", proporcionBase: 0.338,
+    fuenteProporcion: "33,8 % de Bayer en 24-25 (Resumen rubro Bayer y Ranking Bayer Clientes coinciden)",
+  },
+  {
+    id: "adengo", nombre: "Adengo / ventas de semilla", unidad: "USD",
+    crecimiento: 0.50, base: "bayer", proporcionBase: null,
+    fuenteProporcion: "Adengo solo figura en unidades, no en USD: falta el dato para poder medirlo",
+  },
 ];
 
 export const PRODUCTORES: Productor[] = [

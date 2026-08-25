@@ -3,13 +3,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/shared/components/page-header";
 import { CarteraTab } from "../components/cartera-tab";
 import { ObjetivosTab } from "../components/objetivos-tab";
-import { SegmentacionTab } from "../components/segmentacion-tab";
+import { SegmentacionModal } from "../components/segmentacion-modal";
 import { claveCampania, fraccionEstacional } from "../lib/campanias";
 import { CRITERIOS, calcular } from "../lib/segmentacion";
 import { COSTOS, FECHA_CORTE, OBJETIVOS_LINEA, PRODUCTORES } from "../mock/datos";
 import type { CriterioMatriz, ObjetivoLinea } from "../types";
 
-type Tab = "cartera" | "segmentacion" | "objetivos";
+type Tab = "cartera" | "objetivos";
 
 /**
  * Planificación de Ventas.
@@ -19,18 +19,22 @@ type Tab = "cartera" | "segmentacion" | "objetivos";
  * La unidad de análisis es el **productor**: del plan de siembra sale cuánto va a gastar en
  * insumos, contra eso se pone lo que le vendimos (La Clementina + Bayer), y la diferencia es
  * la oportunidad. La lectura por vendedor es una agregación de eso.
+ *
+ * Dos pestañas y no tres: la matriz de segmentación es configuración —se toca una vez por
+ * campaña— así que vive en un modal, y su resultado se lee como banda dentro de la Cartera.
  */
 export function PlanificacionPage() {
   const [tab, setTab] = useState<Tab>("cartera");
   const [criterios, setCriterios] = useState<CriterioMatriz[]>(CRITERIOS);
   const [lineas, setLineas] = useState<ObjetivoLinea[]>(OBJETIVOS_LINEA);
+  const [configurando, setConfigurando] = useState(false);
 
   const hoy = FECHA_CORTE;
   const campania = claveCampania(hoy);
   const campaniaPrev = claveCampania(hoy, 1);
   const esperado = useMemo(() => fraccionEstacional(hoy), [hoy]);
 
-  // El score y el segmento se recalculan cuando cambia la matriz: es el punto de la pantalla.
+  // El score y el segmento se recalculan cuando cambia la matriz.
   const productores = useMemo(
     () => PRODUCTORES.map((p) => calcular(p, COSTOS, criterios)),
     [criterios],
@@ -51,7 +55,6 @@ export function PlanificacionPage() {
       <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="cartera">Cartera de productores</TabsTrigger>
-          <TabsTrigger value="segmentacion">Segmentación</TabsTrigger>
           <TabsTrigger value="objetivos">Objetivos y avance</TabsTrigger>
         </TabsList>
 
@@ -61,11 +64,8 @@ export function PlanificacionPage() {
             costos={COSTOS}
             criterios={criterios}
             campania={campania}
+            onConfigurarSegmentacion={() => setConfigurando(true)}
           />
-        </TabsContent>
-
-        <TabsContent value="segmentacion">
-          <SegmentacionTab productores={productores} criterios={criterios} onCambiar={setCriterios} />
         </TabsContent>
 
         <TabsContent value="objetivos">
@@ -79,6 +79,16 @@ export function PlanificacionPage() {
           />
         </TabsContent>
       </Tabs>
+
+      {configurando && (
+        <SegmentacionModal
+          criterios={criterios}
+          productores={PRODUCTORES}
+          costos={COSTOS}
+          onGuardar={setCriterios}
+          onClose={() => setConfigurando(false)}
+        />
+      )}
 
       <p className="mt-6 text-center text-xs leading-relaxed text-ink-soft">
         Los nombres de productor son inventados; la economía (hectáreas, mercado, facturación,

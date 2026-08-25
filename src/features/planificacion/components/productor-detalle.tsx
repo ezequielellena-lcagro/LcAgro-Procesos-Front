@@ -2,11 +2,11 @@ import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { numero, pct, usd } from "@/shared/format/format";
 import {
-  CRITERIOS,
   CULTIVOS,
   NOMBRE_CULTIVO,
   TONO_SEGMENTO,
   costoPorHa,
+  fraccionObtenida,
 } from "../lib/segmentacion";
 import type { CostoCultivo, CriterioMatriz, Cultivo, ProductorCalculado } from "../types";
 
@@ -23,7 +23,7 @@ interface Props {
  * el segmento en el que está. Es la pantalla que contesta "¿por qué este cliente es B?".
  */
 export function ProductorDetalle({ productor: p, costos, criterios, campania, onClose }: Props) {
-  const activos = criterios.filter((c) => c.activo);
+  const activos = criterios.filter((c) => c.peso > 0);
   const pesoTotal = activos.reduce((t, c) => t + c.peso, 0);
 
   return (
@@ -145,11 +145,7 @@ export function ProductorDetalle({ productor: p, costos, criterios, campania, on
           </p>
           <div className="space-y-2">
             {activos.map((c) => {
-              const base = CRITERIOS.find((x) => x.id === c.id)?.peso ?? c.peso;
-              const obtenidos =
-                c.id === "rentabilidad"
-                  ? Math.min(p.mix / 4, 1) * c.peso
-                  : (base > 0 ? p.pts[c.id] / base : 0) * c.peso;
+              const obtenidos = fraccionObtenida(p, c.id) * c.peso;
               return (
                 <div key={c.id} className="grid grid-cols-[9rem_1fr_3.5rem] items-center gap-3 text-xs">
                   <span className="truncate text-ink-soft" title={c.nombre}>

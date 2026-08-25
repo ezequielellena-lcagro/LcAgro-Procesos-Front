@@ -1,18 +1,22 @@
 import { useMemo, useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { KpiCard } from "@/shared/components/kpi-card";
 import { numero, pct, usd } from "@/shared/format/format";
 import { TONO_SEGMENTO } from "../lib/segmentacion";
-import type { Canal, ProductorCalculado, Segmento } from "../types";
+import type { Canal, CriterioMatriz, ProductorCalculado, Segmento } from "../types";
 import { ProductorDetalle } from "./productor-detalle";
 
 interface Props {
   productores: ProductorCalculado[];
   costos: Parameters<typeof ProductorDetalle>[0]["costos"];
-  criterios: Parameters<typeof ProductorDetalle>[0]["criterios"];
+  criterios: CriterioMatriz[];
   campania: string;
+  /** Abre la configuración de la matriz. La segmentación se lee acá y se configura aparte. */
+  onConfigurarSegmentacion: () => void;
 }
 
 type Orden = "oportunidad" | "mercado" | "vendido" | "participacion" | "nombre";
@@ -23,7 +27,13 @@ type Orden = "oportunidad" | "mercado" | "vendido" | "participacion" | "nombre";
  * El orden por defecto NO es por facturación: es por lo que falta capturar. Un ranking por
  * facturación pone arriba a los clientes que ya están trabajados; este pone arriba dónde ir.
  */
-export function CarteraTab({ productores, costos, criterios, campania }: Props) {
+export function CarteraTab({
+  productores,
+  costos,
+  criterios,
+  campania,
+  onConfigurarSegmentacion,
+}: Props) {
   const [vendedor, setVendedor] = useState("");
   const [segmento, setSegmento] = useState("");
   const [canal, setCanal] = useState("");
@@ -36,8 +46,19 @@ export function CarteraTab({ productores, costos, criterios, campania }: Props) 
     [productores],
   );
 
-  const filas = useMemo(() => {
+  /**
+   * Todos los filtros MENOS el de segmento: es lo que alimenta la banda de segmentos, para que
+   * siga mostrando el reparto completo cuando clickeás uno (si no, se filtra a sí misma).
+   */
+  const filasSinSegmento = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
+    return productores
+      .filter((p) => !q || p.nombre.toLowerCase().includes(q))
+      .filter((p) => !vendedor || p.vendedor === vendedor)
+      .filter((p) => !canal || p.canal === canal);
+  }, [productores, busqueda, vendedor, canal]);
+
+  const filas = useMemo(() => {
     const cmp: Record<Orden, (a: ProductorCalculado, b: ProductorCalculado) => number> = {
       oportunidad: (a, b) => b.oportunidad - a.oportunidad,
       mercado: (a, b) => b.mercado - a.mercado,
@@ -45,13 +66,10 @@ export function CarteraTab({ productores, costos, criterios, campania }: Props) 
       participacion: (a, b) => a.participacion - b.participacion,
       nombre: (a, b) => a.nombre.localeCompare(b.nombre, "es"),
     };
-    return productores
-      .filter((p) => !q || p.nombre.toLowerCase().includes(q))
-      .filter((p) => !vendedor || p.vendedor === vendedor)
+    return filasSinSegmento
       .filter((p) => !segmento || p.segmentoCalculado === segmento)
-      .filter((p) => !canal || p.canal === canal)
       .sort(cmp[orden]);
-  }, [productores, busqueda, vendedor, segmento, canal, orden]);
+  }, [filasSinSegmento, segmento, orden]);
 
   const suma = (f: (p: ProductorCalculado) => number) => filas.reduce((t, p) => t + f(p), 0);
   const mercado = suma((p) => p.mercado);
@@ -133,6 +151,13 @@ export function CarteraTab({ productores, costos, criterios, campania }: Props) 
         />
       </div>
 
+      <BandaSegmentos
+        productores={filasSinSegmento}
+        segmentoActivo={segmento}
+        onSegmento={setSegmento}
+        onConfigurar={onConfigurarSegmentacion}
+      />
+
       <FilterBar>
         <FilterField label="Productor">
           <input
@@ -207,6 +232,96 @@ export function CarteraTab({ productores, costos, criterios, campania }: Props) 
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Distribución A/B/C/D como banda de lectura, no como pantalla aparte.
+ *
+ * Cada tarjeta es además un filtro: la segmentación se mira seguido, se configura casi nunca.
+ * Muestra participación y oportunidad por segmento porque es donde se ve lo contraintuitivo:
+ * el segmento "Estándar" concentra la mayor parte del mercado sin capturar.
+ */
+function BandaSegmentos({
+  productores,
+  segmentoActivo,
+  onSegmento,
+  onConfigurar,
+}: {
+  productores: ProductorCalculado[];
+  segmentoActivo: string;
+  onSegmento: (s: string) => void;
+  onConfigurar: () => void;
+}) {
+  const oportunidadTotal = productores.reduce((t, p) => t + p.oportunidad, 0) || 1;
+
+  const segmentos = (["A", "B", "C", "D"] as Segmento[]).map((s) => {
+    const g = productores.filter((p) => p.segmentoCalculado === s);
+    const suma = (f: (p: ProductorCalculado) => number) => g.reduce((t, p) => t + f(p), 0);
+    const mercado = suma((p) => p.mercado);
+    const oportunidad = suma((p) => p.oportunidad);
+    return {
+      segmento: s,
+      cantidad: g.length,
+      participacion: mercado > 0 ? suma((p) => p.total) / mercado : 0,
+      oportunidad,
+      shareOportunidad: oportunidad / oportunidadTotal,
+    };
+  });
+
+  return (
+    <section className="rounded-card border border-line bg-panel p-3.5 shadow-card">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">Segmentación de la cartera</h2>
+          <p className="text-xs text-ink-soft">
+            Clic en un segmento para filtrar. Es un Pareto: los segmentos bajos no son clientes
+            malos, son los que tienen más mercado sin capturar.
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Configurar matriz
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
+        {segmentos.map((s) => {
+          const activo = segmentoActivo === s.segmento;
+          return (
+            <button
+              key={s.segmento}
+              type="button"
+              onClick={() => onSegmento(activo ? "" : s.segmento)}
+              aria-pressed={activo}
+              className={cn(
+                "rounded-md border p-2.5 text-left transition",
+                activo
+                  ? "border-clementina-deep bg-clementina/10 ring-2 ring-clementina/30"
+                  : "border-line bg-panel-soft hover:border-slate-brand/40",
+              )}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", TONO_SEGMENTO[s.segmento])}>
+                  {s.segmento}
+                </span>
+                <span className="font-display text-lg font-semibold tabular text-ink">{s.cantidad}</span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded bg-panel" title="Participación de bolsillo">
+                <div
+                  className="h-full rounded bg-clementina"
+                  style={{ width: `${Math.min(s.participacion * 100, 100).toFixed(1)}%` }}
+                />
+              </div>
+              <div className="mt-1 text-[10px] text-ink-soft">
+                capta {pct(s.participacion * 100)} · <b className="text-rojo">{pct(s.shareOportunidad * 100)}</b>{" "}
+                de la oportunidad
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

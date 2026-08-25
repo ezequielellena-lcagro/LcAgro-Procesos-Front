@@ -20,15 +20,31 @@ import type {
   Segmento,
 } from "../types";
 
-/** Los seis criterios de la hoja `Matriz Productor`, con sus pesos y bandas originales. */
+/**
+ * Los seis criterios de la hoja `Matriz Productor`, con sus bandas originales.
+ *
+ * "Rentabilidad LC" arranca en **0 y no en los 20 puntos que dice la matriz**: el Excel del
+ * cliente lo define y nunca lo calcula, así que hoy el score se arma sobre 80. Se deja
+ * reproduciendo lo que el negocio tiene hoy, y subirlo es una decisión visible con su impacto.
+ */
 export const CRITERIOS: CriterioMatriz[] = [
-  { id: "lc", nombre: "Facturación LC", peso: 25, bandas: ["> 100 K", "99–50 K", "49–20 K", "< 20 K"], activo: true },
-  { id: "rentabilidad", nombre: "Rentabilidad LC", peso: 20, bandas: ["> 15 %", "15–10 %", "10–8 %", "< 8 %"], activo: false },
-  { id: "bayer", nombre: "Facturación Bayer", peso: 20, bandas: ["> 100 K", "99–50 K", "49–20 K", "< 20 K"], activo: true },
-  { id: "mix", nombre: "Mix de sub-rubros", peso: 15, bandas: ["4 o más", "3", "2", "1"], activo: true },
-  { id: "has", nombre: "Has trabajadas", peso: 10, bandas: ["> 1000", "999–500", "499–200", "< 200"], activo: true },
-  { id: "canje", nombre: "Canje cerealero", peso: 10, bandas: ["> 1000 tn", "999–500", "499–100", "< 100"], activo: true },
+  { id: "lc", nombre: "Facturación LC", peso: 25, bandas: ["> 100 K", "99–50 K", "49–20 K", "< 20 K"] },
+  { id: "rentabilidad", nombre: "Rentabilidad LC", peso: 0, bandas: ["> 15 %", "15–10 %", "10–8 %", "< 8 %"] },
+  { id: "bayer", nombre: "Facturación Bayer", peso: 20, bandas: ["> 100 K", "99–50 K", "49–20 K", "< 20 K"] },
+  { id: "mix", nombre: "Mix de sub-rubros", peso: 15, bandas: ["4 o más", "3", "2", "1"] },
+  { id: "has", nombre: "Has trabajadas", peso: 10, bandas: ["> 1000", "999–500", "499–200", "< 200"] },
+  { id: "canje", nombre: "Canje cerealero", peso: 10, bandas: ["> 1000 tn", "999–500", "499–100", "< 100"] },
 ];
+
+/** Peso "de fábrica" de cada criterio, para poder calcular la fracción obtenida. */
+const PESO_ORIGINAL: Record<CriterioMatriz["id"], number> = {
+  lc: 25,
+  rentabilidad: 20,
+  bayer: 20,
+  mix: 15,
+  has: 10,
+  canje: 10,
+};
 
 /** Cortes de segmento, tal como los define el cliente. */
 export const CORTES: { segmento: Segmento; desde: number; etiqueta: string }[] = [
@@ -62,22 +78,23 @@ export const hasTotalDe = (p: Productor) => CULTIVOS.reduce((t, c) => t + (p.has
  * apagar un criterio no debe hundir a todos los productores, solo cambiar el reparto.
  */
 export function scoreDe(p: Productor, criterios: CriterioMatriz[]): number {
-  const activos = criterios.filter((c) => c.activo);
+  const activos = criterios.filter((c) => c.peso > 0);
   const pesoTotal = activos.reduce((t, c) => t + c.peso, 0);
   if (pesoTotal === 0) return 0;
 
-  const obtenidos = activos.reduce((t, c) => {
-    if (c.id === "rentabilidad") {
-      // Todavía no llega del backend. Se aproxima con el mix, que es el mejor proxy
-      // disponible en el mockup; en la app real sale de la rentabilidad por línea.
-      return t + Math.min(p.mix / 4, 1) * c.peso;
-    }
-    const base = CRITERIOS.find((x) => x.id === c.id)?.peso ?? c.peso;
-    const proporcion = base > 0 ? p.pts[c.id] / base : 0;
-    return t + proporcion * c.peso;
-  }, 0);
-
+  const obtenidos = activos.reduce((t, c) => t + fraccionObtenida(p, c.id) * c.peso, 0);
   return Math.round((obtenidos / pesoTotal) * 100);
+}
+
+/** Qué proporción del criterio se llevó el productor (0, 0,25, 0,5, 0,75 o 1). */
+export function fraccionObtenida(p: Productor, id: CriterioMatriz["id"]): number {
+  if (id === "rentabilidad") {
+    // Todavía no llega del backend. Se aproxima con el mix, que es el mejor proxy disponible
+    // en el mockup; en la app real sale de la rentabilidad por línea del módulo de Comisiones.
+    return Math.min(p.mix / 4, 1);
+  }
+  const base = PESO_ORIGINAL[id];
+  return base > 0 ? p.pts[id] / base : 0;
 }
 
 export function segmentoDe(score: number): Segmento {

@@ -53,19 +53,19 @@ export interface Productor {
   pts: { lc: number; bayer: number; mix: number; has: number; canje: number };
 }
 
-/** Un criterio de la matriz de segmentación, con su peso. */
+/**
+ * Un criterio de la matriz de segmentación, con su peso.
+ *
+ * No hay un flag de activo aparte a propósito: **peso 0 ya significa apagado**. Tener las dos
+ * cosas invita a que se contradigan (un criterio "encendido" con peso 0, o al revés).
+ */
 export interface CriterioMatriz {
   id: keyof Productor["pts"] | "rentabilidad";
   nombre: string;
-  /** Peso en puntos. El score se normaliza sobre la suma de los criterios activos. */
+  /** Peso en puntos. El score se normaliza sobre la suma de los pesos > 0. */
   peso: number;
   /** Etiquetas de las cuatro bandas, de mayor a menor. */
   bandas: [string, string, string, string];
-  /**
-   * `false` = definido en la matriz del cliente pero **no calculado** en el Excel de hoy.
-   * La app sí puede calcularlo: la rentabilidad por línea ya sale del módulo de Comisiones.
-   */
-  activo: boolean;
 }
 
 /**
@@ -80,6 +80,35 @@ export interface ObjetivoLinea {
   crecimiento: number;
   /** Sobre qué facturación se aplica. */
   base: "lc" | "bayer" | "total";
+  /**
+   * Fracción de la base que corresponde a esta línea, cuando es un subconjunto.
+   * `null` = el dato no está desagregado y la línea **no se puede medir** todavía.
+   */
+  proporcionBase: number | null;
+  /** De dónde sale esa proporción, para poder auditarla. */
+  fuenteProporcion?: string;
+  /** `true` si la línea contiene a otras (facturación general contiene LC y Bayer). */
+  esAgregada?: boolean;
+}
+
+/** Cómo se reparte el crecimiento entre vendedores. */
+export type ModoReparto = "plano" | "oportunidad";
+
+/** Objetivo derivado para un vendedor, con las dos lecturas para poder compararlas. */
+export interface ObjetivoVendedorCalculado {
+  vendedor: string;
+  productores: number;
+  mercado: number;
+  previo: number;
+  real: number;
+  /** Participación de bolsillo de su cartera: define cuánto margen tiene para crecer. */
+  participacion: number;
+  /** Crecimiento pedido con el modo activo. */
+  crecimiento: number;
+  objetivo: number;
+  /** Objetivo con reparto plano, para contrastar. */
+  objetivoPlano: number;
+  avance: number;
 }
 
 /** Productor con todo lo derivado ya calculado. */
