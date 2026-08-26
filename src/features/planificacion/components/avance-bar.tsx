@@ -24,16 +24,18 @@ export function AvanceBar({
   esperado,
   ancho = "w-28",
   mostrarPct = true,
+  motivoIndisponible = "sin avance disponible",
 }: {
-  /** Real ÷ objetivo (0–1+). `null` = sin objetivo cargado. */
+  /** Real ÷ objetivo (0–1+). `null` = el cociente no está disponible. */
   avance: number | null;
   /** Fracción de campaña que debería llevar hoy, según la curva estacional. */
   esperado: number;
   ancho?: string;
   mostrarPct?: boolean;
+  motivoIndisponible?: string;
 }) {
   if (avance == null || !Number.isFinite(avance)) {
-    return <span className="text-xs text-ink-soft">sin objetivo</span>;
+    return <span className="text-xs text-ink-soft">{motivoIndisponible}</span>;
   }
 
   const tono = tonoAvance(avance, esperado);

@@ -1,160 +1,210 @@
-import { useMemo, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/shared/components/data-table";
+import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { KpiCard } from "@/shared/components/kpi-card";
-import { numero, pct, usd } from "@/shared/format/format";
-import { TONO_SEGMENTO } from "../lib/segmentacion";
-import type { Canal, CriterioMatriz, ProductorCalculado, Segmento } from "../types";
+import { Pagination } from "@/shared/components/pagination";
+import { numero, oDash, pct, usd } from "@/shared/format/format";
+import { ETIQUETA_CANAL, TONO_CANAL, TONO_SEGMENTO } from "../lib/presentacion";
+import { useProductorTableroDetalle } from "../queries/use-tablero-planificacion";
+import type {
+  CanalVentaPlanificacion,
+  ProductorTableroDto,
+  Segmento,
+  TableroFiltros,
+  TableroPlanificacionDto,
+} from "../types";
 import { ProductorDetalle } from "./productor-detalle";
 
 interface Props {
-  productores: ProductorCalculado[];
-  costos: Parameters<typeof ProductorDetalle>[0]["costos"];
-  criterios: CriterioMatriz[];
-  campania: string;
-  /** Abre la configuración de la matriz. La segmentación se lee acá y se configura aparte. */
+  tablero: TableroPlanificacionDto;
+  filtros: TableroFiltros;
+  busqueda: string;
+  actualizando: boolean;
+  onBusqueda: (valor: string) => void;
+  onFiltros: (cambios: Partial<TableroFiltros>) => void;
+  onLimpiarFiltros: () => void;
   onConfigurarSegmentacion: () => void;
 }
 
-type Orden = "oportunidad" | "mercado" | "vendido" | "participacion" | "nombre";
+const SEGMENTOS: Segmento[] = ["A", "B", "C", "D"];
+const CANALES: CanalVentaPlanificacion[] = ["Ambos", "SoloLc", "SoloBayer", "SinCompras"];
 
-/**
- * Cartera de productores ordenada por oportunidad.
- *
- * El orden por defecto NO es por facturación: es por lo que falta capturar. Un ranking por
- * facturación pone arriba a los clientes que ya están trabajados; este pone arriba dónde ir.
- */
+/** Cartera operativa: todos los cálculos y agregados llegan del snapshot único del servidor. */
 export function CarteraTab({
-  productores,
-  costos,
-  criterios,
-  campania,
+  tablero,
+  filtros,
+  busqueda,
+  actualizando,
+  onBusqueda,
+  onFiltros,
+  onLimpiarFiltros,
   onConfigurarSegmentacion,
 }: Props) {
-  const [vendedor, setVendedor] = useState("");
-  const [segmento, setSegmento] = useState("");
-  const [canal, setCanal] = useState("");
-  const [busqueda, setBusqueda] = useState("");
-  const [orden, setOrden] = useState<Orden>("oportunidad");
-  const [detalle, setDetalle] = useState<ProductorCalculado | null>(null);
+  const [productorId, setProductorId] = useState<number>();
+  const detalle = useProductorTableroDetalle(productorId, tablero.campania);
+  const resumen = tablero.resumenSeleccion;
 
-  const vendedores = useMemo(
-    () => [...new Set(productores.map((p) => p.vendedor))].sort((a, b) => a.localeCompare(b, "es")),
-    [productores],
-  );
-
-  /**
-   * Todos los filtros MENOS el de segmento: es lo que alimenta la banda de segmentos, para que
-   * siga mostrando el reparto completo cuando clickeás uno (si no, se filtra a sí misma).
-   */
-  const filasSinSegmento = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
-    return productores
-      .filter((p) => !q || p.nombre.toLowerCase().includes(q))
-      .filter((p) => !vendedor || p.vendedor === vendedor)
-      .filter((p) => !canal || p.canal === canal);
-  }, [productores, busqueda, vendedor, canal]);
-
-  const filas = useMemo(() => {
-    const cmp: Record<Orden, (a: ProductorCalculado, b: ProductorCalculado) => number> = {
-      oportunidad: (a, b) => b.oportunidad - a.oportunidad,
-      mercado: (a, b) => b.mercado - a.mercado,
-      vendido: (a, b) => b.total - a.total,
-      participacion: (a, b) => a.participacion - b.participacion,
-      nombre: (a, b) => a.nombre.localeCompare(b.nombre, "es"),
-    };
-    return filasSinSegmento
-      .filter((p) => !segmento || p.segmentoCalculado === segmento)
-      .sort(cmp[orden]);
-  }, [filasSinSegmento, segmento, orden]);
-
-  const suma = (f: (p: ProductorCalculado) => number) => filas.reduce((t, p) => t + f(p), 0);
-  const mercado = suma((p) => p.mercado);
-  const vendido = suma((p) => p.total);
-  const oportunidad = suma((p) => p.oportunidad);
-  const soloUnCanal = filas.filter((p) => p.canal !== "Ambos");
-
-  const columnas: Column<ProductorCalculado>[] = [
+  const columnas: Column<ProductorTableroDto>[] = [
     {
       key: "productor",
       header: "Productor",
-      cell: (p) => (
+      cell: ({ productor }) => (
         <div className="min-w-0">
-          <div className="truncate font-medium" title={p.nombre}>
-            {p.nombre}
+          <button
+            type="button"
+            aria-label={`Abrir detalle de ${productor.razonSocial}`}
+            className="block max-w-full truncate rounded text-left font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-clementina-deep"
+            title={productor.razonSocial}
+            onClick={() => setProductorId(productor.productorId)}
+          >
+            {productor.razonSocial}
+          </button>
+          <div className="truncate text-xs text-ink-soft">
+            {productor.vendedorNombre ?? "Sin vendedor asignado"}
           </div>
-          <div className="truncate text-xs text-ink-soft">{p.vendedor}</div>
         </div>
       ),
-      sortBy: (p) => p.nombre,
     },
     {
       key: "segmento",
       header: "Seg.",
-      cell: (p) => (
-        <span className={cn("rounded-full px-2 py-0.5 text-xs font-bold", TONO_SEGMENTO[p.segmentoCalculado])}>
-          {p.segmentoCalculado}
-        </span>
-      ),
-      sortBy: (p) => p.score,
+      cell: (fila) =>
+        fila.segmento ? (
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-xs font-bold",
+              TONO_SEGMENTO[fila.segmento],
+            )}
+          >
+            {fila.segmento}
+          </span>
+        ) : (
+          <span className="text-xs text-ink-soft">Sin calcular</span>
+        ),
     },
-    { key: "canal", header: "Canal", cell: (p) => <CanalBadge canal={p.canal} />, sortBy: (p) => p.canal },
-    { key: "has", header: "Has", align: "right", cell: (p) => numero(p.hasTotal), sortBy: (p) => p.hasTotal },
+    {
+      key: "canal",
+      header: "Canal",
+      cell: ({ productor }) => (
+        <CanalBadge canal={productor.canal} bayerDisponible={tablero.bayerDisponible} />
+      ),
+    },
+    {
+      key: "has",
+      header: "Has",
+      align: "right",
+      cell: ({ productor }) => (
+        <div>
+          <div className="tabular">{numero(productor.hectareasTotales)}</div>
+          {!productor.planCargado && <div className="text-[10px] text-rojo">sin plan</div>}
+        </div>
+      ),
+    },
     {
       key: "mercado",
       header: "Mercado",
       align: "right",
-      cell: (p) => usd(p.mercado),
-      sortBy: (p) => p.mercado,
+      cell: ({ productor }) => (
+        <div>
+          <div className="tabular">{oDash(productor.mercadoConocidoUsd, usd)}</div>
+          {productor.planCargado && !productor.mercadoCompleto && (
+            <div className="text-[10px] text-clementina-deep">incompleto</div>
+          )}
+        </div>
+      ),
     },
-    { key: "lc", header: "LC", align: "right", cell: (p) => usd(p.lc), sortBy: (p) => p.lc },
-    { key: "bayer", header: "Bayer", align: "right", cell: (p) => usd(p.bayer), sortBy: (p) => p.bayer },
+    {
+      key: "lc",
+      header: "LC",
+      align: "right",
+      cell: ({ productor }) => <span className="tabular">{usd(productor.facturacionLcUsd)}</span>,
+    },
+    {
+      key: "bayer",
+      header: "Bayer",
+      align: "right",
+      cell: ({ productor }) => (
+        <span className="tabular">{oDash(productor.facturacionBayerUsd, usd)}</span>
+      ),
+    },
     {
       key: "participacion",
       header: "Participación",
-      cell: (p) => <ParticipacionBar productor={p} />,
-      sortBy: (p) => p.participacion,
+      cell: ({ productor }) => <ParticipacionBar valor={productor.participacionPct} />,
     },
     {
       key: "oportunidad",
       header: "Oportunidad",
       align: "right",
-      cell: (p) => <span className="font-medium tabular text-rojo">{usd(p.oportunidad)}</span>,
-      sortBy: (p) => p.oportunidad,
+      cell: ({ productor }) => (
+        <span className="font-medium tabular text-rojo">
+          {oDash(productor.oportunidadUsd, usd)}
+        </span>
+      ),
     },
   ];
+
+  const hayFiltros = Boolean(
+    busqueda || filtros.vendedorCodigo || filtros.segmento || filtros.canal,
+  );
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        <KpiCard label="Productores" value={filas.length} hint={`${numero(suma((p) => p.hasTotal))} has sembradas`} />
-        <KpiCard label="Mercado de la cartera" value={usd(mercado)} hint="lo que van a gastar en insumos" />
         <KpiCard
-          label="Vendido"
-          value={usd(vendido)}
-          hint={`LC ${usd(suma((p) => p.lc))} · Bayer ${usd(suma((p) => p.bayer))}`}
+          label="Productores"
+          value={resumen.productores}
+          hint={`${numero(resumen.hectareasTotales)} has · ${resumen.productoresConPlan} con plan`}
+        />
+        <KpiCard
+          label="Mercado conocido"
+          value={usd(resumen.mercadoConocidoUsd)}
+          hint={
+            resumen.productoresMercadoIncompleto > 0
+              ? `${resumen.productoresMercadoIncompleto} planes con costos faltantes`
+              : "plan y costos completos para la selección"
+          }
+        />
+        <KpiCard
+          label="Vendido operativo"
+          value={oDash(resumen.facturacionTotalUsd, usd)}
+          hint={
+            tablero.bayerDisponible
+              ? `LC ${usd(resumen.facturacionLcUsd)} · Bayer ${oDash(resumen.facturacionBayerUsd, usd)}`
+              : `LC ${usd(resumen.facturacionLcUsd)} · Bayer sin importación`
+          }
         />
         <KpiCard
           label="Participación"
-          value={pct(mercado > 0 ? (vendido / mercado) * 100 : 0)}
-          tone={vendido / mercado >= 0.3 ? "verde" : "rojo"}
-          hint="de bolsillo del productor"
+          value={oDash(resumen.participacionComparablePct, pct)}
+          tone={
+            resumen.participacionComparablePct == null
+              ? "default"
+              : resumen.participacionComparablePct >= 30
+                ? "verde"
+                : "rojo"
+          }
+          hint="venta comparable ÷ mercado comparable"
         />
         <KpiCard
           label="Oportunidad"
-          tone="rojo"
-          value={usd(oportunidad)}
-          hint={`${soloUnCanal.length} compran por un solo canal`}
+          value={oDash(resumen.oportunidadUsd, usd)}
+          tone={resumen.oportunidadUsd == null ? "default" : "rojo"}
+          hint="mercado conocido menos venta comparable"
         />
       </div>
 
       <BandaSegmentos
-        productores={filasSinSegmento}
-        segmentoActivo={segmento}
-        onSegmento={setSegmento}
+        tablero={tablero}
+        segmentoActivo={filtros.segmento}
+        onSegmento={(segmento) => onFiltros({ segmento, page: 1 })}
         onConfigurar={onConfigurarSegmentacion}
       />
 
@@ -162,112 +212,193 @@ export function CarteraTab({
         <FilterField label="Productor">
           <input
             value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            placeholder="Buscar…"
-            className="h-9 w-48 rounded-md border border-line bg-panel px-2 text-sm text-ink outline-none focus:border-clementina-deep"
+            onChange={(e) => onBusqueda(e.target.value)}
+            placeholder="Buscar por nombre, vendedor o cuenta…"
+            className="h-9 w-64 rounded-md border border-line bg-panel px-2 text-sm text-ink outline-none focus:border-clementina-deep"
           />
         </FilterField>
         <FilterField label="Vendedor">
-          <Select value={vendedor} onChange={setVendedor} vacio="Todos">
-            {vendedores.map((v) => (
-              <option key={v} value={v}>
-                {v}
+          <Select
+            className="h-9 min-w-48"
+            value={filtros.vendedorCodigo ?? ""}
+            onChange={(e) =>
+              onFiltros({
+                vendedorCodigo: e.target.value ? Number(e.target.value) : undefined,
+                page: 1,
+              })
+            }
+          >
+            <option value="">Todos</option>
+            {tablero.vendedores.map((vendedor) => (
+              <option key={vendedor.codigo} value={vendedor.codigo}>
+                {vendedor.nombre} ({vendedor.productores})
               </option>
             ))}
           </Select>
         </FilterField>
         <FilterField label="Segmento">
-          <Select value={segmento} onChange={setSegmento} vacio="Todos">
-            {(["A", "B", "C", "D"] as Segmento[]).map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
+          <Select
+            className="h-9"
+            value={filtros.segmento ?? ""}
+            disabled={!tablero.segmentacionDisponible}
+            onChange={(e) =>
+              onFiltros({
+                segmento: (e.target.value || undefined) as Segmento | undefined,
+                page: 1,
+              })
+            }
+          >
+            <option value="">Todos</option>
+            {SEGMENTOS.map((segmento) => {
+              const cantidad =
+                tablero.resumenPorSegmento.find((x) => x.segmento === segmento)?.productores ?? 0;
+              return (
+                <option key={segmento} value={segmento}>
+                  {segmento} ({cantidad})
+                </option>
+              );
+            })}
           </Select>
         </FilterField>
         <FilterField label="Canal">
-          <Select value={canal} onChange={setCanal} vacio="Todos">
-            {(["Ambos", "Solo LC", "Solo Bayer"] as Canal[]).map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+          <Select
+            className="h-9 min-w-36"
+            value={filtros.canal ?? ""}
+            disabled={!tablero.bayerDisponible}
+            onChange={(e) =>
+              onFiltros({
+                canal: (e.target.value || undefined) as CanalVentaPlanificacion | undefined,
+                page: 1,
+              })
+            }
+          >
+            <option value="">Todos</option>
+            {CANALES.map((canal) => {
+              const cantidad =
+                tablero.resumenPorCanal.find((x) => x.canal === canal)?.productores ?? 0;
+              return (
+                <option key={canal} value={canal}>
+                  {ETIQUETA_CANAL[canal]} ({cantidad})
+                </option>
+              );
+            })}
           </Select>
         </FilterField>
         <div className="flex-1" />
+        {hayFiltros && (
+          <Button type="button" variant="ghost" size="sm" onClick={onLimpiarFiltros}>
+            <X className="size-4" /> Limpiar
+          </Button>
+        )}
         <FilterField label="Ordenar por">
-          <Select value={orden} onChange={(v) => setOrden(v as Orden)}>
-            <option value="oportunidad">Oportunidad</option>
-            <option value="mercado">Mercado</option>
-            <option value="vendido">Vendido</option>
-            <option value="participacion">Menor participación</option>
-            <option value="nombre">Nombre</option>
+          <Select
+            className="h-9 min-w-48"
+            value={filtros.orden ?? "Oportunidad"}
+            onChange={(e) =>
+              onFiltros({ orden: e.target.value as TableroFiltros["orden"], page: 1 })
+            }
+          >
+            <option value="Oportunidad">Mayor oportunidad</option>
+            <option value="Mercado">Mayor mercado</option>
+            <option value="Vendido">Mayor venta</option>
+            <option value="Participacion">Menor participación</option>
+            <option value="Nombre">Nombre</option>
           </Select>
         </FilterField>
       </FilterBar>
 
-      <section>
+      <section aria-busy={actualizando}>
+        {actualizando && (
+          <div className="mb-2 flex items-center gap-1.5 text-xs text-ink-soft">
+            <RefreshCw className="size-3.5 animate-spin" /> Actualizando datos…
+          </div>
+        )}
         <DataTable
           columns={columnas}
-          rows={filas}
-          getRowKey={(p) => p.id}
-          onRowClick={setDetalle}
-          empty="Ningún productor coincide con el filtro."
+          rows={tablero.items}
+          getRowKey={(fila) => fila.productor.productorId}
+          empty={
+            hayFiltros
+              ? "Ningún productor coincide con los filtros."
+              : "Todavía no hay productores habilitados en el padrón."
+          }
         />
-        <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-          Clic en una fila para ver la ficha. El <b>mercado</b> sale del plan de siembra del
-          productor por el costo de insumos de cada cultivo; la <b>oportunidad</b> es lo que
-          gasta menos lo que nos compra. Ordenado por oportunidad, no por facturación: el
-          ranking por facturación muestra a los que ya están trabajados.
+        <Pagination
+          page={tablero.page}
+          totalPages={tablero.totalPages}
+          total={tablero.total}
+          onPage={(page) => onFiltros({ page })}
+          unidad={{ singular: "productor", plural: "productores" }}
+          detalle={`${tablero.items.length} en esta página`}
+        />
+        <p className="text-xs leading-relaxed text-ink-soft">
+          El mercado sale del plan de siembra y los costos vigentes. La oportunidad se informa sólo
+          cuando mercado y ventas son comparables. Usá el nombre del productor para ver sus fuentes
+          y el desglose del score.
         </p>
       </section>
 
-      {detalle && (
-        <ProductorDetalle
-          productor={detalle}
-          costos={costos}
-          criterios={criterios}
-          campania={campania}
-          onClose={() => setDetalle(null)}
-        />
+      {productorId && detalle.isPending && (
+        <Modal
+          open
+          onClose={() => setProductorId(undefined)}
+          title="Cargando productor"
+          className="w-full max-w-2xl"
+        >
+          <div className="space-y-3 p-5">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-52 w-full" />
+          </div>
+        </Modal>
+      )}
+      {productorId && detalle.isError && (
+        <Modal
+          open
+          onClose={() => setProductorId(undefined)}
+          title="No se pudo abrir el productor"
+          className="w-full max-w-xl"
+        >
+          <div className="p-5">
+            <ErrorState error={detalle.error} onRetry={() => void detalle.refetch()} />
+          </div>
+        </Modal>
+      )}
+      {productorId && detalle.data && (
+        <ProductorDetalle detalle={detalle.data} onClose={() => setProductorId(undefined)} />
       )}
     </div>
   );
 }
 
-/**
- * Distribución A/B/C/D como banda de lectura, no como pantalla aparte.
- *
- * Cada tarjeta es además un filtro: la segmentación se mira seguido, se configura casi nunca.
- * Muestra participación y oportunidad por segmento porque es donde se ve lo contraintuitivo:
- * el segmento "Estándar" concentra la mayor parte del mercado sin capturar.
- */
 function BandaSegmentos({
-  productores,
+  tablero,
   segmentoActivo,
   onSegmento,
   onConfigurar,
 }: {
-  productores: ProductorCalculado[];
-  segmentoActivo: string;
-  onSegmento: (s: string) => void;
+  tablero: TableroPlanificacionDto;
+  segmentoActivo: Segmento | undefined;
+  onSegmento: (segmento: Segmento | undefined) => void;
   onConfigurar: () => void;
 }) {
-  const oportunidadTotal = productores.reduce((t, p) => t + p.oportunidad, 0) || 1;
-
-  const segmentos = (["A", "B", "C", "D"] as Segmento[]).map((s) => {
-    const g = productores.filter((p) => p.segmentoCalculado === s);
-    const suma = (f: (p: ProductorCalculado) => number) => g.reduce((t, p) => t + f(p), 0);
-    const mercado = suma((p) => p.mercado);
-    const oportunidad = suma((p) => p.oportunidad);
-    return {
-      segmento: s,
-      cantidad: g.length,
-      participacion: mercado > 0 ? suma((p) => p.total) / mercado : 0,
-      oportunidad,
-      shareOportunidad: oportunidad / oportunidadTotal,
-    };
-  });
+  if (!tablero.segmentacionDisponible) {
+    return (
+      <section className="rounded-card border border-clementina-deep/30 bg-clementina/10 p-3.5 shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Segmentación no disponible</h2>
+            <p className="mt-0.5 text-xs text-ink-soft">
+              {tablero.motivoSegmentacionNoDisponible ??
+                "Falta una fuente requerida por la matriz vigente."}
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
+            <SlidersHorizontal className="size-3.5" /> Configurar matriz
+          </Button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-card border border-line bg-panel p-3.5 shadow-card">
@@ -275,24 +406,23 @@ function BandaSegmentos({
         <div>
           <h2 className="text-sm font-semibold text-ink">Segmentación de la cartera</h2>
           <p className="text-xs text-ink-soft">
-            Clic en un segmento para filtrar. Es un Pareto: los segmentos bajos no son clientes
-            malos, son los que tienen más mercado sin capturar.
+            Cada tarjeta filtra la tabla; sus totales conservan el resto de los filtros activos.
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
-          <SlidersHorizontal className="h-3.5 w-3.5" />
-          Configurar matriz
+          <SlidersHorizontal className="size-3.5" /> Configurar matriz
         </Button>
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">
-        {segmentos.map((s) => {
-          const activo = segmentoActivo === s.segmento;
+        {SEGMENTOS.map((segmento) => {
+          const resumen = tablero.resumenPorSegmento.find((x) => x.segmento === segmento);
+          const activo = segmentoActivo === segmento;
           return (
             <button
-              key={s.segmento}
+              key={segmento}
               type="button"
-              onClick={() => onSegmento(activo ? "" : s.segmento)}
+              onClick={() => onSegmento(activo ? undefined : segmento)}
               aria-pressed={activo}
               className={cn(
                 "rounded-md border p-2.5 text-left transition",
@@ -302,20 +432,33 @@ function BandaSegmentos({
               )}
             >
               <div className="flex items-baseline justify-between gap-2">
-                <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", TONO_SEGMENTO[s.segmento])}>
-                  {s.segmento}
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                    TONO_SEGMENTO[segmento],
+                  )}
+                >
+                  {segmento}
                 </span>
-                <span className="font-display text-lg font-semibold tabular text-ink">{s.cantidad}</span>
+                <span className="font-display text-lg font-semibold tabular text-ink">
+                  {resumen?.productores ?? 0}
+                </span>
               </div>
-              <div className="mt-1.5 h-1.5 overflow-hidden rounded bg-panel" title="Participación de bolsillo">
+              <div
+                className="mt-1.5 h-1.5 overflow-hidden rounded bg-panel"
+                title="Participación de bolsillo"
+              >
                 <div
                   className="h-full rounded bg-clementina"
-                  style={{ width: `${Math.min(s.participacion * 100, 100).toFixed(1)}%` }}
+                  style={{
+                    width: `${Math.min(Math.max(resumen?.participacionPct ?? 0, 0), 100)}%`,
+                  }}
                 />
               </div>
               <div className="mt-1 text-[10px] text-ink-soft">
-                capta {pct(s.participacion * 100)} · <b className="text-rojo">{pct(s.shareOportunidad * 100)}</b>{" "}
-                de la oportunidad
+                capta {oDash(resumen?.participacionPct, pct)} ·{" "}
+                <b className="text-rojo">{oDash(resumen?.participacionOportunidadPct, pct)}</b> de
+                la oportunidad
               </div>
             </button>
           );
@@ -325,45 +468,37 @@ function BandaSegmentos({
   );
 }
 
-function ParticipacionBar({ productor: p }: { productor: ProductorCalculado }) {
-  const tono = p.participacion >= 0.5 ? "bg-verde" : p.participacion >= 0.2 ? "bg-clementina-deep" : "bg-rojo";
+function ParticipacionBar({ valor }: { valor: number | null }) {
+  if (valor == null) return <span className="text-xs text-ink-soft">—</span>;
+  const tono = valor >= 50 ? "bg-verde" : valor >= 20 ? "bg-clementina-deep" : "bg-rojo";
   return (
     <div className="flex items-center gap-2 whitespace-nowrap">
       <div className="h-2 w-20 overflow-hidden rounded bg-panel-soft">
-        <div className={cn("h-full rounded", tono)} style={{ width: `${Math.min(p.participacion * 100, 100).toFixed(1)}%` }} />
+        <div
+          className={cn("h-full rounded", tono)}
+          style={{ width: `${Math.min(Math.max(valor, 0), 100)}%` }}
+        />
       </div>
-      <span className="text-xs tabular text-ink-soft">{pct(p.participacion * 100)}</span>
+      <span className="text-xs tabular text-ink-soft">{pct(valor)}</span>
     </div>
   );
 }
 
-function CanalBadge({ canal }: { canal: Canal }) {
-  const estilo =
-    canal === "Ambos"
-      ? "bg-verde/10 text-verde"
-      : "bg-clementina/15 text-clementina-deep";
-  return <span className={cn("whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium", estilo)}>{canal}</span>;
-}
-
-function Select({
-  value,
-  onChange,
-  vacio,
-  children,
+function CanalBadge({
+  canal,
+  bayerDisponible,
 }: {
-  value: string;
-  onChange: (v: string) => void;
-  vacio?: string;
-  children: React.ReactNode;
+  canal: CanalVentaPlanificacion | null;
+  bayerDisponible: boolean;
 }) {
+  if (!bayerDisponible || canal == null) {
+    return <span className="whitespace-nowrap text-xs text-ink-soft">Bayer sin importar</span>;
+  }
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-9 rounded-md border border-line bg-panel px-2 text-sm text-ink outline-none focus:border-clementina-deep"
+    <span
+      className={cn("whitespace-nowrap rounded px-2 py-0.5 text-xs font-medium", TONO_CANAL[canal])}
     >
-      {vacio && <option value="">{vacio}</option>}
-      {children}
-    </select>
+      {ETIQUETA_CANAL[canal]}
+    </span>
   );
 }

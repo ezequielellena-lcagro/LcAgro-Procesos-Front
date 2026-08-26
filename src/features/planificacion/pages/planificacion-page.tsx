@@ -1,100 +1,169 @@
 import { useMemo, useState } from "react";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ErrorState } from "@/shared/components/error-state";
 import { PageHeader } from "@/shared/components/page-header";
+import { useDebounce } from "@/shared/hooks/use-debounce";
 import { CarteraTab } from "../components/cartera-tab";
+import { ComparacionFuentes } from "../components/comparacion-fuentes";
 import { ObjetivosTab } from "../components/objetivos-tab";
 import { SegmentacionModal } from "../components/segmentacion-modal";
-import { claveCampania, fraccionEstacional } from "../lib/campanias";
-import { CRITERIOS, calcular } from "../lib/segmentacion";
-import { COSTOS, FECHA_CORTE, OBJETIVOS_LINEA, PRODUCTORES } from "../mock/datos";
-import type { CriterioMatriz, ObjetivoLinea } from "../types";
+import { claveCampania, ultimasCampanias } from "../lib/campanias";
+import { useTableroPlanificacion } from "../queries/use-tablero-planificacion";
+import type { TableroFiltros } from "../types";
 
 type Tab = "cartera" | "objetivos";
 
-/**
- * Planificación de Ventas.
- *
- * ⚠️ PANTALLA MOCKUP — sin API, datos de ejemplo (ver `mock/datos.ts`).
- *
- * La unidad de análisis es el **productor**: del plan de siembra sale cuánto va a gastar en
- * insumos, contra eso se pone lo que le vendimos (La Clementina + Bayer), y la diferencia es
- * la oportunidad. La lectura por vendedor es una agregación de eso.
- *
- * Dos pestañas y no tres: la matriz de segmentación es configuración —se toca una vez por
- * campaña— así que vive en un modal, y su resultado se lee como banda dentro de la Cartera.
- */
+function filtrosIniciales(campania: string): TableroFiltros {
+  return { campania, orden: "Oportunidad", page: 1, pageSize: 50 };
+}
+
+/** Tablero productivo de planificación. Toda la lógica comercial llega resuelta por la API. */
 export function PlanificacionPage() {
+  const inicial = useMemo(() => claveCampania(new Date()), []);
+  const campaniasIniciales = useMemo(() => ultimasCampanias(new Date(), 3), []);
   const [tab, setTab] = useState<Tab>("cartera");
-  const [criterios, setCriterios] = useState<CriterioMatriz[]>(CRITERIOS);
-  const [lineas, setLineas] = useState<ObjetivoLinea[]>(OBJETIVOS_LINEA);
+  const [filtros, setFiltros] = useState<TableroFiltros>(() => filtrosIniciales(inicial));
+  const [busqueda, setBusqueda] = useState("");
   const [configurando, setConfigurando] = useState(false);
+  const busquedaDiferida = useDebounce(busqueda.trim(), 350);
 
-  const hoy = FECHA_CORTE;
-  const campania = claveCampania(hoy);
-  const campaniaPrev = claveCampania(hoy, 1);
-  const esperado = useMemo(() => fraccionEstacional(hoy), [hoy]);
-
-  // El score y el segmento se recalculan cuando cambia la matriz.
-  const productores = useMemo(
-    () => PRODUCTORES.map((p) => calcular(p, COSTOS, criterios)),
-    [criterios],
+  const filtrosConsulta = useMemo<TableroFiltros>(
+    () => ({ ...filtros, q: busquedaDiferida || undefined }),
+    [busquedaDiferida, filtros],
   );
+  const tablero = useTableroPlanificacion(filtrosConsulta);
+  const data = tablero.data;
+
+  function cambiarCampania(campania: string) {
+    setFiltros(filtrosIniciales(campania));
+    setBusqueda("");
+    setConfigurando(false);
+  }
+
+  function cambiarBusqueda(valor: string) {
+    setBusqueda(valor);
+    setFiltros((actuales) => (actuales.page === 1 ? actuales : { ...actuales, page: 1 }));
+  }
+
+  function cambiarFiltros(cambios: Partial<TableroFiltros>) {
+    setFiltros((actuales) => ({ ...actuales, ...cambios }));
+  }
+
+  function limpiarFiltros() {
+    setFiltros(filtrosIniciales(filtros.campania));
+    setBusqueda("");
+  }
+
+  // El selector es estable: cambiar a una campaña anterior no debe hacer desaparecer la vigente.
+  const campanias = campaniasIniciales;
 
   return (
     <div>
       <PageHeader
         title="Planificación de Ventas"
-        subtitle={`Qué va a gastar cada productor, cuánto le vendemos y dónde está la oportunidad · campaña ${campania}`}
+        subtitle={
+          data
+            ? `Mercado, venta y oportunidad por productor · campaña ${data.campania}`
+            : "Mercado, venta y oportunidad por productor"
+        }
         actions={
-          <span className="rounded-md border border-clementina-deep/40 bg-clementina/10 px-2 py-1 text-xs font-semibold text-clementina-deep">
-            MOCKUP · datos de ejemplo
-          </span>
+          <div className="flex flex-wrap items-end justify-end gap-3">
+            {data && (
+              <span className="pb-2 text-xs text-ink-soft">
+                Corte generado {new Date(data.generadoEn).toLocaleString("es-AR")}
+              </span>
+            )}
+            <label className="text-xs font-medium text-ink-soft">
+              Campaña
+              <Select
+                className="mt-1 h-9 min-w-36 text-ink"
+                value={filtros.campania}
+                onChange={(event) => cambiarCampania(event.target.value)}
+                disabled={tablero.isPending}
+              >
+                {campanias.map((campania) => (
+                  <option key={campania} value={campania}>
+                    {campania}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </div>
         }
       />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <TabsList>
-          <TabsTrigger value="cartera">Cartera de productores</TabsTrigger>
-          <TabsTrigger value="objetivos">Objetivos y avance</TabsTrigger>
-        </TabsList>
+      {tablero.isError && !data ? (
+        <ErrorState error={tablero.error} onRetry={() => void tablero.refetch()} />
+      ) : !data ? (
+        <CargandoTablero />
+      ) : (
+        <>
+          {tablero.isError && (
+            <div className="mb-4">
+              <ErrorState error={tablero.error} onRetry={() => void tablero.refetch()} />
+            </div>
+          )}
+          <div className="mb-5">
+            <ComparacionFuentes tablero={data} />
+          </div>
 
-        <TabsContent value="cartera">
-          <CarteraTab
-            productores={productores}
-            costos={COSTOS}
-            criterios={criterios}
-            campania={campania}
-            onConfigurarSegmentacion={() => setConfigurando(true)}
-          />
-        </TabsContent>
+          <Tabs value={tab} onValueChange={(valor) => setTab(valor as Tab)}>
+            <TabsList>
+              <TabsTrigger value="cartera">Cartera de productores</TabsTrigger>
+              <TabsTrigger value="objetivos">Objetivos y avance</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="objetivos">
-          <ObjetivosTab
-            productores={productores}
-            lineas={lineas}
-            onCambiar={setLineas}
-            esperado={esperado}
-            campania={campania}
-            campaniaPrev={campaniaPrev}
-          />
-        </TabsContent>
-      </Tabs>
+            <TabsContent value="cartera">
+              <CarteraTab
+                key={data.campania}
+                tablero={data}
+                filtros={filtrosConsulta}
+                busqueda={busqueda}
+                actualizando={tablero.isFetching}
+                onBusqueda={cambiarBusqueda}
+                onFiltros={cambiarFiltros}
+                onLimpiarFiltros={limpiarFiltros}
+                onConfigurarSegmentacion={() => setConfigurando(true)}
+              />
+            </TabsContent>
 
-      {configurando && (
-        <SegmentacionModal
-          criterios={criterios}
-          productores={PRODUCTORES}
-          costos={COSTOS}
-          onGuardar={setCriterios}
-          onClose={() => setConfigurando(false)}
-        />
+            <TabsContent value="objetivos">
+              <ObjetivosTab
+                key={`${data.campania}-${data.objetivos.revision}`}
+                objetivos={data.objetivos}
+                actualizando={tablero.isFetching}
+              />
+            </TabsContent>
+          </Tabs>
+
+          {configurando && (
+            <SegmentacionModal
+              matriz={data.matriz}
+              campania={data.campania}
+              onClose={() => setConfigurando(false)}
+            />
+          )}
+        </>
       )}
+    </div>
+  );
+}
 
-      <p className="mt-6 text-center text-xs leading-relaxed text-ink-soft">
-        Los nombres de productor son inventados; la economía (hectáreas, mercado, facturación,
-        mix y score) sale de una muestra del <b>PLAN DE VENTAS</b> real. Campaña única
-        <b> 1-abr a 31-mar</b> para todo, por rango de fechas, como lo confirmó el cliente.
-      </p>
+function CargandoTablero() {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Skeleton className="h-36 w-full rounded-card" />
+        <Skeleton className="h-36 w-full rounded-card" />
+      </div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+        {[0, 1, 2, 3, 4].map((indice) => (
+          <Skeleton key={indice} className="h-24 w-full rounded-card" />
+        ))}
+      </div>
+      <Skeleton className="h-80 w-full rounded-card" />
     </div>
   );
 }

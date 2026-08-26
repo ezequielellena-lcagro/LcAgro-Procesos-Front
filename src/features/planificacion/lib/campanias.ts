@@ -17,37 +17,18 @@
 /** Mes en que arranca la campaña comercial. */
 export const MES_INICIO = 4;
 
-/** Peso de cada mes dentro de la campaña, desde abril. La venta se concentra ago–dic. */
-export const CURVA = [0.04, 0.07, 0.08, 0.06, 0.09, 0.13, 0.16, 0.13, 0.09, 0.06, 0.05, 0.04];
-
 export function inicioCampania(hoy: Date): Date {
   const anio = hoy.getMonth() + 1 >= MES_INICIO ? hoy.getFullYear() : hoy.getFullYear() - 1;
   return new Date(anio, MES_INICIO - 1, 1);
 }
 
-/** "2025/2026" para la campaña vigente a esa fecha. */
+/** "2025-2026" para la campaña vigente a esa fecha (formato canónico de la API). */
 export function claveCampania(hoy: Date, atras = 0): string {
   const a = inicioCampania(hoy).getFullYear() - atras;
-  return `${a}/${a + 1}`;
+  return `${a}-${a + 1}`;
 }
 
-/** Fracción transcurrida contando días. Es lo que hace un run-rate ingenuo. */
-export function fraccionLineal(hoy: Date): number {
-  const ini = inicioCampania(hoy);
-  const fin = new Date(ini.getFullYear() + 1, ini.getMonth(), 1);
-  return (hoy.getTime() - ini.getTime()) / (fin.getTime() - ini.getTime());
-}
-
-/**
- * Fracción transcurrida contando la VENTA esperada, no los días. Es el número contra el
- * que hay que medir el avance: en agosto nadie lleva el 38 % de la campaña vendido.
- */
-export function fraccionEstacional(hoy: Date): number {
-  const ini = inicioCampania(hoy);
-  const meses = (hoy.getFullYear() - ini.getFullYear()) * 12 + (hoy.getMonth() - ini.getMonth());
-  const diasDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
-
-  let acum = 0;
-  for (let i = 0; i < meses; i++) acum += CURVA[i] ?? 0;
-  return acum + (CURVA[meses] ?? 0) * ((hoy.getDate() - 1) / diasDelMes);
+/** Campaña vigente y las anteriores, de más nueva a más vieja. */
+export function ultimasCampanias(hoy: Date, cantidad = 3): string[] {
+  return Array.from({ length: Math.max(0, cantidad) }, (_, atras) => claveCampania(hoy, atras));
 }
