@@ -27,10 +27,11 @@ import { AvanceBar } from "./avance-bar";
 interface Props {
   objetivos: ObjetivosDto;
   actualizando?: boolean;
+  soloLectura?: boolean;
 }
 
 /** Objetivos versionados: React edita un borrador; el servidor calcula preview y persistencia. */
-export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
+export function ObjetivosTab({ objetivos, actualizando = false, soloLectura = false }: Props) {
   const [modo, setModo] = useState<ModoReparto>(objetivos.modoReparto);
   const [valores, setValores] = useState<Record<string, number>>(() =>
     Object.fromEntries(objetivos.lineas.map((linea) => [linea.linea, linea.valor])),
@@ -62,18 +63,21 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
   );
 
   const hayCambios =
-    !objetivos.configurado ||
-    modo !== objetivos.modoReparto ||
-    objetivos.lineas.some((linea) => (valores[linea.linea] ?? linea.valor) !== linea.valor);
-  const vista = preview.data ?? objetivos;
+    !soloLectura &&
+    (!objetivos.configurado ||
+      modo !== objetivos.modoReparto ||
+      objetivos.lineas.some((linea) => (valores[linea.linea] ?? linea.valor) !== linea.valor));
+  const vista = soloLectura ? objetivos : (preview.data ?? objetivos);
   const linea = vista.lineas.find((item) => item.linea === lineaSeleccionada) ?? vista.lineas[0];
 
   function cambiarModo(nuevo: ModoReparto) {
+    if (soloLectura) return;
     setModo(nuevo);
     preview.reset();
   }
 
   function cambiarValor(lineaId: LineaObjetivoPlanificacion, valor: number) {
+    if (soloLectura) return;
     setValores((actuales) => ({ ...actuales, [lineaId]: valor }));
     preview.reset();
   }
@@ -86,6 +90,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
   }
 
   async function previsualizarCambios() {
+    if (soloLectura) return;
     try {
       await preview.mutateAsync(request);
     } catch (cause) {
@@ -94,6 +99,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
   }
 
   async function guardarCambios() {
+    if (soloLectura) return;
     try {
       const respuesta = await guardar.mutateAsync(request);
       if (respuesta.sinCambios) resetearBorrador();
@@ -102,7 +108,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
     }
   }
 
-  const error = preview.error ?? guardar.error;
+  const error = soloLectura ? null : (preview.error ?? guardar.error);
 
   if (!linea) {
     return (
@@ -114,7 +120,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
 
   return (
     <div className="space-y-5" aria-busy={actualizando || preview.isPending || guardar.isPending}>
-      <ComparacionObjetivoLc objetivos={vista} />
+      <ComparacionObjetivoLc objetivos={vista} soloLectura={soloLectura} />
 
       <section className="rounded-card border border-line bg-panel p-4 shadow-card">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
@@ -123,35 +129,44 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
               Objetivos de campaña {objetivos.campania}
             </h2>
             <p className="mt-1 text-xs text-ink-soft">
-              Editás la meta de compañía; el servidor la baja a cada vendedor y conserva el total al
-              centavo.
+              {soloLectura
+                ? "Esta foto conserva los objetivos y acuerdos tal como estaban en el corte."
+                : "Editás la meta de compañía; el servidor la baja a cada vendedor y conserva el total al centavo."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {hayCambios && !preview.data && (
-              <span className="text-xs font-medium text-clementina-deep">
-                Cambios sin previsualizar
+            {soloLectura ? (
+              <span className="rounded-full border border-line bg-panel-soft px-2.5 py-1 text-xs font-medium text-ink-soft">
+                Sólo lectura
               </span>
+            ) : (
+              <>
+                {hayCambios && !preview.data && (
+                  <span className="text-xs font-medium text-clementina-deep">
+                    Cambios sin previsualizar
+                  </span>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={!hayCambios || preview.isPending || guardar.isPending}
+                  onClick={() => void previsualizarCambios()}
+                >
+                  <Eye className="size-4" />
+                  {preview.isPending ? "Calculando…" : "Previsualizar"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!hayCambios || !preview.data || guardar.isPending}
+                  onClick={() => void guardarCambios()}
+                >
+                  <Save className="size-4" />
+                  {guardar.isPending ? "Guardando…" : "Guardar objetivos"}
+                </Button>
+              </>
             )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!hayCambios || preview.isPending || guardar.isPending}
-              onClick={() => void previsualizarCambios()}
-            >
-              <Eye className="size-4" />
-              {preview.isPending ? "Calculando…" : "Previsualizar"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={!hayCambios || !preview.data || guardar.isPending}
-              onClick={() => void guardarCambios()}
-            >
-              <Save className="size-4" />
-              {guardar.isPending ? "Guardando…" : "Guardar objetivos"}
-            </Button>
           </div>
         </div>
 
@@ -188,6 +203,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
                     max={120}
                     step={1}
                     value={Math.round(valorBorrador * 100)}
+                    disabled={soloLectura}
                     onChange={(event) => cambiarValor(item.linea, Number(event.target.value) / 100)}
                     onClick={(event) => event.stopPropagation()}
                     aria-label={`Crecimiento de ${item.nombre}`}
@@ -199,6 +215,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
                     min={0}
                     step={0.01}
                     value={valorBorrador}
+                    disabled={soloLectura}
                     onChange={(event) => cambiarValor(item.linea, Number(event.target.value))}
                     onClick={(event) => event.stopPropagation()}
                     aria-label={`Objetivo de ${item.nombre}`}
@@ -234,6 +251,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
                 <button
                   key={item}
                   type="button"
+                  disabled={soloLectura}
                   onClick={() => cambiarModo(item)}
                   aria-pressed={modo === item}
                   className={cn(
@@ -293,7 +311,8 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
         <DetalleLinea
           linea={linea}
           objetivos={vista}
-          puedeAcordar={!hayCambios && !preview.data}
+          puedeAcordar={!soloLectura && !hayCambios && !preview.data}
+          soloLectura={soloLectura}
           onAcordar={setAcuerdo}
         />
       ) : (
@@ -303,7 +322,7 @@ export function ObjetivosTab({ objetivos, actualizando = false }: Props) {
         </div>
       )}
 
-      {acuerdo && (
+      {!soloLectura && acuerdo && (
         <AcuerdoDialog
           vendedor={acuerdo}
           linea={linea}
@@ -319,11 +338,13 @@ function DetalleLinea({
   linea,
   objetivos,
   puedeAcordar,
+  soloLectura,
   onAcordar,
 }: {
   linea: ObjetivoLineaDto;
   objetivos: ObjetivosDto;
   puedeAcordar: boolean;
+  soloLectura: boolean;
   onAcordar: (vendedor: ObjetivoVendedorDto) => void;
 }) {
   const filas = [...linea.vendedores].sort((a, b) => b.objetivoEfectivoUsd - a.objetivoEfectivoUsd);
@@ -387,7 +408,7 @@ function DetalleLinea({
     },
     {
       key: "real",
-      header: "Real a hoy",
+      header: soloLectura ? "Real al corte" : "Real a hoy",
       align: "right",
       cell: (fila) => oDash(fila.realAcumuladoUsd, usd),
     },
@@ -401,6 +422,7 @@ function DetalleLinea({
           motivoIndisponible={motivoAvanceIndisponible(
             fila.realAcumuladoUsd,
             fila.objetivoEfectivoUsd,
+            soloLectura,
           )}
         />
       ),
@@ -410,7 +432,7 @@ function DetalleLinea({
       header: "",
       align: "right",
       cell: (fila) =>
-        fila.fueraDeReparto ? null : (
+        fila.fueraDeReparto || soloLectura ? null : (
           <Button
             type="button"
             variant="ghost"
@@ -450,10 +472,10 @@ function DetalleLinea({
         <KpiCard
           label={`Objetivo ${objetivos.campania}`}
           value={oDash(linea.objetivoEfectivoUsd, usd)}
-          hint="incluye acuerdos vigentes"
+          hint={soloLectura ? "incluye acuerdos vigentes al corte" : "incluye acuerdos vigentes"}
         />
         <KpiCard
-          label="Real a hoy"
+          label={soloLectura ? "Real al corte" : "Real a hoy"}
           value={oDash(linea.realCompaniaUsd, usd)}
           tone={
             avance == null
@@ -507,6 +529,7 @@ function DetalleLinea({
               motivoIndisponible={motivoAvanceIndisponible(
                 linea.realCompaniaUsd,
                 linea.objetivoEfectivoUsd,
+                soloLectura,
               )}
             />,
             "",
@@ -517,7 +540,13 @@ function DetalleLinea({
   );
 }
 
-function ComparacionObjetivoLc({ objetivos }: { objetivos: ObjetivosDto }) {
+function ComparacionObjetivoLc({
+  objetivos,
+  soloLectura,
+}: {
+  objetivos: ObjetivosDto;
+  soloLectura: boolean;
+}) {
   const referencia = objetivos.referenciaHistorica;
   const lc = objetivos.lineas.find((linea) => linea.linea === "facturacion_lc");
   return (
@@ -527,7 +556,7 @@ function ComparacionObjetivoLc({ objetivos }: { objetivos: ObjetivosDto }) {
     >
       <div className="rounded-card border border-verde/30 bg-verde/5 p-4 shadow-card">
         <div className="text-xs font-semibold uppercase tracking-wide text-verde">
-          Dato operativo actual
+          {soloLectura ? "Dato operativo fotografiado" : "Dato operativo actual"}
         </div>
         <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
           <Dato
@@ -693,8 +722,12 @@ function crecimiento(valor: number): string {
   return `${valor >= 0 ? "+" : ""}${pct(valor * 100)}`;
 }
 
-function motivoAvanceIndisponible(real: number | null, objetivo: number | null): string {
-  if (real == null) return "sin dato actual";
+function motivoAvanceIndisponible(
+  real: number | null,
+  objetivo: number | null,
+  soloLectura: boolean,
+): string {
+  if (real == null) return soloLectura ? "sin dato al corte" : "sin dato actual";
   if (objetivo == null || objetivo <= 0) return "sin objetivo positivo";
   return "sin avance disponible";
 }

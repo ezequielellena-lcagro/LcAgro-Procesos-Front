@@ -44,7 +44,7 @@ function tableroReferencia(): TableroPlanificacionDto {
 
 describe("ComparacionFuentes", () => {
   it("separa el dato actual de la referencia Excel y aclara que no se suman", () => {
-    render(<ComparacionFuentes tablero={tableroReferencia()} />);
+    render(<ComparacionFuentes tablero={tableroReferencia()} soloLectura={false} />);
 
     expect(screen.getByText("Fuentes operativas completas")).toBeInTheDocument();
     expect(screen.getByText("Referencia histórica Excel")).toBeInTheDocument();
@@ -55,7 +55,7 @@ describe("ComparacionFuentes", () => {
   });
 
   it("muestra la distribución histórica validada sin mezclarla con la operativa", () => {
-    render(<ComparacionFuentes tablero={tableroReferencia()} />);
+    render(<ComparacionFuentes tablero={tableroReferencia()} soloLectura={false} />);
 
     expect(screen.getByText("Segmentación histórica Excel")).toBeInTheDocument();
     expect(screen.getAllByText("404")).toHaveLength(2);
@@ -65,5 +65,28 @@ describe("ComparacionFuentes", () => {
     expect(
       screen.getByText(/no se suma ni reemplaza la segmentación operativa/i),
     ).toBeInTheDocument();
+  });
+
+  it("en una foto reemplaza los rótulos vivos por términos del corte sin cambiar importes", () => {
+    render(<ComparacionFuentes tablero={tableroReferencia()} soloLectura />);
+
+    expect(screen.getByText("Fuentes fotografiadas vs. referencia Excel")).toBeInTheDocument();
+    expect(screen.getByText("Dato fotografiado")).toBeInTheDocument();
+    expect(screen.getByText("LC fotografiado")).toBeInTheDocument();
+    expect(screen.getByText("Diferencia al momento del corte − histórica")).toBeInTheDocument();
+    expect(screen.queryByText(/actual|vivo/i)).not.toBeInTheDocument();
+    expect(screen.getByText("US$ 13.396.528,69")).toBeInTheDocument();
+    expect(screen.getByText("US$ 13.284.338,65")).toBeInTheDocument();
+  });
+
+  it("muestra las fechas operativas en la zona de Buenos Aires", () => {
+    const tablero = tableroReferencia();
+    tablero.generadoEn = "2026-04-01T02:30:00Z";
+    tablero.conciliacion.bayer.fechaImportacion = "2026-04-01T02:30:00Z";
+
+    render(<ComparacionFuentes tablero={tablero} soloLectura />);
+
+    expect(screen.getByText(/Corte 31\/3\/26.*23:30/)).toBeInTheDocument();
+    expect(screen.getByText(/Importado el 31\/3\/26.*23:30/)).toBeInTheDocument();
   });
 });

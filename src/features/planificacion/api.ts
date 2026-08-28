@@ -9,10 +9,15 @@ import type {
   ObjetivosDto,
   ObjetivosRequest,
   ProductorTableroDetalleDto,
+  ProductorPlanificacionHistoricoDto,
   PrevisualizacionMatrizSegmentacionDto,
+  ReferenciaSnapshotPlanificacion,
   SegmentacionFiltros,
   SegmentacionListadoDto,
+  SnapshotPlanificacionDto,
+  SnapshotsPlanificacionFiltros,
   TableroFiltros,
+  TableroPlanificacionHistoricoDto,
   TableroPlanificacionDto,
 } from "./types";
 
@@ -41,6 +46,52 @@ export async function obtenerDetalleProductorTablero(
   const { data } = await apiClient.get<ProductorTableroDetalleDto>(
     `${BASE}/tablero/productores/${productorId}`,
     { params: { campania } },
+  );
+  return data;
+}
+
+export async function listarSnapshotsPlanificacion(
+  filtros: SnapshotsPlanificacionFiltros,
+): Promise<SnapshotPlanificacionDto[]> {
+  const { data } = await apiClient.get<SnapshotPlanificacionDto[]>(`${BASE}/snapshots`, {
+    params: {
+      campania: filtros.campania || undefined,
+      desde: filtros.desde,
+      hasta: filtros.hasta,
+    },
+  });
+  return data;
+}
+
+export async function obtenerTableroSnapshot(
+  snapshot: ReferenciaSnapshotPlanificacion,
+  filtros: TableroFiltros,
+): Promise<TableroPlanificacionHistoricoDto> {
+  const { data } = await apiClient.get<TableroPlanificacionHistoricoDto>(
+    `${BASE}/snapshots/${snapshot.id}/tablero`,
+    {
+      params: {
+        sha256: snapshot.sha256,
+        q: filtros.q || undefined,
+        vendedorCodigo: filtros.vendedorCodigo,
+        segmento: filtros.segmento,
+        canal: filtros.canal,
+        orden: filtros.orden ?? "Oportunidad",
+        page: filtros.page ?? 1,
+        pageSize: filtros.pageSize ?? 50,
+      },
+    },
+  );
+  return data;
+}
+
+export async function obtenerDetalleProductorSnapshot(
+  snapshot: ReferenciaSnapshotPlanificacion,
+  productorId: number,
+): Promise<ProductorPlanificacionHistoricoDto> {
+  const { data } = await apiClient.get<ProductorPlanificacionHistoricoDto>(
+    `${BASE}/snapshots/${snapshot.id}/productores/${productorId}`,
+    { params: { sha256: snapshot.sha256 } },
   );
   return data;
 }

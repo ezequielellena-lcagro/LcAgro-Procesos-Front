@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TableroPlanificacionDto } from "../types";
+import { CORTE_VIVO_PLANIFICACION } from "../queries/keys";
 import { useProductorTableroDetalle } from "../queries/use-tablero-planificacion";
 import { CarteraTab } from "./cartera-tab";
 
@@ -107,6 +108,37 @@ describe("CarteraTab", () => {
     });
     fireEvent.click(abrir);
 
-    expect(useProductorTableroDetalle).toHaveBeenLastCalledWith(7, "2025-2026");
+    expect(useProductorTableroDetalle).toHaveBeenLastCalledWith(
+      7,
+      "2025-2026",
+      CORTE_VIVO_PLANIFICACION,
+    );
+  });
+
+  it("abre el detalle desde el mismo snapshot y oculta la configuración mutable", () => {
+    render(
+      <CarteraTab
+        tablero={tablero()}
+        filtros={{ campania: "2025-2026" }}
+        busqueda=""
+        actualizando={false}
+        corte={{ modo: "snapshot", snapshot: { id: 41, sha256: "a".repeat(64) } }}
+        soloLectura
+        onBusqueda={vi.fn()}
+        onFiltros={vi.fn()}
+        onLimpiarFiltros={vi.fn()}
+        onConfigurarSegmentacion={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Configurar matriz" })).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Abrir detalle de Productor de prueba" }),
+    );
+
+    expect(useProductorTableroDetalle).toHaveBeenLastCalledWith(7, "2025-2026", {
+      modo: "snapshot",
+      snapshot: { id: 41, sha256: "a".repeat(64) },
+    });
   });
 });

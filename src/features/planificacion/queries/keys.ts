@@ -1,17 +1,43 @@
-import type { ObjetivosConsulta, SegmentacionFiltros, TableroFiltros } from "../types";
+import type {
+  CorteConsultaPlanificacion,
+  ObjetivosConsulta,
+  SegmentacionFiltros,
+  TableroFiltros,
+} from "../types";
+
+export const CORTE_VIVO_PLANIFICACION: CorteConsultaPlanificacion = { modo: "vivo" };
 
 export const planificacionKeys = {
   all: ["planificacion-vendedores"] as const,
 
   tableros: () => [...planificacionKeys.all, "tablero"] as const,
   tablerosCampania: (campania: string) => [...planificacionKeys.tableros(), campania] as const,
-  tablero: (filtros: TableroFiltros) =>
-    [...planificacionKeys.tablerosCampania(filtros.campania), filtros] as const,
+  tablero: (
+    filtros: TableroFiltros,
+    corte: CorteConsultaPlanificacion = CORTE_VIVO_PLANIFICACION,
+  ) =>
+    [
+      ...planificacionKeys.tablerosCampania(filtros.campania),
+      claveCortePlanificacion(corte),
+      filtros,
+    ] as const,
 
   detalles: () => [...planificacionKeys.all, "detalle-productor"] as const,
   detallesCampania: (campania: string) => [...planificacionKeys.detalles(), campania] as const,
-  detalle: (productorId: number | undefined, campania: string) =>
-    [...planificacionKeys.detallesCampania(campania), productorId ?? null] as const,
+  detalle: (
+    productorId: number | undefined,
+    campania: string,
+    corte: CorteConsultaPlanificacion = CORTE_VIVO_PLANIFICACION,
+  ) =>
+    [
+      ...planificacionKeys.detallesCampania(campania),
+      claveCortePlanificacion(corte),
+      productorId ?? null,
+    ] as const,
+
+  snapshots: () => [...planificacionKeys.all, "snapshots"] as const,
+  listadoSnapshots: (campania: string, desde?: string, hasta?: string) =>
+    [...planificacionKeys.snapshots(), campania, desde ?? null, hasta ?? null] as const,
 
   segmentaciones: () => [...planificacionKeys.all, "segmentacion"] as const,
   segmentacionesCampania: (campania: string) =>
@@ -38,3 +64,11 @@ export const planificacionKeys = {
           consulta.linea ?? "todas",
         ] as const),
 };
+
+export function claveCortePlanificacion(corte: CorteConsultaPlanificacion): string {
+  if (corte.modo === "vivo") return "vivo";
+  if (corte.modo === "snapshot-pendiente") {
+    return `snapshot:${corte.snapshotId}:sin-metadatos`;
+  }
+  return `snapshot:${corte.snapshot.id}:${corte.snapshot.sha256}`;
+}

@@ -12,9 +12,11 @@ import { KpiCard } from "@/shared/components/kpi-card";
 import { Pagination } from "@/shared/components/pagination";
 import { numero, oDash, pct, usd } from "@/shared/format/format";
 import { ETIQUETA_CANAL, TONO_CANAL, TONO_SEGMENTO } from "../lib/presentacion";
+import { CORTE_VIVO_PLANIFICACION } from "../queries/keys";
 import { useProductorTableroDetalle } from "../queries/use-tablero-planificacion";
 import type {
   CanalVentaPlanificacion,
+  CorteConsultaPlanificacion,
   ProductorTableroDto,
   Segmento,
   TableroFiltros,
@@ -27,6 +29,8 @@ interface Props {
   filtros: TableroFiltros;
   busqueda: string;
   actualizando: boolean;
+  corte?: CorteConsultaPlanificacion;
+  soloLectura?: boolean;
   onBusqueda: (valor: string) => void;
   onFiltros: (cambios: Partial<TableroFiltros>) => void;
   onLimpiarFiltros: () => void;
@@ -42,13 +46,15 @@ export function CarteraTab({
   filtros,
   busqueda,
   actualizando,
+  corte = CORTE_VIVO_PLANIFICACION,
+  soloLectura = false,
   onBusqueda,
   onFiltros,
   onLimpiarFiltros,
   onConfigurarSegmentacion,
 }: Props) {
   const [productorId, setProductorId] = useState<number>();
-  const detalle = useProductorTableroDetalle(productorId, tablero.campania);
+  const detalle = useProductorTableroDetalle(productorId, tablero.campania, corte);
   const resumen = tablero.resumenSeleccion;
 
   const columnas: Column<ProductorTableroDto>[] = [
@@ -206,6 +212,7 @@ export function CarteraTab({
         segmentoActivo={filtros.segmento}
         onSegmento={(segmento) => onFiltros({ segmento, page: 1 })}
         onConfigurar={onConfigurarSegmentacion}
+        soloLectura={soloLectura}
       />
 
       <FilterBar>
@@ -375,11 +382,13 @@ function BandaSegmentos({
   segmentoActivo,
   onSegmento,
   onConfigurar,
+  soloLectura,
 }: {
   tablero: TableroPlanificacionDto;
   segmentoActivo: Segmento | undefined;
   onSegmento: (segmento: Segmento | undefined) => void;
   onConfigurar: () => void;
+  soloLectura: boolean;
 }) {
   if (!tablero.segmentacionDisponible) {
     return (
@@ -392,9 +401,15 @@ function BandaSegmentos({
                 "Falta una fuente requerida por la matriz vigente."}
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
-            <SlidersHorizontal className="size-3.5" /> Configurar matriz
-          </Button>
+          {soloLectura ? (
+            <span className="rounded-full border border-line bg-panel px-2.5 py-1 text-xs font-medium text-ink-soft">
+              Sólo lectura
+            </span>
+          ) : (
+            <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
+              <SlidersHorizontal className="size-3.5" /> Configurar matriz
+            </Button>
+          )}
         </div>
       </section>
     );
@@ -409,9 +424,15 @@ function BandaSegmentos({
             Cada tarjeta filtra la tabla; sus totales conservan el resto de los filtros activos.
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
-          <SlidersHorizontal className="size-3.5" /> Configurar matriz
-        </Button>
+        {soloLectura ? (
+          <span className="rounded-full border border-line bg-panel-soft px-2.5 py-1 text-xs font-medium text-ink-soft">
+            Sólo lectura
+          </span>
+        ) : (
+          <Button type="button" variant="outline" size="sm" onClick={onConfigurar}>
+            <SlidersHorizontal className="size-3.5" /> Configurar matriz
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2">

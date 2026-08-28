@@ -1,12 +1,14 @@
 import { ArrowRightLeft, Database, FileSpreadsheet, Info } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { fecha, numero, pct, usd } from "@/shared/format/format";
+import { numero, pct, usd } from "@/shared/format/format";
+import { fechaHoraPlanificacion } from "../lib/campanias";
 import { TONO_SEGMENTO } from "../lib/presentacion";
 import type { DistribucionSegmentacionDto, Segmento, TableroPlanificacionDto } from "../types";
 
 interface Props {
   tablero: TableroPlanificacionDto;
+  soloLectura: boolean;
 }
 
 const SEGMENTOS: Array<{
@@ -23,7 +25,7 @@ const SEGMENTOS: Array<{
  * Contrasta fuentes actuales e históricas sin mezclarlas con el total operativo
  * de la cartera. Todos los totales, diferencias y porcentajes llegan de la API.
  */
-export function ComparacionFuentes({ tablero }: Props) {
+export function ComparacionFuentes({ tablero, soloLectura }: Props) {
   const { conciliacion } = tablero;
   const referencia = conciliacion.referenciaHistorica;
 
@@ -42,7 +44,7 @@ export function ComparacionFuentes({ tablero }: Props) {
               id="comparacion-fuentes-titulo"
               className="mt-1 font-display text-lg font-semibold text-ink"
             >
-              Fuentes actuales vs. referencia Excel
+              {soloLectura ? "Fuentes fotografiadas" : "Fuentes actuales"} vs. referencia Excel
             </h2>
             <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-soft">
               Comparación informada por el servidor para la campaña {tablero.campania}. Los alcances
@@ -50,14 +52,14 @@ export function ComparacionFuentes({ tablero }: Props) {
             </p>
           </div>
           <p className="rounded-full bg-panel-soft px-2.5 py-1 text-xs text-ink-soft">
-            Snapshot {fecha(tablero.generadoEn)}
+            Corte {fechaHoraPlanificacion(tablero.generadoEn)}
           </p>
         </div>
 
         <div className="mt-4 grid gap-3 lg:grid-cols-2">
           <FuenteCard
             icono={<Database className="size-4" aria-hidden />}
-            sobrelinea="Dato actual"
+            sobrelinea={soloLectura ? "Dato fotografiado" : "Dato actual"}
             titulo="Fuentes operativas completas"
             total={
               referencia.totalActualFuentesUsd == null
@@ -68,7 +70,7 @@ export function ComparacionFuentes({ tablero }: Props) {
             detalle="Alcance total de las fuentes LC y Bayer, previo al recorte por padrón y cartera."
           >
             <FilaFuente
-              etiqueta="LC vivo"
+              etiqueta={soloLectura ? "LC fotografiado" : "LC vivo"}
               valor={usd(conciliacion.lc.totalVivoUsd)}
               ayuda={`${numero(conciliacion.lc.renglones)} renglones`}
             />
@@ -82,7 +84,7 @@ export function ComparacionFuentes({ tablero }: Props) {
               ayuda={
                 conciliacion.bayer.disponible
                   ? conciliacion.bayer.fechaImportacion
-                    ? `Importado el ${fecha(conciliacion.bayer.fechaImportacion)}`
+                    ? `Importado el ${fechaHoraPlanificacion(conciliacion.bayer.fechaImportacion)}`
                     : "Importación disponible"
                   : "Fuente no disponible"
               }
@@ -150,7 +152,9 @@ export function ComparacionFuentes({ tablero }: Props) {
             <ArrowRightLeft className="size-4 text-slate-brand" aria-hidden />
             <div>
               <h3 id="diferencias-fuentes-titulo" className="text-sm font-semibold text-ink">
-                Diferencia actual − histórica
+                {soloLectura
+                  ? "Diferencia al momento del corte − histórica"
+                  : "Diferencia actual − histórica"}
               </h3>
               <p className="text-[11px] text-ink-soft">
                 Valores ya conciliados por la API; el signo se conserva.
@@ -160,9 +164,14 @@ export function ComparacionFuentes({ tablero }: Props) {
 
           <dl className="mt-3 grid gap-2 sm:grid-cols-3">
             <Diferencia etiqueta="Total de fuentes" valor={referencia.diferenciaTotalFuentesUsd} />
-            <Diferencia etiqueta="LC vivo vs. Excel" valor={referencia.diferenciaLcVivoUsd} />
             <Diferencia
-              etiqueta="Bayer actual vs. Excel"
+              etiqueta={soloLectura ? "LC fotografiado vs. Excel" : "LC vivo vs. Excel"}
+              valor={referencia.diferenciaLcVivoUsd}
+            />
+            <Diferencia
+              etiqueta={
+                soloLectura ? "Bayer al momento del corte vs. Excel" : "Bayer actual vs. Excel"
+              }
               valor={referencia.diferenciaBayerArchivoUsd}
             />
           </dl>
@@ -176,7 +185,9 @@ export function ComparacionFuentes({ tablero }: Props) {
             <Info className="mt-0.5 size-4 shrink-0 text-slate-brand" aria-hidden />
             <p className="text-xs leading-relaxed text-ink-soft">
               <strong className="text-ink">No se suma:</strong> la cartera operativa habilitada es
-              un recorte de gestión. Se muestra aparte del total actual de fuentes y de la
+              un recorte de gestión. Se muestra aparte del total {soloLectura
+                ? "fotografiado"
+                : "actual"} de fuentes y de la
               referencia histórica Excel; no es un componente adicional de esos totales.
             </p>
           </div>

@@ -174,4 +174,18 @@ describe("ObjetivosTab", () => {
     ).toBeInTheDocument();
     expect(acordarObjetivo).not.toHaveBeenCalled();
   });
+
+  it("presenta un snapshot como sólo lectura sin acciones de escritura", () => {
+    renderizar(<ObjetivosTab objetivos={objetivos()} soloLectura />);
+
+    expect(screen.getByText("Sólo lectura")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previsualizar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar objetivos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Acordar" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Crecimiento de Facturación LC")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mismo % para todos" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Ajustado por oportunidad" })).toBeDisabled();
+    expect(screen.getAllByText("Real al corte")).toHaveLength(2);
+    expect(screen.queryByText("Real a hoy")).not.toBeInTheDocument();
+  });
 });

@@ -577,3 +577,43 @@ export interface ProductorTableroDetalleDto {
   item: ProductorTableroDto;
   plan: ProductorPlanSiembraDto;
 }
+
+export interface SnapshotPlanificacionDto {
+  id: number;
+  loteId: string;
+  fecha: string;
+  campania: string;
+  capturadoEn: string;
+  versionEsquema: number;
+  productores: number;
+  bayerImportacionId: number | null;
+  matrizRevision: number;
+  objetivosRevision: number;
+  sha256: string;
+}
+
+export interface ReferenciaSnapshotPlanificacion {
+  id: number;
+  sha256: string;
+}
+
+export type CorteConsultaPlanificacion =
+  | { modo: "vivo" }
+  | { modo: "snapshot"; snapshot: ReferenciaSnapshotPlanificacion }
+  | { modo: "snapshot-pendiente"; snapshotId: number };
+
+export interface SnapshotsPlanificacionFiltros {
+  campania?: string;
+  desde?: string;
+  hasta?: string;
+}
+
+export interface TableroPlanificacionHistoricoDto {
+  snapshot: SnapshotPlanificacionDto;
+  tablero: TableroPlanificacionDto;
+}
+
+export interface ProductorPlanificacionHistoricoDto {
+  snapshot: SnapshotPlanificacionDto;
+  detalle: ProductorTableroDetalleDto;
+}

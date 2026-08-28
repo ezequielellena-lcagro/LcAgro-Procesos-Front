@@ -2,7 +2,8 @@ import { AlertTriangle, CheckCircle2, CircleHelp, Database, FileSpreadsheet } fr
 import type { ReactNode } from "react";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
-import { fecha, numero, pct, usd } from "@/shared/format/format";
+import { numero, pct, usd } from "@/shared/format/format";
+import { fechaHoraPlanificacion } from "../lib/campanias";
 import {
   ETIQUETA_BANDA,
   ETIQUETA_CANAL,
@@ -27,7 +28,7 @@ type EstadoDato = "disponible" | "advertencia" | "no-disponible";
  * Ficha de un productor del tablero productivo.
  *
  * Los importes, la participación, la oportunidad y el score se muestran tal como
- * llegan en el snapshot de la API. Este componente sólo les da formato.
+ * llegan en el corte de la API. Este componente sólo les da formato.
  */
 export function ProductorDetalle({ detalle, onClose }: Props) {
   const { item, plan } = detalle;
@@ -99,7 +100,7 @@ export function ProductorDetalle({ detalle, onClose }: Props) {
                   : `Código ${productor.vendedorCodigo}`
               }
             />
-            <Identidad termino="Snapshot" valor={fecha(detalle.generadoEn)} />
+            <Identidad termino="Corte" valor={fechaHoraPlanificacion(detalle.generadoEn)} />
           </dl>
         </header>
 
@@ -122,7 +123,7 @@ export function ProductorDetalle({ detalle, onClose }: Props) {
                 !plan.planCargado
                   ? "No hay hectáreas informadas para la campaña."
                   : plan.vigenteDesde
-                    ? `Vigente desde ${fecha(plan.vigenteDesde)}`
+                    ? `Vigente desde ${fechaHoraPlanificacion(plan.vigenteDesde)}`
                     : "Sin fecha de vigencia informada."
               }
               estado={plan.planCargado ? "disponible" : "advertencia"}
@@ -152,7 +153,7 @@ export function ProductorDetalle({ detalle, onClose }: Props) {
               valor={bayerDisponible ? "Disponible" : "Sin importación"}
               detalle={
                 bayerDisponible
-                  ? "La venta directa está incluida en el snapshot."
+                  ? "La venta directa está incluida en el corte."
                   : "No hay una fuente Bayer disponible para esta campaña."
               }
               estado={bayerDisponible ? "disponible" : "no-disponible"}
