@@ -315,7 +315,12 @@ export interface ConciliacionFuenteBayerDto {
   fechaImportacion: string | null;
   nombreArchivo: string | null;
   formato: string | null;
+  /** Filas de la campaña seleccionada dentro del archivo confirmado. */
   filas: number;
+  /** Conteos globales del archivo confirmado; nulos sin importación o en fotos de esquema anterior. */
+  filasImportacion: number | null;
+  filasCruzadasImportacion: number | null;
+  filasSinCruzarImportacion: number | null;
   filasVendedorPendienteImportacion: number;
   filasSinVendedorPorDefinicionImportacion: number;
   filasVendedorDiferenteImportacion: number;

@@ -4,7 +4,13 @@ import { cn } from "@/lib/utils";
 import { numero, pct, usd } from "@/shared/format/format";
 import { fechaHoraPlanificacion } from "../lib/campanias";
 import { TONO_SEGMENTO } from "../lib/presentacion";
-import type { DistribucionSegmentacionDto, Segmento, TableroPlanificacionDto } from "../types";
+import type {
+  BayerControlDepositoDto,
+  ConciliacionConsolidadoVentasDto,
+  DistribucionSegmentacionDto,
+  Segmento,
+  TableroPlanificacionDto,
+} from "../types";
 
 interface Props {
   tablero: TableroPlanificacionDto;
@@ -20,6 +26,8 @@ const SEGMENTOS: Array<{
   { segmento: "C", campo: "c" },
   { segmento: "D", campo: "d" },
 ];
+
+const DEPOSITOS_CONTROL_BAYER = [43, 53] as const;
 
 /**
  * Contrasta fuentes actuales e históricas sin mezclarlas con el total operativo
@@ -75,7 +83,11 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
               ayuda={`${numero(conciliacion.lc.renglones)} renglones`}
             />
             <FilaFuente
-              etiqueta="Bayer importado"
+              etiqueta={
+                soloLectura
+                  ? "Bayer de la campaña al corte"
+                  : "Bayer de la campaña (archivo confirmado)"
+              }
               valor={
                 conciliacion.bayer.totalArchivoUsd == null
                   ? "Sin importación Bayer"
@@ -84,7 +96,7 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
               ayuda={
                 conciliacion.bayer.disponible
                   ? conciliacion.bayer.fechaImportacion
-                    ? `Importado el ${fechaHoraPlanificacion(conciliacion.bayer.fechaImportacion)}`
+                    ? `${soloLectura ? "Confirmado al corte el" : "Importado el"} ${fechaHoraPlanificacion(conciliacion.bayer.fechaImportacion)}`
                     : "Importación disponible"
                   : "Fuente no disponible"
               }
@@ -143,6 +155,8 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
             />
           </FuenteCard>
         </div>
+
+        <EstadoOperativoBayer conciliacion={conciliacion} soloLectura={soloLectura} />
 
         <section
           aria-labelledby="diferencias-fuentes-titulo"
@@ -214,6 +228,223 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
       <SegmentacionHistorica tablero={tablero} />
     </div>
   );
+}
+
+function EstadoOperativoBayer({
+  conciliacion,
+  soloLectura,
+}: {
+  conciliacion: ConciliacionConsolidadoVentasDto;
+  soloLectura: boolean;
+}) {
+  const { bayer, controlBayer } = conciliacion;
+  const datosControl = controlBayer.disponible ? controlBayer.datos : null;
+
+  return (
+    <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <section
+        aria-labelledby="fuente-bayer-operativa-titulo"
+        className="rounded-md border border-line bg-panel-soft p-4"
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+              <FileSpreadsheet className="size-4" aria-hidden />
+              {soloLectura ? "Fuente operativa fotografiada" : "Fuente operativa"}
+            </p>
+            <h3 id="fuente-bayer-operativa-titulo" className="mt-1 text-sm font-semibold text-ink">
+              {soloLectura
+                ? "Fuente operativa fotografiada: último Excel Bayer confirmado al corte"
+                : "Fuente operativa: último Excel Bayer confirmado"}
+            </h3>
+          </div>
+          <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold text-amber-800">
+            Integración directa: pendiente de habilitación externa
+          </span>
+        </div>
+
+        <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+          El dato operativo Bayer sale del último archivo confirmado. No se informa una conexión
+          directa con Bayer mientras esa habilitación externa siga pendiente.
+        </p>
+
+        {!bayer.disponible ? (
+          <div
+            role="status"
+            className="mt-3 rounded-md border border-dashed border-line bg-panel p-4"
+          >
+            <p className="text-sm font-medium text-ink">Sin importación Bayer confirmada</p>
+            <p className="mt-1 text-xs text-ink-soft">
+              La campaña no tiene todavía un Excel confirmado como fuente operativa.
+            </p>
+          </div>
+        ) : (
+          <>
+            <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <DatoBayer
+                etiqueta="Identificador"
+                valor={
+                  bayer.importacionId == null ? "Sin dato" : `Importación #${bayer.importacionId}`
+                }
+              />
+              <DatoBayer
+                etiqueta={soloLectura ? "Confirmado al corte" : "Confirmado en"}
+                valor={
+                  bayer.fechaImportacion == null
+                    ? "Sin dato"
+                    : fechaHoraPlanificacion(bayer.fechaImportacion)
+                }
+              />
+              <DatoBayer etiqueta="Archivo" valor={bayer.nombreArchivo ?? "Sin dato"} />
+              <DatoBayer
+                etiqueta="Formato"
+                valor={bayer.formato == null ? "Sin dato" : bayer.formato.toUpperCase()}
+              />
+            </dl>
+
+            <dl
+              aria-label="Conteos del archivo Bayer completo"
+              className="mt-3 grid gap-2 border-t border-line pt-3 text-xs sm:grid-cols-3"
+            >
+              <DatoBayer
+                etiqueta="Filas del archivo"
+                valor={conteoBayer(bayer.filasImportacion, soloLectura)}
+              />
+              <DatoBayer
+                etiqueta="Filas cruzadas"
+                valor={conteoBayer(bayer.filasCruzadasImportacion, soloLectura)}
+              />
+              <DatoBayer
+                etiqueta="Filas sin cruzar"
+                valor={conteoBayer(bayer.filasSinCruzarImportacion, soloLectura)}
+              />
+            </dl>
+            <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
+              Los conteos anteriores corresponden al archivo completo; esta campaña usa {numero(
+                bayer.filas,
+              )} filas.
+            </p>
+          </>
+        )}
+      </section>
+
+      <section
+        aria-labelledby="control-bayer-titulo"
+        className="rounded-md border border-line bg-panel-soft p-4"
+      >
+        <div className="flex items-start gap-2">
+          <Database className="mt-0.5 size-4 shrink-0 text-slate-brand" aria-hidden />
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">
+              Control de consistencia separado
+            </p>
+            <h3 id="control-bayer-titulo" className="mt-1 text-sm font-semibold text-ink">
+              {soloLectura
+                ? "Control indicativo al corte · depósitos 43/53"
+                : "Control indicativo · depósitos 43/53"}
+            </h3>
+          </div>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-ink-soft">
+          Contrasta pedidos de MacroGest de los depósitos 43 y 53. No reemplaza el Excel confirmado
+          y <strong className="text-ink">no se suma al consolidado</strong>.
+        </p>
+
+        {datosControl == null ? (
+          <div
+            role="status"
+            className="mt-3 rounded-md border border-dashed border-line bg-panel p-4"
+          >
+            <p className="text-sm font-medium text-ink">Control indicativo no disponible</p>
+            <p className="mt-1 text-xs text-ink-soft">
+              {controlBayer.motivoNoDisponible ??
+                "No se pudo consultar el control auxiliar de depósitos 43/53."}
+            </p>
+          </div>
+        ) : (
+          <>
+            <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <DatoBayer
+                etiqueta="Renglones vigentes"
+                valor={numero(datosControl.renglonesVigentes)}
+              />
+              <DatoBayer etiqueta="Pedidos" valor={numero(datosControl.pedidos)} />
+              <DatoBayer
+                etiqueta="Importe nominal USD"
+                valor={usd(datosControl.importeNominalUsd)}
+              />
+              <DatoBayer
+                etiqueta="Archivo − pedido nominal USD"
+                valor={valorUsdConSigno(controlBayer.diferenciaArchivoVsPedidoNominalUsd)}
+              />
+            </dl>
+
+            <div className="mt-3 grid gap-2 border-t border-line pt-3 sm:grid-cols-2">
+              {DEPOSITOS_CONTROL_BAYER.map((numeroDeposito) => (
+                <DepositoControlBayer
+                  key={numeroDeposito}
+                  numeroDeposito={numeroDeposito}
+                  datos={datosControl.depositos.find(
+                    ({ deposito }) => deposito === numeroDeposito,
+                  )}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function DatoBayer({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="min-w-0 rounded-md border border-line/70 bg-panel p-2.5">
+      <dt className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft">{etiqueta}</dt>
+      <dd className="mt-1 break-words font-medium tabular text-ink">{valor}</dd>
+    </div>
+  );
+}
+
+function DepositoControlBayer({
+  numeroDeposito,
+  datos,
+}: {
+  numeroDeposito: (typeof DEPOSITOS_CONTROL_BAYER)[number];
+  datos: BayerControlDepositoDto | undefined;
+}) {
+  return (
+    <article className="rounded-md border border-line bg-panel p-2.5">
+      <h4 className="text-xs font-semibold text-ink">Depósito {numeroDeposito}</h4>
+      {datos == null ? (
+        <p className="mt-1 text-[11px] text-ink-soft">Sin detalle en el control informado.</p>
+      ) : (
+        <dl className="mt-2 space-y-1 text-[11px]">
+          <FilaControl etiqueta="Renglones vigentes" valor={numero(datos.renglonesVigentes)} />
+          <FilaControl etiqueta="Pedidos" valor={numero(datos.pedidos)} />
+          <FilaControl etiqueta="Importe nominal USD" valor={usd(datos.importeNominalUsd)} />
+        </dl>
+      )}
+    </article>
+  );
+}
+
+function FilaControl({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <dt className="text-ink-soft">{etiqueta}</dt>
+      <dd className="text-right font-medium tabular text-ink">{valor}</dd>
+    </div>
+  );
+}
+
+function conteoBayer(valor: number | null, soloLectura: boolean): string {
+  if (valor != null) return numero(valor);
+  return soloLectura ? "Sin dato en este corte" : "Sin dato";
+}
+
+function valorUsdConSigno(valor: number | null): string {
+  return valor == null ? "No calculable" : `${valor > 0 ? "+" : ""}${usd(valor)}`;
 }
 
 function FuenteCard({
