@@ -24,7 +24,7 @@ import type {
   TableroFiltros,
 } from "../types";
 
-type Tab = "cartera" | "objetivos";
+type Tab = "cartera" | "objetivos" | "conciliacion";
 
 function filtrosIniciales(campania: string): TableroFiltros {
   return { campania, orden: "Oportunidad", page: 1, pageSize: 50 };
@@ -198,14 +198,11 @@ export function PlanificacionPage() {
               <ErrorState error={tablero.error} onRetry={() => void tablero.refetch()} />
             </div>
           )}
-          <div className="mb-5">
-            <ComparacionFuentes tablero={data} soloLectura={soloLectura} />
-          </div>
-
           <Tabs value={tab} onValueChange={(valor) => setTab(valor as Tab)}>
             <TabsList>
               <TabsTrigger value="cartera">Cartera de productores</TabsTrigger>
               <TabsTrigger value="objetivos">Objetivos y avance</TabsTrigger>
+              <TabsTrigger value="conciliacion">Conciliación</TabsTrigger>
             </TabsList>
 
             <TabsContent value="cartera">
@@ -231,6 +228,10 @@ export function PlanificacionPage() {
                 actualizando={tablero.isFetching}
                 soloLectura={soloLectura}
               />
+            </TabsContent>
+
+            <TabsContent value="conciliacion">
+              <ComparacionFuentes tablero={data} soloLectura={soloLectura} />
             </TabsContent>
           </Tabs>
 

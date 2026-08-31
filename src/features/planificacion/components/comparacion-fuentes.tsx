@@ -54,9 +54,11 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
             >
               {soloLectura ? "Fuentes fotografiadas" : "Fuentes actuales"} vs. referencia Excel
             </h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-ink-soft">
-              Comparación informada por el servidor para la campaña {tablero.campania}. Los alcances
-              se presentan separados para que el origen de cada número sea visible.
+            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-ink-soft">
+              Esta pantalla contesta una sola pregunta: <b>¿la app da lo mismo que el Excel que se
+              venía armando a mano?</b> Es un control de puesta en marcha, no un dato de gestión —
+              por eso vive acá y no en la cartera. Cuanto más chica la diferencia, más confiable es
+              lo que muestran las otras pestañas.
             </p>
           </div>
           <p className="rounded-full bg-panel-soft px-2.5 py-1 text-xs text-ink-soft">
@@ -75,7 +77,7 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
                 : usd(referencia.totalActualFuentesUsd)
             }
             totalDisponible={referencia.totalActualFuentesUsd != null}
-            detalle="Alcance total de las fuentes LC y Bayer, previo al recorte por padrón y cartera."
+            detalle="Lo que la app lee HOY: la facturación de La Clementina en vivo desde MacroGest más el último Excel de Bayer importado. Es el alcance completo, antes de recortar por padrón y por los vendedores del proceso."
           >
             <FilaFuente
               etiqueta={soloLectura ? "LC fotografiado" : "LC vivo"}
@@ -125,7 +127,8 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
             totalDisponible={referencia.facturacionTotalUsd != null}
             detalle={
               referencia.disponible
-                ? `Campaña ${referencia.campania ?? "sin identificar"} · ${referencia.estado}`
+                ? `Los mismos totales, sacados del PLAN DE VENTAS.xlsx que arma el negocio a mano. `
+                  + `Campaña ${referencia.campania ?? "sin identificar"} · ${referencia.estado}`
                 : referencia.estado
             }
           >
@@ -170,8 +173,11 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
                   ? "Diferencia al momento del corte − histórica"
                   : "Diferencia actual − histórica"}
               </h3>
-              <p className="text-[11px] text-ink-soft">
-                Valores ya conciliados por la API; el signo se conserva.
+              <p className="text-[11px] leading-relaxed text-ink-soft">
+                Cuánto se aparta la app del Excel. <b>Positivo = la app ve más</b>, normal cuando
+                MacroGest sumó facturas después de que se armó la planilla. Una diferencia chica
+                valida el cálculo; una grande avisa que falta cargar algo o que se está mirando
+                otra campaña.
               </p>
             </div>
           </div>
@@ -199,10 +205,10 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
             <Info className="mt-0.5 size-4 shrink-0 text-slate-brand" aria-hidden />
             <p className="text-xs leading-relaxed text-ink-soft">
               <strong className="text-ink">No se suma:</strong> la cartera operativa habilitada es
-              un recorte de gestión. Se muestra aparte del total {soloLectura
-                ? "fotografiado"
-                : "actual"} de fuentes y de la
-              referencia histórica Excel; no es un componente adicional de esos totales.
+              lo que queda después de recortar por los vendedores del proceso y por los productores
+              del padrón — es el número que ves en la pestaña de Cartera. Se muestra aparte del
+              total {soloLectura ? "fotografiado" : "actual"} de fuentes y de la referencia
+              histórica Excel: es un subconjunto de ellos, no algo que se les suma.
             </p>
           </div>
           <div className="border-t border-line pt-2 text-left sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0 sm:text-right">
@@ -264,8 +270,10 @@ function EstadoOperativoBayer({
         </div>
 
         <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-          El dato operativo Bayer sale del último archivo confirmado. No se informa una conexión
-          directa con Bayer mientras esa habilitación externa siga pendiente.
+          Bayer le factura <b>directo al productor</b> y La Clementina cobra comisión, así que esa
+          venta no pasa por la facturación de LC: por eso se suma en vez de pisarse. El dato sale
+          del último Excel confirmado (el mismo que llena Georgina mes a mes). El cliente pidió a
+          Bayer una conexión directa y todavía no le contestaron; mientras tanto, manda el archivo.
         </p>
 
         {!bayer.disponible ? (
@@ -346,8 +354,12 @@ function EstadoOperativoBayer({
           </div>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-ink-soft">
-          Contrasta pedidos de MacroGest de los depósitos 43 y 53. No reemplaza el Excel confirmado
-          y <strong className="text-ink">no se suma al consolidado</strong>.
+          Cuando se carga una venta de Bayer, en MacroGest queda un pedido con depósito 43 o 53
+          (&quot;MONSANTO / BAYER&quot; de San Jorge y Las Varillas). Sirve para ver cuánto de lo
+          facturado por Bayer quedó realmente registrado: hoy los pedidos capturan cerca del 64 %
+          porque los vendedores no los cargan completos. Es un <b>control de calidad de la carga</b>,
+          no una fuente: no reemplaza al Excel y{" "}
+          <strong className="text-ink">no se suma al consolidado</strong>.
         </p>
 
         {datosControl == null ? (
