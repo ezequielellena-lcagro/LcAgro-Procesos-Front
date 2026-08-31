@@ -15,6 +15,7 @@ import {
   claveCortePlanificacion,
   CORTE_VIVO_PLANIFICACION,
 } from "../queries/keys";
+import { campaniaInicial, useCampaniasConPlan } from "../queries/use-campanias-con-plan";
 import { useSnapshotsPlanificacion } from "../queries/use-snapshots-planificacion";
 import { useTableroPlanificacion } from "../queries/use-tablero-planificacion";
 import type {
@@ -39,16 +40,24 @@ export function PlanificacionPage() {
   );
   const [tab, setTab] = useState<Tab>("cartera");
   const [filtros, setFiltros] = useState<TableroFiltros>(() => filtrosIniciales(inicial));
+  // La campaña vigente por almanaque suele estar vacía (arranca el 1 de abril). Se abre en la más
+  // reciente CON plan cargado; hasta que llega la lista se muestra la del almanaque.
+  const campaniasConPlan = useCampaniasConPlan();
+  // null = el usuario todavía no eligió; vale la sugerida. Derivado, sin efecto ni setState.
+  const [campaniaManual, setCampaniaManual] = useState<string | null>(null);
   const [snapshotId, setSnapshotId] = useState<number | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [configurando, setConfigurando] = useState(false);
   const busquedaDiferida = useDebounce(busqueda.trim(), 350);
 
+  const campaniaEfectiva = campaniaManual
+    ?? campaniaInicial(campaniasConPlan.data, campaniasIniciales, inicial);
+
   const filtrosConsulta = useMemo<TableroFiltros>(
-    () => ({ ...filtros, q: busquedaDiferida || undefined }),
-    [busquedaDiferida, filtros],
+    () => ({ ...filtros, campania: campaniaEfectiva, q: busquedaDiferida || undefined }),
+    [busquedaDiferida, campaniaEfectiva, filtros],
   );
-  const snapshots = useSnapshotsPlanificacion(filtros.campania);
+  const snapshots = useSnapshotsPlanificacion(campaniaEfectiva);
   const snapshotActivo = snapshots.data?.find((snapshot) => snapshot.id === snapshotId);
   const corte = useMemo<CorteConsultaPlanificacion>(() => {
     if (snapshotId == null) return CORTE_VIVO_PLANIFICACION;
@@ -60,6 +69,7 @@ export function PlanificacionPage() {
   const soloLectura = corte.modo !== "vivo";
 
   function cambiarCampania(campania: string) {
+    setCampaniaManual(campania);
     setFiltros(filtrosIniciales(campania));
     setSnapshotId(null);
     setBusqueda("");
@@ -91,7 +101,7 @@ export function PlanificacionPage() {
   }
 
   function limpiarFiltros() {
-    setFiltros(filtrosIniciales(filtros.campania));
+    setFiltros(filtrosIniciales(campaniaEfectiva));
     setBusqueda("");
   }
 
@@ -139,7 +149,7 @@ export function PlanificacionPage() {
               Campaña
               <Select
                 className="mt-1 h-9 min-w-36 text-ink"
-                value={filtros.campania}
+                value={campaniaEfectiva}
                 onChange={(event) => cambiarCampania(event.target.value)}
                 disabled={tablero.isPending && corte.modo !== "snapshot-pendiente"}
               >

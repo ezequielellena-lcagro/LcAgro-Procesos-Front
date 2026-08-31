@@ -166,3 +166,13 @@ export async function acordarObjetivo(
   const { data } = await apiClient.put<GuardadoObjetivosDto>(`${BASE}/objetivos/acuerdo`, request);
   return data;
 }
+
+/**
+ * Campañas que ya tienen plan de siembra cargado, de la más reciente a la más vieja.
+ * Sirve para abrir el tablero donde hay datos: la campaña vigente por almanaque arranca en abril
+ * y suele estar vacía durante meses, y abrir ahí hace parecer que el módulo no anda.
+ */
+export async function listarCampaniasConPlan(): Promise<string[]> {
+  const { data } = await apiClient.get<string[]>(`${BASE}/plan-siembra/campanias-con-plan`);
+  return data;
+}

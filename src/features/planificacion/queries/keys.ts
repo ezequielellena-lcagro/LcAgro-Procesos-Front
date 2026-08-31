@@ -10,6 +10,8 @@ export const CORTE_VIVO_PLANIFICACION: CorteConsultaPlanificacion = { modo: "viv
 export const planificacionKeys = {
   all: ["planificacion-vendedores"] as const,
 
+  campaniasConPlan: () => [...planificacionKeys.all, "campanias-con-plan"] as const,
+
   tableros: () => [...planificacionKeys.all, "tablero"] as const,
   tablerosCampania: (campania: string) => [...planificacionKeys.tableros(), campania] as const,
   tablero: (
