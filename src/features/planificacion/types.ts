@@ -346,6 +346,10 @@ export interface ReferenciaHistoricaVentasDto {
   diferenciaTotalFuentesUsd: number | null;
   participacionActualSobreMercadoReferenciaPct: number | null;
   estado: string;
+  /** Archivo del que salieron los totales. Null si no hay referencia importada. */
+  nombreArchivo: string | null;
+  /** Cuándo se importó: es lo que permite saber si la referencia quedó vieja. */
+  fechaImportacion: string | null;
 }
 
 export interface ConciliacionControlBayerDto {

@@ -127,9 +127,10 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
             totalDisponible={referencia.facturacionTotalUsd != null}
             detalle={
               referencia.disponible
-                ? `Los mismos totales, sacados del PLAN DE VENTAS.xlsx que arma el negocio a mano. `
-                  + `Campaña ${referencia.campania ?? "sin identificar"} · ${referencia.estado}`
-                : referencia.estado
+                ? "Los mismos totales, sacados del Excel que arma el negocio a mano. Se importan " +
+                  "con archivo y fecha: si la planilla se actualiza, se vuelve a importar."
+                : "Nadie importó todavía el Excel de esta campaña, así que no hay contra qué " +
+                  "comparar. Se sube desde Conciliación."
             }
           >
             <FilaFuente
@@ -156,6 +157,17 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
               }
               disponible={referencia.participacionPct != null}
             />
+            {/* La procedencia es lo que hace confiable al numero: antes estaba pegado en el codigo. */}
+            {referencia.nombreArchivo && (
+              <p className="mt-2 border-t border-line pt-2 text-[11px] leading-relaxed text-ink-soft">
+                Importado de <b className="text-ink">{referencia.nombreArchivo}</b>
+                {referencia.fechaImportacion
+                  ? ` el ${fechaHoraPlanificacion(referencia.fechaImportacion)}`
+                  : ""}
+                . Si la planilla cambia, hay que volver a importarla para que la comparación siga
+                siendo válida.
+              </p>
+            )}
           </FuenteCard>
         </div>
 
