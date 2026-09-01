@@ -461,9 +461,10 @@ export const prestamosHandlers = [
     const choque = lista.find((x) => x.nombre.toLowerCase() === input.nombre.toLowerCase());
     if (choque) return HttpResponse.json({ detail: `Ya existe '${choque.nombre}'.` }, { status: 409 });
 
-    const item = { ...input, id: Math.max(0, ...lista.map((x) => x.id)) + 1 };
+    // Un catálogo recién creado no lo usa ningún préstamo todavía.
+    const item = { ...input, id: Math.max(0, ...lista.map((x) => x.id)) + 1, enUso: 0 };
     lista.push(item);
-    return HttpResponse.json({ ...item, enUso: 0 });
+    return HttpResponse.json(item);
   }),
 
   http.put(`${API}/prestamos/catalogos/:tipo/:id`, async ({ params, request }) => {

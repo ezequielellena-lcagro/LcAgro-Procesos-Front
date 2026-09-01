@@ -107,11 +107,6 @@ function archivo(nombre = "PLAN DE VENTAS.xlsx") {
   });
 }
 
-function subir(indice: number) {
-  const inputs = screen.getAllByRole("textbox", { hidden: true });
-  return inputs[indice];
-}
-
 describe("solapa de carga de datos", () => {
   beforeEach(() => {
     vi.clearAllMocks();
