@@ -43,6 +43,10 @@ const CON_DIFERENCIAS: ConciliacionMacroGest = {
       tasaNominalAnual: 2.75,
       concepto: "Préstamo Agronación Agro Bayer TNA 2,75 %",
       fecha: "2026-05-04",
+      moneda: "USD" as const,
+      vencimiento: "2027-05-10",
+      cantidadCuotas: 1,
+      periodicidad: "Unico" as const,
     },
   ],
   sinNumeroDeOperacion: [
@@ -254,6 +258,7 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={vi.fn()}
         onQuitarDescarte={onQuitarDescarte}
+        onDarDeAlta={vi.fn()}
         puedeGestionar
       />,
     );
