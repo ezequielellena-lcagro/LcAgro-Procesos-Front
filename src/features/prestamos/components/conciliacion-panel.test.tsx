@@ -39,7 +39,7 @@ const CON_DIFERENCIAS: ConciliacionMacroGest = {
     {
       nroOperacion: "00058050",
       banco: "NACIÓN",
-      capitalUsd: 225377.02,
+      capital: 225377.02,
       tasaNominalAnual: 2.75,
       concepto: "Préstamo Agronación Agro Bayer TNA 2,75 %",
       fecha: "2026-05-04",
@@ -357,5 +357,44 @@ describe("ConciliacionPanel", () => {
     );
 
     expect(screen.queryByRole("button", { name: /dar de alta/i })).not.toBeInTheDocument();
+  });
+
+  // ── Préstamos en pesos (Fase E) ─────────────────────────────────────────
+
+  /**
+   * Desde que el cruce mira también la cuenta de amortizables, en la misma tabla conviven pesos y
+   * dólares. Un encabezado fijo "Capital U$S" convertiría 200 millones de pesos en 200 millones de
+   * dólares a los ojos de quien lee — que es el error más caro que puede cometer esta pantalla.
+   */
+  it("cada propuesta muestra el símbolo de SU moneda", () => {
+    renderPanel({
+      datos: {
+        ...CON_DIFERENCIAS,
+        sinCargar: [
+          { ...CON_DIFERENCIAS.sinCargar[0], nroOperacion: "1", capital: 59028.33, moneda: "USD" },
+          {
+            ...CON_DIFERENCIAS.sinCargar[0],
+            nroOperacion: "28078488",
+            capital: 200000000,
+            moneda: "ARS",
+          },
+        ],
+      },
+    });
+
+    expect(screen.getByText("U$S 59.028,33")).toBeInTheDocument();
+    expect(screen.getByText("$ 200.000.000,00")).toBeInTheDocument();
+  });
+
+  /** Sin capital no se inventa nada: se ve el guión, no un símbolo suelto. */
+  it("sin capital no muestra un símbolo huérfano", () => {
+    renderPanel({
+      datos: {
+        ...CON_DIFERENCIAS,
+        sinCargar: [{ ...CON_DIFERENCIAS.sinCargar[0], capital: null }],
+      },
+    });
+
+    expect(screen.queryByText(/U\$S\s*$/)).not.toBeInTheDocument();
   });
 });

@@ -80,7 +80,7 @@ export function PrestamosPage() {
       banco: fila.banco,
       nroOperacion: fila.nroOperacion,
       moneda: fila.moneda,
-      capitalOriginal: fila.capitalUsd,
+      capitalOriginal: fila.capital,
       fechaOtorgamiento: fila.fecha,
       tasaNominalAnual: fila.tasaNominalAnual,
       cantidadCuotas: fila.cantidadCuotas,

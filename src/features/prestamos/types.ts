@@ -258,7 +258,8 @@ export interface FilaConciliacion {
 export interface FilaPropuesta {
   nroOperacion: string;
   banco: string;
-  capitalUsd: number | null;
+  /** Capital EN LA MONEDA del préstamo: dólares si es USD, pesos si es ARS. */
+  capital: number | null;
   tasaNominalAnual: number | null;
   concepto: string;
   /** Fecha de acreditación: es la de otorgamiento del préstamo. */

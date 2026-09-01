@@ -409,7 +409,7 @@ export const prestamosHandlers = [
         {
           nroOperacion: "00058050",
           banco: "NACIÓN",
-          capitalUsd: 225377.02,
+          capital: 225377.02,
           tasaNominalAnual: 2.75,
           concepto: "Préstamo Agronación Agro Bayer TNA 2,75 %",
           fecha: enMeses(-3),

@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { fecha, oDash, pct } from "@/shared/format/format";
-import { importe } from "../format";
+import { importe, importeConMoneda } from "../format";
 import type {
   ConciliacionMacroGest,
   DescartarInput,
@@ -149,10 +149,12 @@ const COLUMNAS_BANCO: Column<FilaPropuesta>[] = [
   },
   { key: "banco", header: "Banco", cell: (f) => f.banco },
   {
+    // Con la cuenta de amortizables adentro conviven pesos y dólares en la misma tabla, así que el
+    // símbolo va POR FILA. Un encabezado fijo "U$S" leería 200 millones de pesos como dólares.
     key: "capital",
-    header: "Capital U$S",
+    header: "Capital",
     align: "right",
-    cell: (f) => oDash(f.capitalUsd, importe),
+    cell: (f) => oDash(f.capital, (n) => importeConMoneda(n, f.moneda)),
   },
   { key: "tna", header: "TNA", align: "right", cell: (f) => oDash(f.tasaNominalAnual, pct) },
   { key: "concepto", header: "Concepto en MacroGest", cell: (f) => f.concepto },
