@@ -31,7 +31,7 @@ export function Tabs<T extends string>({ value, onValueChange, className, childr
 
 export function TabsList({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div role="tablist" className={cn("flex gap-1", className)}>
+    <div role="tablist" className={cn("flex gap-2", className)}>
       {children}
     </div>
   );
