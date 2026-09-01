@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { AlertTriangle, CheckCircle2, EyeOff, HelpCircle, Undo2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, EyeOff, HelpCircle, Plus, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
@@ -22,6 +22,8 @@ interface Props {
   onReintentar: () => void;
   onDescartar: (input: DescartarInput) => void;
   onQuitarDescarte: (id: number) => void;
+  /** Abre el alta con lo que el banco ya sabe del préstamo. */
+  onDarDeAlta: (fila: FilaPropuesta) => void;
   puedeGestionar: boolean;
 }
 
@@ -171,6 +173,7 @@ export function ConciliacionPanel({
   onReintentar,
   onDescartar,
   onQuitarDescarte,
+  onDarDeAlta,
   puedeGestionar,
 }: Props) {
   const [descartando, setDescartando] = useState<string | null>(null);
@@ -209,18 +212,28 @@ export function ConciliacionPanel({
     ? [
         ...COLUMNAS_BANCO,
         {
-          key: "descartar",
+          key: "acciones",
           header: "",
           align: "right",
           cell: (f) => (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDescartando(f.nroOperacion)}
-              title="Sacarlo del cruce dejando registrado por qué"
-            >
-              <EyeOff className="size-3.5" /> No corresponde
-            </Button>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="accent"
+                size="sm"
+                onClick={() => onDarDeAlta(f)}
+                title="Cargarlo con los datos que ya tiene el banco"
+              >
+                <Plus className="size-3.5" /> Dar de alta
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setDescartando(f.nroOperacion)}
+                title="Sacarlo del cruce dejando registrado por qué"
+              >
+                <EyeOff className="size-3.5" /> No corresponde
+              </Button>
+            </div>
           ),
         },
       ]

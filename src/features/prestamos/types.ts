@@ -240,7 +240,31 @@ export interface FilaPropuesta {
   capitalUsd: number | null;
   tasaNominalAnual: number | null;
   concepto: string;
+  /** Fecha de acreditación: es la de otorgamiento del préstamo. */
   fecha: string;
+  // Lo que sigue alcanza para darlo de alta sin ir al Excel.
+  moneda: Moneda;
+  /** Vencimiento de la única cuota, o el PRIMERO si el préstamo es en cuotas. */
+  vencimiento: string | null;
+  cantidadCuotas: number;
+  periodicidad: Periodicidad;
+}
+
+/**
+ * Lo que el banco sabe de un préstamo que el sistema no tiene, listo para abrir el alta con los
+ * campos ya puestos. Es una propuesta: se revisa y se completa antes de guardar.
+ */
+export interface PrecargaPrestamo {
+  banco: string;
+  nroOperacion: string;
+  moneda: Moneda;
+  capitalOriginal: number | null;
+  fechaOtorgamiento: string;
+  tasaNominalAnual: number | null;
+  cantidadCuotas: number;
+  periodicidad: Periodicidad;
+  primerVencimiento: string | null;
+  concepto: string;
 }
 
 /**

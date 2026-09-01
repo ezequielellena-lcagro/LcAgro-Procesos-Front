@@ -25,6 +25,7 @@ import {
   TIPOS,
   type Moneda,
   type Periodicidad,
+  type PrecargaPrestamo,
   type PrestamoDetalleDto,
 } from "../types";
 import { CronogramaEditor } from "./cronograma-editor";
@@ -69,6 +70,25 @@ const VACIO: Values = {
   tasaNominalAnual: "",
   observaciones: "",
 };
+
+/**
+ * Traduce lo que dice el banco a los campos del formulario. Lo que MacroGest no declara queda en
+ * blanco: es preferible que la persona lo complete a que el sistema invente un número.
+ */
+function desdePrecarga(p: PrecargaPrestamo, bancoId: string): Values {
+  return {
+    ...VACIO,
+    bancoId,
+    nroOperacion: p.nroOperacion,
+    moneda: p.moneda,
+    capitalOriginal: p.capitalOriginal === null ? "" : String(p.capitalOriginal),
+    fechaOtorgamiento: p.fechaOtorgamiento,
+    cantidadCuotas: String(p.cantidadCuotas),
+    periodicidad: p.periodicidad,
+    tasaNominalAnual: p.tasaNominalAnual === null ? "" : String(p.tasaNominalAnual),
+    observaciones: `Dado de alta desde MacroGest: ${p.concepto}`,
+  };
+}
 
 function aValues(p: PrestamoDetalleDto): Values {
   return {
@@ -181,6 +201,11 @@ interface Props {
   prestamoId: number | null;
   onClose: () => void;
   monedaPorDefecto: Moneda;
+  /**
+   * Valores con los que abrir un alta. Vienen del movimiento del banco: para un préstamo bullet
+   * MacroGest ya sabe capital, tasa y vencimiento, así que no hace falta ir al Excel a buscarlos.
+   */
+  precarga?: PrecargaPrestamo | null;
 }
 
 /**
@@ -194,10 +219,22 @@ interface Props {
  * `key` recién cuando los datos están. Así el estado inicial sale del `useState` y no hace falta
  * sincronizarlo con un efecto (que además dispararía `setState` en render).
  */
-export function PrestamoDialog({ prestamoId, onClose, monedaPorDefecto }: Props) {
+export function PrestamoDialog({
+  prestamoId,
+  onClose,
+  monedaPorDefecto,
+  precarga,
+}: Props) {
   const esAlta = prestamoId === 0;
   const detalle = usePrestamo(prestamoId !== null && prestamoId > 0 ? prestamoId : null);
-  const listo = esAlta || detalle.data !== undefined;
+
+  // Con precarga hay que esperar los catálogos: el banco viene por nombre ("MACRO") y sin la
+  // lista no se puede resolver su id. Como los valores iniciales se fijan UNA vez al montar,
+  // montar antes dejaría el banco sin elegir.
+  const catalogos = useCatalogosPrestamos();
+  const listo = esAlta
+    ? !precarga || catalogos.data !== undefined
+    : detalle.data !== undefined;
 
   return (
     <Modal
@@ -214,6 +251,7 @@ export function PrestamoDialog({ prestamoId, onClose, monedaPorDefecto }: Props)
           prestamoId={prestamoId!}
           detalle={esAlta ? null : detalle.data!}
           monedaPorDefecto={monedaPorDefecto}
+          precarga={esAlta ? precarga : null}
           onClose={onClose}
         />
       )}
@@ -225,11 +263,13 @@ function PrestamoForm({
   prestamoId,
   detalle,
   monedaPorDefecto,
+  precarga,
   onClose,
 }: {
   prestamoId: number;
   detalle: PrestamoDetalleDto | null;
   monedaPorDefecto: Moneda;
+  precarga?: PrecargaPrestamo | null;
   onClose: () => void;
 }) {
   const esAlta = detalle === null;
@@ -249,12 +289,21 @@ function PrestamoForm({
     })),
   );
   const [primerVto, setPrimerVto] = useState(
-    () => detalle?.cuotas[0]?.fechaVencimiento ?? hoyISO(),
+    () => detalle?.cuotas[0]?.fechaVencimiento ?? precarga?.primerVencimiento ?? hoyISO(),
   );
+
+  // El banco del catálogo se busca por nombre: la precarga trae "MACRO", no un id.
+  const bancoDePrecarga = precarga
+    ? (catalogos.data?.bancos.find((b) => b.nombre === precarga.banco)?.id ?? "")
+    : "";
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: detalle ? aValues(detalle) : { ...VACIO, moneda: monedaPorDefecto },
+    defaultValues: detalle
+      ? aValues(detalle)
+      : precarga
+        ? desdePrecarga(precarga, String(bancoDePrecarga))
+        : { ...VACIO, moneda: monedaPorDefecto },
   });
 
   const pagadas = (detalle?.cuotas ?? [])

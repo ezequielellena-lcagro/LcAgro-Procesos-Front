@@ -59,6 +59,7 @@ function renderPanel(over: Partial<Parameters<typeof ConciliacionPanel>[0]> = {}
       onReintentar={vi.fn()}
       onDescartar={vi.fn()}
       onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
       puedeGestionar
       {...over}
     />,
@@ -149,6 +150,7 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={vi.fn()}
         onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
         puedeGestionar
       />,
     );
@@ -166,6 +168,7 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={onDescartar}
         onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
         puedeGestionar
       />,
     );
@@ -188,6 +191,7 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={onDescartar}
         onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
         puedeGestionar
       />,
     );
@@ -224,6 +228,7 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={vi.fn()}
         onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
         puedeGestionar
       />,
     );
@@ -272,6 +277,7 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={vi.fn()}
         onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
         puedeGestionar={false}
       />,
     );
@@ -295,10 +301,56 @@ describe("ConciliacionPanel", () => {
         onReintentar={vi.fn()}
         onDescartar={vi.fn()}
         onQuitarDescarte={vi.fn()}
+      onDarDeAlta={vi.fn()}
         puedeGestionar
       />,
     );
 
     expect(screen.getByText(/Sin diferencias/i)).toBeInTheDocument();
+  });
+
+  // ── Dar de alta desde el banco ────────────────────────────────────────────
+
+  /**
+   * Para un préstamo bullet MacroGest ya sabe capital, tasa y vencimiento: no hace falta ir al
+   * Excel a buscarlos. El botón abre el alta con eso puesto.
+   */
+  it("ofrece dar de alta lo que el banco tiene y el sistema no", () => {
+    const onDarDeAlta = vi.fn();
+    render(
+      <ConciliacionPanel
+        datos={CON_DIFERENCIAS}
+        cargando={false}
+        error={null}
+        onReintentar={vi.fn()}
+        onDescartar={vi.fn()}
+        onQuitarDescarte={vi.fn()}
+        onDarDeAlta={onDarDeAlta}
+        puedeGestionar
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /dar de alta/i }));
+
+    expect(onDarDeAlta).toHaveBeenCalledWith(
+      expect.objectContaining({ nroOperacion: "00058050", banco: "NACIÓN" }),
+    );
+  });
+
+  it("sin permiso de gestión no se puede dar de alta", () => {
+    render(
+      <ConciliacionPanel
+        datos={CON_DIFERENCIAS}
+        cargando={false}
+        error={null}
+        onReintentar={vi.fn()}
+        onDescartar={vi.fn()}
+        onQuitarDescarte={vi.fn()}
+        onDarDeAlta={vi.fn()}
+        puedeGestionar={false}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /dar de alta/i })).not.toBeInTheDocument();
   });
 });

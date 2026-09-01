@@ -26,7 +26,13 @@ import { useConfirmarPagos, usePagosMacroGest } from "../queries/use-pagos-macro
 import { useResumen } from "../queries/use-resumen";
 import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
 import { usePrestamos, useVencimientos } from "../queries/use-prestamos";
-import type { Agrupacion, Moneda, VencimientoDto } from "../types";
+import type {
+  Agrupacion,
+  FilaPropuesta,
+  Moneda,
+  PrecargaPrestamo,
+  VencimientoDto,
+} from "../types";
 
 type Pestania = "vencimientos" | "operaciones" | "resumen" | "conciliacion" | "pagos";
 
@@ -49,6 +55,28 @@ export function PrestamosPage() {
   const [importando, setImportando] = useState(false);
   const [agrupacion, setAgrupacion] = useState<Agrupacion>("mes");
   const [agrupaVto, setAgrupaVto] = useState<AgrupacionVencimientos>("ninguna");
+  const [precarga, setPrecarga] = useState<PrecargaPrestamo | null>(null);
+
+  /**
+   * Abre el alta con lo que el banco ya sabe. Para un préstamo de una sola cuota eso es todo lo
+   * que hace falta; para uno en cuotas queda el asistente de cronograma, que arranca con la
+   * cantidad y el primer vencimiento ya puestos.
+   */
+  const darDeAlta = (fila: FilaPropuesta) => {
+    setPrecarga({
+      banco: fila.banco,
+      nroOperacion: fila.nroOperacion,
+      moneda: fila.moneda,
+      capitalOriginal: fila.capitalUsd,
+      fechaOtorgamiento: fila.fecha,
+      tasaNominalAnual: fila.tasaNominalAnual,
+      cantidadCuotas: fila.cantidadCuotas,
+      periodicidad: fila.periodicidad,
+      primerVencimiento: fila.vencimiento,
+      concepto: fila.concepto,
+    });
+    setEditando(0);   // 0 = alta
+  };
 
   const exportarPlantilla = useExportarPlantilla();
   const exportarReporte = useExportarReporte();
@@ -101,7 +129,14 @@ export function PrestamosPage() {
                 <Button variant="outline" size="sm" onClick={() => setImportando(true)}>
                   <FileUp className="size-4" /> Importar
                 </Button>
-                <Button variant="accent" size="sm" onClick={() => setEditando(0)}>
+                <Button
+                  variant="accent"
+                  size="sm"
+                  onClick={() => {
+                    setPrecarga(null);
+                    setEditando(0);
+                  }}
+                >
                   <Plus className="size-4" /> Nuevo préstamo
                 </Button>
               </>
@@ -230,6 +265,7 @@ export function PrestamosPage() {
                 onReintentar={() => void conciliacion.refetch()}
                 onDescartar={(input) => descartar.mutate(input)}
                 onQuitarDescarte={(id) => quitarDescarte.mutate(id)}
+                onDarDeAlta={darDeAlta}
                 puedeGestionar={puedeGestionar}
               />
             </TabsContent>
@@ -239,8 +275,12 @@ export function PrestamosPage() {
 
       <PrestamoDialog
         prestamoId={editando}
-        onClose={() => setEditando(null)}
+        onClose={() => {
+          setEditando(null);
+          setPrecarga(null);   // el próximo alta arranca en blanco
+        }}
         monedaPorDefecto={moneda}
+        precarga={precarga}
       />
       <PagarCuotaDialog cuota={pagando} onClose={() => setPagando(null)} />
       <ImportarDialog open={importando} onClose={() => setImportando(false)} />
