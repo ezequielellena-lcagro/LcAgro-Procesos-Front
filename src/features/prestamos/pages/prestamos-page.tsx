@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, FileUp, Plus, Printer } from "lucide-react";
+import { Download, FileUp, Plus, Printer, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,6 +9,7 @@ import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { ConciliacionPanel } from "../components/conciliacion-panel";
+import { CatalogosDialog } from "../components/catalogos-dialog";
 import { ImportarDialog } from "../components/importar-dialog";
 import { OperacionesTable } from "../components/operaciones-table";
 import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
@@ -23,9 +24,14 @@ import {
 } from "../components/vencimientos-table";
 import { useConciliacion, useDescartar, useQuitarDescarte } from "../queries/use-conciliacion";
 import { useConfirmarPagos, usePagosMacroGest } from "../queries/use-pagos-macrogest";
+import {
+  useActualizarCatalogo,
+  useCrearCatalogo,
+  useEliminarCatalogo,
+} from "../queries/use-prestamo-mutations";
 import { useResumen } from "../queries/use-resumen";
 import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
-import { usePrestamos, useVencimientos } from "../queries/use-prestamos";
+import { useCatalogosAdmin, usePrestamos, useVencimientos } from "../queries/use-prestamos";
 import type {
   Agrupacion,
   FilaPropuesta,
@@ -56,6 +62,13 @@ export function PrestamosPage() {
   const [agrupacion, setAgrupacion] = useState<Agrupacion>("mes");
   const [agrupaVto, setAgrupaVto] = useState<AgrupacionVencimientos>("ninguna");
   const [precarga, setPrecarga] = useState<PrecargaPrestamo | null>(null);
+  const [administrando, setAdministrando] = useState(false);
+
+  // Los catálogos se piden recién al abrir el diálogo: es la pantalla que menos se usa.
+  const catalogosAdmin = useCatalogosAdmin(administrando);
+  const crearCatalogo = useCrearCatalogo();
+  const actualizarCatalogo = useActualizarCatalogo();
+  const eliminarCatalogo = useEliminarCatalogo();
 
   /**
    * Abre el alta con lo que el banco ya sabe. Para un préstamo de una sola cuota eso es todo lo
@@ -128,6 +141,9 @@ export function PrestamosPage() {
               <>
                 <Button variant="outline" size="sm" onClick={() => setImportando(true)}>
                   <FileUp className="size-4" /> Importar
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setAdministrando(true)}>
+                  <Settings2 className="size-4" /> Bancos y líneas
                 </Button>
                 <Button
                   variant="accent"
@@ -284,6 +300,19 @@ export function PrestamosPage() {
       />
       <PagarCuotaDialog cuota={pagando} onClose={() => setPagando(null)} />
       <ImportarDialog open={importando} onClose={() => setImportando(false)} />
+
+      <CatalogosDialog
+        open={administrando}
+        onClose={() => setAdministrando(false)}
+        datos={catalogosAdmin.data}
+        cargando={catalogosAdmin.isLoading}
+        onCrear={(tipo, input) => crearCatalogo.mutate({ tipo, ...input })}
+        onActualizar={(tipo, id, input) => actualizarCatalogo.mutate({ tipo, id, ...input })}
+        onEliminar={(tipo, id) => eliminarCatalogo.mutate({ tipo, id })}
+        guardando={
+          crearCatalogo.isPending || actualizarCatalogo.isPending || eliminarCatalogo.isPending
+        }
+      />
     </>
   );
 }

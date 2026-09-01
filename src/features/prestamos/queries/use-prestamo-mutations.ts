@@ -2,6 +2,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import type {
+  CatalogoAdminDto,
+  CatalogoInput,
+  CatalogoTipo,
   CronogramaInput,
   CuotaPropuesta,
   PagarCuotaInput,
@@ -107,6 +110,68 @@ export function useSimularCronograma() {
         input,
       );
       return data;
+    },
+  });
+}
+
+// ── Catálogos ─────────────────────────────────────────────────────────────
+
+/**
+ * Bancos y líneas. Los tres verbos comparten la invalidación porque los desplegables del alta
+ * salen del mismo catálogo que la pantalla de administración.
+ */
+function useInvalidarCatalogos() {
+  const qc = useQueryClient();
+  return () => {
+    qc.invalidateQueries({ queryKey: prestamosKeys.catalogos() });
+    qc.invalidateQueries({ queryKey: prestamosKeys.catalogosAdmin() });
+  };
+}
+
+export function useCrearCatalogo() {
+  const invalidar = useInvalidarCatalogos();
+  return useMutation({
+    mutationFn: async ({ tipo, ...input }: CatalogoInput & { tipo: CatalogoTipo }) => {
+      const { data } = await apiClient.post<CatalogoAdminDto>(
+        `/prestamos/catalogos/${tipo}`,
+        input,
+      );
+      return data;
+    },
+    onSuccess: (item) => {
+      invalidar();
+      toast.success(`${item.nombre} agregado.`);
+    },
+  });
+}
+
+export function useActualizarCatalogo() {
+  const invalidar = useInvalidarCatalogos();
+  return useMutation({
+    mutationFn: async ({ tipo, id, ...input }: CatalogoInput & { tipo: CatalogoTipo; id: number }) => {
+      const { data } = await apiClient.put<CatalogoAdminDto>(
+        `/prestamos/catalogos/${tipo}/${id}`,
+        input,
+      );
+      return data;
+    },
+    onSuccess: (item) => {
+      invalidar();
+      // Desactivar es lo que más se usa y lo que menos se ve: conviene decirlo.
+      toast.success(item.activo ? `${item.nombre} guardado.` : `${item.nombre} quedó desactivado.`);
+    },
+  });
+}
+
+export function useEliminarCatalogo() {
+  const invalidar = useInvalidarCatalogos();
+  return useMutation({
+    mutationFn: async ({ tipo, id }: { tipo: CatalogoTipo; id: number }) => {
+      await apiClient.delete(`/prestamos/catalogos/${tipo}/${id}`);
+    },
+    onSuccess: () => {
+      invalidar();
+      toast.success("Eliminado del catálogo.");
     },
   });
 }

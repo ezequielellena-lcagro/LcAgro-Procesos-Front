@@ -1,5 +1,8 @@
 import { http, HttpResponse } from "msw";
 import type {
+  AdministrarCatalogos,
+  CatalogoAdminDto,
+  CatalogoInput,
   CatalogosPrestamos,
   CuotaDto,
   CuotaPropuesta,
@@ -18,18 +21,22 @@ const API = env.apiUrl;
  * Datos de ejemplo con la FORMA de la cartera real (una operación multicuota, varias bullet, dos en
  * pesos), pero con importes redondeados: la deuda bancaria de la empresa no va a un repo.
  */
-const BANCOS = [
-  { id: 1, nombre: "NACIÓN", esFinanciacionProveedor: false },
-  { id: 2, nombre: "GALICIA", esFinanciacionProveedor: false },
-  { id: 3, nombre: "SANTANDER", esFinanciacionProveedor: false },
-  { id: 4, nombre: "MACRO", esFinanciacionProveedor: false },
+const BANCOS: CatalogoAdminDto[] = [
+  { id: 1, nombre: "NACIÓN", esFinanciacionProveedor: false, activo: true, enUso: 0 },
+  { id: 2, nombre: "GALICIA", esFinanciacionProveedor: false, activo: true, enUso: 0 },
+  { id: 3, nombre: "SANTANDER", esFinanciacionProveedor: false, activo: true, enUso: 0 },
+  { id: 4, nombre: "MACRO", esFinanciacionProveedor: false, activo: true, enUso: 0 },
 ];
 
-const LINEAS = [
-  { id: 1, nombre: "CAPITAL DE TRABAJO", esFinanciacionProveedor: false },
-  { id: 2, nombre: "AGRO BAYER", esFinanciacionProveedor: true },
-  { id: 3, nombre: "BUNGE", esFinanciacionProveedor: true },
+const LINEAS: CatalogoAdminDto[] = [
+  { id: 1, nombre: "CAPITAL DE TRABAJO", esFinanciacionProveedor: false, activo: true, enUso: 0 },
+  { id: 2, nombre: "AGRO BAYER", esFinanciacionProveedor: true, activo: true, enUso: 0 },
+  { id: 3, nombre: "BUNGE", esFinanciacionProveedor: true, activo: true, enUso: 0 },
 ];
+
+/** Cuántos préstamos del demo usan ese banco o esa línea. */
+const usos = (id: number, que: "banco" | "linea") =>
+  detalles.filter((p) => (que === "banco" ? p.bancoId : p.lineaCreditoId) === id).length;
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
@@ -431,8 +438,61 @@ export const prestamosHandlers = [
   ),
 
   http.get(`${API}/prestamos/catalogos`, () =>
-    HttpResponse.json({ bancos: BANCOS, lineas: LINEAS } satisfies CatalogosPrestamos),
+    HttpResponse.json({
+      bancos: BANCOS.filter((b) => b.activo),
+      lineas: LINEAS.filter((l) => l.activo),
+    } satisfies CatalogosPrestamos),
   ),
+
+  // ── Administración de catálogos ─────────────────────────────────────────
+  // El modo demo edita las listas en memoria: alcanza para ver cómo se comporta la pantalla.
+
+  http.get(`${API}/prestamos/catalogos/administrar`, () =>
+    HttpResponse.json({
+      bancos: BANCOS.map((b) => ({ ...b, enUso: usos(b.id, "banco") })),
+      lineas: LINEAS.map((l) => ({ ...l, enUso: usos(l.id, "linea") })),
+    } satisfies AdministrarCatalogos),
+  ),
+
+  http.post(`${API}/prestamos/catalogos/:tipo`, async ({ params, request }) => {
+    const lista = params.tipo === "bancos" ? BANCOS : LINEAS;
+    const input = (await request.json()) as CatalogoInput;
+    // El nombre del mensaje es el que YA existe, no el que se tipeó: así se ve cuál es el choque.
+    const choque = lista.find((x) => x.nombre.toLowerCase() === input.nombre.toLowerCase());
+    if (choque) return HttpResponse.json({ detail: `Ya existe '${choque.nombre}'.` }, { status: 409 });
+
+    const item = { ...input, id: Math.max(0, ...lista.map((x) => x.id)) + 1 };
+    lista.push(item);
+    return HttpResponse.json({ ...item, enUso: 0 });
+  }),
+
+  http.put(`${API}/prestamos/catalogos/:tipo/:id`, async ({ params, request }) => {
+    const lista = params.tipo === "bancos" ? BANCOS : LINEAS;
+    const item = lista.find((x) => x.id === Number(params.id));
+    if (!item) return HttpResponse.json({ detail: "Recurso no encontrado." }, { status: 404 });
+
+    Object.assign(item, await request.json());
+    return HttpResponse.json({
+      ...item,
+      enUso: usos(item.id, params.tipo === "bancos" ? "banco" : "linea"),
+    });
+  }),
+
+  http.delete(`${API}/prestamos/catalogos/:tipo/:id`, ({ params }) => {
+    const lista = params.tipo === "bancos" ? BANCOS : LINEAS;
+    const i = lista.findIndex((x) => x.id === Number(params.id));
+    if (i < 0) return HttpResponse.json({ detail: "Recurso no encontrado." }, { status: 404 });
+
+    const enUso = usos(lista[i].id, params.tipo === "bancos" ? "banco" : "linea");
+    if (enUso > 0)
+      return HttpResponse.json(
+        { detail: `No se puede borrar '${lista[i].nombre}': lo usan ${enUso} préstamo(s).` },
+        { status: 409 },
+      );
+
+    lista.splice(i, 1);
+    return new HttpResponse(null, { status: 204 });
+  }),
 
   http.get(`${API}/prestamos/:id`, ({ params }) => {
     const p = detalles.find((x) => x.id === Number(params.id));

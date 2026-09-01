@@ -1,6 +1,7 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
 import type {
+  AdministrarCatalogos,
   CatalogosPrestamos,
   PrestamoDetalleDto,
   PrestamoFiltros,
@@ -57,5 +58,20 @@ export function useCatalogosPrestamos() {
       return data;
     },
     staleTime: 30 * 60 * 1000,
+  });
+}
+
+/**
+ * La vista de administración: todos, con su estado y cuántos préstamos usan cada uno. Sin
+ * `staleTime`: acá se está editando, y ver algo viejo es peor que un pedido de más.
+ */
+export function useCatalogosAdmin(habilitado: boolean) {
+  return useQuery({
+    queryKey: prestamosKeys.catalogosAdmin(),
+    queryFn: async () => {
+      const { data } = await apiClient.get<AdministrarCatalogos>("/prestamos/catalogos/administrar");
+      return data;
+    },
+    enabled: habilitado,
   });
 }

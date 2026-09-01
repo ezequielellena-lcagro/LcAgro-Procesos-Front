@@ -145,6 +145,27 @@ export interface CatalogosPrestamos {
   lineas: CatalogoItemDto[];
 }
 
+/** Un banco o una línea en la vista de administración: se ven también los desactivados. */
+export interface CatalogoAdminDto extends CatalogoItemDto {
+  activo: boolean;
+  /** Cuántos préstamos lo usan. Con uno o más se puede desactivar, pero no borrar. */
+  enUso: number;
+}
+
+export interface AdministrarCatalogos {
+  bancos: CatalogoAdminDto[];
+  lineas: CatalogoAdminDto[];
+}
+
+/** Qué catálogo se está tocando. La API tiene la misma forma para los dos. */
+export type CatalogoTipo = "bancos" | "lineas";
+
+export interface CatalogoInput {
+  nombre: string;
+  esFinanciacionProveedor: boolean;
+  activo: boolean;
+}
+
 export interface PrestamoFiltros {
   moneda?: Moneda;
   bancoId?: number;

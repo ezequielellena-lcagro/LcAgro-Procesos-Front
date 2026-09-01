@@ -8,7 +8,8 @@ const API = env.apiUrl;
 const USUARIOS: Record<string, User> = {
   "admin@lcagro.local": {
     id: 1, nombre: "Admin Demo", email: "admin@lcagro.local",
-    roles: ["dashboard", "posicion", "stockfisico", "produccionpropia", "volumenacopiado", "cuentas", "proveedores", "semilla", "stock", "planificacion-vendedores", "usuarios", "config", "auditoria"],
+    // Todas las pantallas de Pantallas.cs: es el usuario con el que se recorre el demo entero.
+    roles: ["dashboard", "posicion", "cuentas", "semilla", "stock", "stockfisico", "produccionpropia", "volumenacopiado", "comisiones", "proveedores", "prestamos", "planificacion-vendedores", "usuarios", "config", "auditoria"],
   },
   "operador@lcagro.local": {
     id: 2, nombre: "Operador Acopio", email: "operador@lcagro.local",
