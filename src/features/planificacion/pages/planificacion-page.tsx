@@ -1,8 +1,10 @@
+import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { ErrorState } from "@/shared/components/error-state";
 import { PageHeader } from "@/shared/components/page-header";
 import { useDebounce } from "@/shared/hooks/use-debounce";
@@ -16,6 +18,7 @@ import {
   CORTE_VIVO_PLANIFICACION,
 } from "../queries/keys";
 import { campaniaInicial, useCampaniasConPlan } from "../queries/use-campanias-con-plan";
+import { useSincronizarPadron } from "../queries/use-sincronizar-padron";
 import { useSnapshotsPlanificacion } from "../queries/use-snapshots-planificacion";
 import { useTableroPlanificacion } from "../queries/use-tablero-planificacion";
 import type {
@@ -43,6 +46,7 @@ export function PlanificacionPage() {
   // La campaña vigente por almanaque suele estar vacía (arranca el 1 de abril). Se abre en la más
   // reciente CON plan cargado; hasta que llega la lista se muestra la del almanaque.
   const campaniasConPlan = useCampaniasConPlan();
+  const sincronizacion = useSincronizarPadron();
   // null = el usuario todavía no eligió; vale la sugerida. Derivado, sin efecto ni setState.
   const [campaniaManual, setCampaniaManual] = useState<string | null>(null);
   const [snapshotId, setSnapshotId] = useState<number | null>(null);
@@ -124,6 +128,24 @@ export function PlanificacionPage() {
                 {soloLectura ? "Datos de la foto" : "Corte vivo generado"}{" "}
                 {fechaHoraPlanificacion(data.generadoEn)}
               </span>
+            )}
+            {/* Sobre una foto no tiene sentido: el padrón se refresca contra los datos vivos. */}
+            {!soloLectura && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mb-0.5"
+                disabled={sincronizacion.isPending}
+                onClick={() => sincronizacion.mutate()}
+                title="Trae de MacroGest las altas, bajas y cambios de vendedor del padrón de clientes."
+              >
+                <RefreshCw
+                  className={cn("size-3.5", sincronizacion.isPending && "animate-spin")}
+                  aria-hidden
+                />
+                {sincronizacion.isPending ? "Sincronizando…" : "Sincronizar padrón"}
+              </Button>
             )}
             <label className="text-xs font-medium text-ink-soft">
               Corte

@@ -14,6 +14,7 @@ import type {
   ReferenciaSnapshotPlanificacion,
   SegmentacionFiltros,
   SegmentacionListadoDto,
+  SincronizacionProductoresDto,
   SnapshotPlanificacionDto,
   SnapshotsPlanificacionFiltros,
   TableroFiltros,
@@ -174,5 +175,17 @@ export async function acordarObjetivo(
  */
 export async function listarCampaniasConPlan(): Promise<string[]> {
   const { data } = await apiClient.get<string[]>(`${BASE}/plan-siembra/campanias-con-plan`);
+  return data;
+}
+
+/**
+ * Copia el padrón de clientes de MacroGest a la base propia. Es un upsert por cuenta: pisa los
+ * datos que manda el ERP y respeta los locales (si el productor participa del proceso, la
+ * sucursal). Nunca escribe en MacroGest.
+ */
+export async function sincronizarPadronProductores(): Promise<SincronizacionProductoresDto> {
+  const { data } = await apiClient.post<SincronizacionProductoresDto>(
+    `${BASE}/productores/sincronizar`,
+  );
   return data;
 }

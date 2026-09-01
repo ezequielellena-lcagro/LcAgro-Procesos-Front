@@ -17,6 +17,13 @@ vi.mock("../queries/use-tablero-planificacion", () => ({
   useTableroPlanificacion: vi.fn(),
 }));
 
+// El botón de sincronizar padrón no participa de estos casos, pero su mutación pide un QueryClient.
+const sincronizar = vi.fn();
+let sincronizando = false;
+vi.mock("../queries/use-sincronizar-padron", () => ({
+  useSincronizarPadron: () => ({ mutate: sincronizar, isPending: sincronizando }),
+}));
+
 // La página consulta qué campañas tienen plan para abrir donde hay datos. Acá no interesa la
 // sugerencia: estos casos fijan la campaña a mano, y sin el mock el hook pide un QueryClient.
 vi.mock("../queries/use-campanias-con-plan", async () => ({
@@ -98,6 +105,7 @@ describe("cortes del tablero de planificación", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-28T12:00:00-03:00"));
     vi.clearAllMocks();
+    sincronizando = false;
     vi.mocked(useTableroPlanificacion).mockReturnValue(resultadoTablero());
     vi.mocked(useSnapshotsPlanificacion).mockReturnValue(resultadoSnapshots());
   });
@@ -222,5 +230,26 @@ describe("cortes del tablero de planificación", () => {
 
     fireEvent.change(screen.getByLabelText("Corte"), { target: { value: "41" } });
     expect(screen.getByText(/Capturada el 31\/3\/26.*23:30/)).toBeInTheDocument();
+  });
+
+  it("sincroniza el padron a pedido y avisa mientras corre", () => {
+    render(<PlanificacionPage />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar padrón" }));
+    expect(sincronizar).toHaveBeenCalledTimes(1);
+  });
+
+  it("bloquea el boton mientras la sincronizacion esta en curso", () => {
+    sincronizando = true;
+    render(<PlanificacionPage />);
+
+    expect(screen.getByRole("button", { name: "Sincronizando…" })).toBeDisabled();
+  });
+
+  it("no ofrece sincronizar sobre una foto: el padron se refresca contra el vivo", () => {
+    render(<PlanificacionPage />);
+    fireEvent.change(screen.getByLabelText("Corte"), { target: { value: "41" } });
+
+    expect(screen.queryByRole("button", { name: /Sincronizar padrón/ })).not.toBeInTheDocument();
   });
 });

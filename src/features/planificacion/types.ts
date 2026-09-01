@@ -629,3 +629,22 @@ export interface ProductorPlanificacionHistoricoDto {
   snapshot: SnapshotPlanificacionDto;
   detalle: ProductorTableroDetalleDto;
 }
+
+/**
+ * Resultado de copiar el padrón de clientes de MacroGest a la base propia.
+ *
+ * El productor de este módulo es el cliente de MacroGest más lo que MacroGest no guarda: plan de
+ * siembra, facturación de Bayer cruzada, si participa del proceso y la sucursal. Por eso hay una
+ * copia local, y por eso hay que refrescarla cuando el cliente da de alta o reasigna cuentas.
+ */
+export interface SincronizacionProductoresDto {
+  leidosMacroGest: number;
+  creados: number;
+  actualizados: number;
+  nombresVendedorActualizados: number;
+  sinCambios: number;
+  omitidos: number;
+  sinCuit: number;
+  sinVendedor: number;
+  sinLocalidad: number;
+}
