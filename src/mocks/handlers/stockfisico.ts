@@ -8,6 +8,9 @@ const API = env.apiUrl;
 // P10 del consolidado por cereal, para que la pantalla cuadre. Silobolsa en 0 (pendiente de carga).
 const DATA: StockCerealDto = {
   fecha: "2026-07-27",
+  campania: null,
+  campanias: ["2025-2026", "2024-2025"],
+  plantasOtrasCampaniasTn: 0,
   silobolsaPendiente: true,
   consolidado: [
     { cereal: "Soja", p15: 12283, p20: 2461, p10: 15552, silobolsa: 0, total: 30296 },
@@ -33,8 +36,57 @@ const DATA: StockCerealDto = {
   ],
 };
 
+/**
+ * Acota la demo a una campaña como lo hace el backend: en el mock solo hay campaña en planta 10 y en
+ * las alertas, así que se recalcula el P10 del consolidado y los totales de fijación sobre lo que queda.
+ */
+function porCampania(campania: string): StockCerealDto {
+  const clave = campania.replace("-", "");
+  const detallePlanta10 = DATA.detallePlanta10.filter((d) => d.campania === clave);
+  const p10De = (cereal: string) =>
+    detallePlanta10.filter((d) => d.cereal === cereal).reduce((acc, d) => acc + d.aFijarTn, 0);
+  // En la demo todo el saldo de plantas está imputado a la campaña vigente; al mirar una anterior
+  // queda afuera y la pantalla lo informa, como pasa con los residuos reales de saldo_planta_v.
+  const enPlantas = clave === "20252026";
+  const consolidado = DATA.consolidado
+    .map((c) => ({
+      ...c,
+      p15: enPlantas ? c.p15 : 0,
+      p20: enPlantas ? c.p20 : 0,
+      p10: p10De(c.cereal),
+      total: (enPlantas ? c.p15 + c.p20 : 0) + p10De(c.cereal) + c.silobolsa,
+    }))
+    .filter((c) => c.total !== 0);
+  const vencidos = detallePlanta10.filter((d) => d.estado === "Vencido");
+  const proximos = detallePlanta10.filter((d) => d.diasParaVto !== null && d.diasParaVto >= 0 && d.diasParaVto <= 30);
+  const suma = (get: (c: (typeof consolidado)[number]) => number) => consolidado.reduce((a, c) => a + get(c), 0);
+
+  return {
+    ...DATA,
+    campania,
+    plantasOtrasCampaniasTn: enPlantas ? 0 : DATA.totales.p15 + DATA.totales.p20,
+    consolidado,
+    detallePlanta10,
+    alertasDescarga: DATA.alertasDescarga.filter((a) => a.campania === clave),
+    totales: {
+      p15: suma((c) => c.p15),
+      p20: suma((c) => c.p20),
+      p10: suma((c) => c.p10),
+      silobolsa: suma((c) => c.silobolsa),
+      total: suma((c) => c.total),
+      vencidoTn: vencidos.reduce((a, d) => a + d.aFijarTn, 0),
+      vencidoContratos: vencidos.length,
+      proximo30Tn: proximos.reduce((a, d) => a + d.aFijarTn, 0),
+      proximo30Contratos: proximos.length,
+    },
+  };
+}
+
 export const stockfisicoHandlers = [
-  http.get(`${API}/stock-cereal`, () => HttpResponse.json(DATA)),
+  http.get(`${API}/stock-cereal`, ({ request }) => {
+    const campania = new URL(request.url).searchParams.get("campania");
+    return HttpResponse.json(campania ? porCampania(campania) : DATA);
+  }),
 
   http.get(`${API}/stock-cereal/export`, () =>
     new HttpResponse(new Blob(["demo"]), {

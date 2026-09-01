@@ -13,8 +13,11 @@ function nombrePorDefecto(): string {
  */
 export function useStockCerealExport() {
   return useMutation({
-    mutationFn: async () => {
-      const res = await apiClient.get("/stock-cereal/export", { responseType: "blob" });
+    mutationFn: async (campania?: string) => {
+      const res = await apiClient.get("/stock-cereal/export", {
+        responseType: "blob",
+        params: campania ? { campania } : undefined,
+      });
       const filename = filenameFromContentDisposition(
         res.headers["content-disposition"],
         nombrePorDefecto(),

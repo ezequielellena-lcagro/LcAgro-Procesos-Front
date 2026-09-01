@@ -1,7 +1,11 @@
+import { useState } from "react";
+import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CampaniaSelect } from "@/shared/components/campania-select";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { ErrorState } from "@/shared/components/error-state";
 import { ExportButtons } from "@/shared/components/export-buttons";
+import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { KpiCard } from "@/shared/components/kpi-card";
 import { PageHeader } from "@/shared/components/page-header";
 import { fecha as fmtFecha, numero, oDash } from "@/shared/format/format";
@@ -10,6 +14,13 @@ import { FijacionVencidaCard } from "../components/fijacion-vencida-card";
 import { PlantaCard } from "../components/planta-card";
 import { PorCompradorCard } from "../components/por-comprador-card";
 import { porExportador, porRiesgo, type GrupoAFijar } from "../lib/a-fijar";
+import {
+  cerealesDe,
+  filtrarPorCereal,
+  filtrarPorVencimiento,
+  OPCIONES_VENCIMIENTO,
+  type FiltroVencimiento,
+} from "../lib/filtros";
 import { useStockCereal } from "../queries/use-stock-cereal";
 import { useStockCerealExport } from "../queries/use-stock-cereal-export";
 import type { AFijarDetalleDto, AlertaDescargaDto, ConsolidadoCerealDto, StockCerealDto } from "../types";
@@ -17,13 +28,25 @@ import type { AFijarDetalleDto, AlertaDescargaDto, ConsolidadoCerealDto, StockCe
 const campLabel = (c: string) => (c.length === 8 ? `${c.slice(0, 4)}-${c.slice(4)}` : c);
 
 export function StockFisicoPage() {
-  const query = useStockCereal();
+  // La campaña se resuelve en el backend (filtra las cuatro componentes, incluida la planilla de
+  // silobolsa del año); cereal y vencimiento son filtros de lectura sobre el reporte ya traído.
+  const [campania, setCampania] = useState("");
+  const [cerealSel, setCerealSel] = useState("");
+  const [vencimiento, setVencimiento] = useState<FiltroVencimiento>("");
+
+  const query = useStockCereal(campania || undefined);
   const exportar = useStockCerealExport();
+
+  const cereales = query.data ? cerealesDe(query.data) : [];
+  // Derivado: si al cambiar de campaña el cereal elegido ya no tiene stock, se vuelve a "Todos"
+  // en vez de dejar la pantalla vacía sin explicación.
+  const cereal = cereales.includes(cerealSel) ? cerealSel : "";
+  const filtrado = query.data ? filtrarPorCereal(query.data, cereal) : undefined;
 
   const cuerpo = query.isError ? (
     <ErrorState error={query.error} onRetry={() => void query.refetch()} />
-  ) : query.data ? (
-    <Reporte data={query.data} />
+  ) : filtrado ? (
+    <Reporte data={filtrado} vencimiento={vencimiento} />
   ) : (
     <Cargando />
   );
@@ -34,24 +57,77 @@ export function StockFisicoPage() {
         title="Stock Físico de Cereal"
         subtitle={
           query.data
-            ? `Existencia de grano propio por cereal · al ${fmtFecha(query.data.fecha)}`
+            ? `Existencia de grano propio por cereal · ${campania ? `campaña ${campania}` : "todas las campañas"} · al ${fmtFecha(query.data.fecha)}`
             : "Existencia de grano propio por cereal"
         }
         actions={
           <ExportButtons
-            onExcel={() => exportar.mutate()}
+            onExcel={() => exportar.mutate(campania || undefined)}
             excelLoading={exportar.isPending}
             excelDisabled={!query.data}
           />
         }
       />
+
+      <FilterBar>
+        <FilterField label="Campaña">
+          <CampaniaSelect
+            value={campania}
+            campanias={query.data?.campanias}
+            onChange={setCampania}
+            disabled={query.isPending}
+            todasLabel="Todas"
+          />
+        </FilterField>
+        <FilterField label="Cereal">
+          <Select
+            value={cereal}
+            onChange={(e) => setCerealSel(e.target.value)}
+            disabled={cereales.length === 0}
+          >
+            <option value="">Todos</option>
+            {cereales.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField
+          label="Vto. de fijación (planta 10)"
+          title="Aplica solo al bloque de planta 10: el grano no deja de estar en la planta porque su fijación venza más adelante."
+        >
+          <Select
+            value={vencimiento}
+            onChange={(e) => setVencimiento(e.target.value as FiltroVencimiento)}
+          >
+            {OPCIONES_VENCIMIENTO.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+      </FilterBar>
+
+      {(cereal || vencimiento) && (
+        <p className="-mt-2 mb-4 text-xs text-ink-soft">
+          Cereal y vencimiento filtran lo que se ve en pantalla; el Excel se descarga con la campaña
+          completa.
+        </p>
+      )}
+
       {cuerpo}
     </div>
   );
 }
 
-function Reporte({ data }: { data: StockCerealDto }) {
+function Reporte({ data, vencimiento }: { data: StockCerealDto; vencimiento: FiltroVencimiento }) {
   const t = data.totales;
+  // El filtro de vencimiento acota SOLO planta 10; el consolidado y los KPIs siguen mostrando la
+  // existencia completa. Los totales de esas tablas se rehacen sobre lo visible para no mentir.
+  const planta10 = filtrarPorVencimiento(data.detallePlanta10, vencimiento);
+  const planta10Tn = planta10.reduce((acc, d) => acc + d.aFijarTn, 0);
 
   const consolidadoCols: Column<ConsolidadoCerealDto>[] = [
     { key: "cereal", header: "Cereal", cell: (r) => r.cereal },
@@ -120,6 +196,16 @@ function Reporte({ data }: { data: StockCerealDto }) {
         </p>
       )}
 
+      {data.campania && data.plantasOtrasCampaniasTn !== 0 && (
+        <p className="rounded-card border border-line bg-panel-soft px-4 py-2 text-sm text-ink-soft">
+          Quedan <strong>{numero(data.plantasOtrasCampaniasTn)} tn</strong> de plantas 15/20 imputadas a
+          otras campañas, fuera de este filtro. MacroGest imputa el saldo de planta a la campaña del
+          movimiento, así que arrastra residuos de años anteriores —y pueden ser negativos, cuando el
+          grano entró imputado a un año y salió imputado a otro—. Sin filtro de campaña el total los
+          incluye: ese es el número que se concilia con Acopio.
+        </p>
+      )}
+
       <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
         <PlantaCard
           titulo="Planta 15"
@@ -167,10 +253,10 @@ function Reporte({ data }: { data: StockCerealDto }) {
         />
       </section>
 
-      {data.detallePlanta10.length > 0 && (
+      {planta10.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-2">
-          <PorCompradorCard filas={data.detallePlanta10} />
-          <FijacionVencidaCard filas={data.detallePlanta10} />
+          <PorCompradorCard filas={planta10} />
+          <FijacionVencidaCard filas={planta10} />
         </div>
       )}
 
@@ -180,9 +266,9 @@ function Reporte({ data }: { data: StockCerealDto }) {
         </h2>
         <DataTable
           columns={detalleCols}
-          rows={porRiesgo(data.detallePlanta10)}
+          rows={porRiesgo(planta10)}
           getRowKey={(r) => `${r.contrato}-${r.cereal}`}
-          footer={["TOTAL PLANTA 10", "", "", "", numero(t.p10), "", "", ""]}
+          footer={["TOTAL PLANTA 10", "", "", "", numero(planta10Tn), "", "", ""]}
           empty="Sin contratos a fijar."
         />
         <p className="mt-2 text-xs text-ink-soft">
@@ -200,17 +286,9 @@ function Reporte({ data }: { data: StockCerealDto }) {
         </p>
         <DataTable
           columns={grupoCols}
-          rows={porExportador(data.detallePlanta10)}
+          rows={porExportador(planta10)}
           getRowKey={(g) => `${g.cereal}-${g.exportador}-${g.via}`}
-          footer={[
-            "TOTAL",
-            "",
-            "",
-            String(data.detallePlanta10.length),
-            numero(t.p10),
-            "",
-            "",
-          ]}
+          footer={["TOTAL", "", "", String(planta10.length), numero(planta10Tn), "", ""]}
           empty="Sin contratos a fijar."
         />
       </section>

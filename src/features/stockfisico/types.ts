@@ -54,6 +54,15 @@ export interface AlertaDescargaDto {
 /** Reporte completo de stock físico de cereal. */
 export interface StockCerealDto {
   fecha: string;
+  /** Campaña a la que está acotado el reporte; null = la foto completa de hoy (todas). */
+  campania: string | null;
+  /** Campañas con stock o contratos a fijar, de la más nueva a la más vieja. */
+  campanias: string[];
+  /**
+   * Toneladas de plantas 15/20 que el filtro de campaña deja afuera (puede ser negativo: la vista de
+   * MacroGest imputa el saldo a la campaña del movimiento y arrastra residuos de años anteriores).
+   */
+  plantasOtrasCampaniasTn: number;
   consolidado: ConsolidadoCerealDto[];
   detallePlanta10: AFijarDetalleDto[];
   alertasDescarga: AlertaDescargaDto[];
