@@ -17,12 +17,7 @@ vi.mock("../queries/use-tablero-planificacion", () => ({
   useTableroPlanificacion: vi.fn(),
 }));
 
-// El botón de sincronizar padrón no participa de estos casos, pero su mutación pide un QueryClient.
-const sincronizar = vi.fn();
-let sincronizando = false;
-vi.mock("../queries/use-sincronizar-padron", () => ({
-  useSincronizarPadron: () => ({ mutate: sincronizar, isPending: sincronizando }),
-}));
+vi.mock("../components/datos-tab", () => ({ DatosTab: () => <div>Carga de datos</div> }));
 
 // La página consulta qué campañas tienen plan para abrir donde hay datos. Acá no interesa la
 // sugerencia: estos casos fijan la campaña a mano, y sin el mock el hook pide un QueryClient.
@@ -105,7 +100,6 @@ describe("cortes del tablero de planificación", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-28T12:00:00-03:00"));
     vi.clearAllMocks();
-    sincronizando = false;
     vi.mocked(useTableroPlanificacion).mockReturnValue(resultadoTablero());
     vi.mocked(useSnapshotsPlanificacion).mockReturnValue(resultadoSnapshots());
   });
@@ -232,24 +226,21 @@ describe("cortes del tablero de planificación", () => {
     expect(screen.getByText(/Capturada el 31\/3\/26.*23:30/)).toBeInTheDocument();
   });
 
-  it("sincroniza el padron a pedido y avisa mientras corre", () => {
+  it("no ofrece cargar datos sobre una foto: la importacion va contra el vivo", () => {
     render(<PlanificacionPage />);
+    expect(screen.getByRole("tab", { name: "Datos" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Sincronizar padrón" }));
-    expect(sincronizar).toHaveBeenCalledTimes(1);
-  });
-
-  it("bloquea el boton mientras la sincronizacion esta en curso", () => {
-    sincronizando = true;
-    render(<PlanificacionPage />);
-
-    expect(screen.getByRole("button", { name: "Sincronizando…" })).toBeDisabled();
-  });
-
-  it("no ofrece sincronizar sobre una foto: el padron se refresca contra el vivo", () => {
-    render(<PlanificacionPage />);
     fireEvent.change(screen.getByLabelText("Corte"), { target: { value: "41" } });
 
-    expect(screen.queryByRole("button", { name: /Sincronizar padrón/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Datos" })).not.toBeInTheDocument();
+  });
+
+  it("esconde el selector de corte cuando todavia no hay fotos guardadas", () => {
+    vi.mocked(useSnapshotsPlanificacion).mockReturnValue(resultadoSnapshots({ data: [] }));
+
+    render(<PlanificacionPage />);
+
+    expect(screen.queryByLabelText("Corte")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Campaña")).toBeInTheDocument();
   });
 });

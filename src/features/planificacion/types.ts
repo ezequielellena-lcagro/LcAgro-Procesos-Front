@@ -648,3 +648,117 @@ export interface SincronizacionProductoresDto {
   sinVendedor: number;
   sinLocalidad: number;
 }
+
+/* ── Importación del PLAN DE VENTAS.xlsx ───────────────────────────────────
+ * El Excel del cliente es la fuente de todo lo que MacroGest no guarda. Un mismo archivo alimenta
+ * dos importaciones distintas: el plan de siembra con sus costos (hoja "Ventas consolidado
+ * Clientes" + "Market Share.") y la facturación de Bayer.
+ *
+ * Las dos son en dos pasos: primero se analiza sin escribir y se devuelve un token, después se
+ * confirma con ese token. Nadie pisa datos sin ver antes qué va a cambiar.
+ */
+
+export interface ProblemaImportacionDto {
+  codigo: string;
+  mensaje: string;
+  filaId: string | null;
+}
+
+export interface CandidatoProductorImportacionDto {
+  productorId: number;
+  cuentaMacroGest: number | null;
+  razonSocial: string;
+}
+
+/** Fila cuyo productor no se pudo resolver solo; alguien tiene que elegir entre los candidatos. */
+export interface FilaPendienteImportacionDto {
+  filaId: string;
+  hoja: string;
+  fila: number;
+  razonSocialArchivo: string | null;
+  cuitEnmascarado: string | null;
+  candidatos: CandidatoProductorImportacionDto[];
+}
+
+export interface MercadoImportacionDto {
+  hectareasTotales: number;
+  mercadoUsd: number;
+  completo: boolean;
+  hectareasSinCosto: number;
+  cultivosSinCosto: string[];
+}
+
+export interface ImportacionPlanSiembraDto {
+  confirmado: boolean;
+  puedeConfirmar: boolean;
+  formato: string;
+  campania: string;
+  vigenteDesde: string;
+  tokenPreview: string | null;
+  filasLeidas: number;
+  filasAccionables: number;
+  filasResueltas: number;
+  productoresModificados: number;
+  planesAabrir: number;
+  planesAcerrar: number;
+  costosAabrir: number;
+  costosAcerrar: number;
+  errores: ProblemaImportacionDto[];
+  advertencias: ProblemaImportacionDto[];
+  pendientes: FilaPendienteImportacionDto[];
+  mercadoAntes: MercadoImportacionDto;
+  mercadoDespues: MercadoImportacionDto;
+}
+
+export interface PendienteBayerDto {
+  tipo: string;
+  referenciaEnmascarada: string;
+  hoja: string;
+  fila: number;
+}
+
+export interface ImportacionBayerDto {
+  confirmado: boolean;
+  yaImportado: boolean;
+  puedeConfirmar: boolean;
+  tokenPreview: string | null;
+  nombreArchivo: string;
+  formato: string;
+  campanias: string[];
+  filas: number;
+  filasConProductor: number;
+  filasConPlanAlImportar: number;
+  filasSinCoincidencia: number;
+  filasAmbiguas: number;
+  filasProductorDeshabilitado: number;
+  filasCuitInvalido: number;
+  filasVendedorPendiente: number;
+  filasSinVendedorPorDefinicion: number;
+  filasVendedorDiferente: number;
+  totalArchivoUsd: number;
+  totalConProductorUsd: number;
+  totalConPlanAlImportarUsd: number;
+  pendientes: PendienteBayerDto[];
+}
+
+export type EstadoBayerShare =
+  | "Deshabilitado"
+  | "Disponible"
+  | "NoConfigurado"
+  | "NoDisponible"
+  | "SinArchivoValido"
+  | "ArchivoDemasiadoGrande";
+
+/**
+ * Qué ve la app del archivo de comisiones que el cliente mantiene en el share ISO9001.
+ * No expone la ruta ni el nombre del archivo: los administra un tercero y podrían traer datos
+ * personales.
+ */
+export interface BayerShareEstadoDto {
+  estado: EstadoBayerShare;
+  habilitado: boolean;
+  disponible: boolean;
+  detalle: string;
+  tamanioBytes: number | null;
+  ultimaModificacionUtc: string | null;
+}

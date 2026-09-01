@@ -1,4 +1,3 @@
-import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -10,6 +9,7 @@ import { PageHeader } from "@/shared/components/page-header";
 import { useDebounce } from "@/shared/hooks/use-debounce";
 import { CarteraTab } from "../components/cartera-tab";
 import { ComparacionFuentes } from "../components/comparacion-fuentes";
+import { DatosTab } from "../components/datos-tab";
 import { ObjetivosTab } from "../components/objetivos-tab";
 import { SegmentacionModal } from "../components/segmentacion-modal";
 import { claveCampania, fechaHoraPlanificacion, ultimasCampanias } from "../lib/campanias";
@@ -18,7 +18,6 @@ import {
   CORTE_VIVO_PLANIFICACION,
 } from "../queries/keys";
 import { campaniaInicial, useCampaniasConPlan } from "../queries/use-campanias-con-plan";
-import { useSincronizarPadron } from "../queries/use-sincronizar-padron";
 import { useSnapshotsPlanificacion } from "../queries/use-snapshots-planificacion";
 import { useTableroPlanificacion } from "../queries/use-tablero-planificacion";
 import type {
@@ -27,7 +26,7 @@ import type {
   TableroFiltros,
 } from "../types";
 
-type Tab = "cartera" | "objetivos" | "conciliacion";
+type Tab = "cartera" | "objetivos" | "conciliacion" | "datos";
 
 function filtrosIniciales(campania: string): TableroFiltros {
   return { campania, orden: "Oportunidad", page: 1, pageSize: 50 };
@@ -46,7 +45,6 @@ export function PlanificacionPage() {
   // La campaña vigente por almanaque suele estar vacía (arranca el 1 de abril). Se abre en la más
   // reciente CON plan cargado; hasta que llega la lista se muestra la del almanaque.
   const campaniasConPlan = useCampaniasConPlan();
-  const sincronizacion = useSincronizarPadron();
   // null = el usuario todavía no eligió; vale la sugerida. Derivado, sin efecto ni setState.
   const [campaniaManual, setCampaniaManual] = useState<string | null>(null);
   const [snapshotId, setSnapshotId] = useState<number | null>(null);
@@ -71,6 +69,9 @@ export function PlanificacionPage() {
   const tablero = useTableroPlanificacion(filtrosConsulta, corte);
   const data = tablero.data;
   const soloLectura = corte.modo !== "vivo";
+  // Hay algo que elegir sólo si existe alguna foto, o si ya se eligió una que perdió sus metadatos:
+  // en ese caso el combo tiene que seguir en pantalla para poder volver al vivo.
+  const hayCortes = (snapshots.data?.length ?? 0) > 0 || snapshotId != null;
 
   function cambiarCampania(campania: string) {
     setCampaniaManual(campania);
@@ -129,44 +130,29 @@ export function PlanificacionPage() {
                 {fechaHoraPlanificacion(data.generadoEn)}
               </span>
             )}
-            {/* Sobre una foto no tiene sentido: el padrón se refresca contra los datos vivos. */}
-            {!soloLectura && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="mb-0.5"
-                disabled={sincronizacion.isPending}
-                onClick={() => sincronizacion.mutate()}
-                title="Trae de MacroGest las altas, bajas y cambios de vendedor del padrón de clientes."
-              >
-                <RefreshCw
-                  className={cn("size-3.5", sincronizacion.isPending && "animate-spin")}
-                  aria-hidden
-                />
-                {sincronizacion.isPending ? "Sincronizando…" : "Sincronizar padrón"}
-              </Button>
+            {/* Sin fotos guardadas el combo ofrece una sola opción y no elige nada: es ruido en el
+                encabezado. Aparece recién cuando hay contra qué comparar. */}
+            {hayCortes && (
+              <label className="text-xs font-medium text-ink-soft">
+                Corte
+                <Select
+                  className="mt-1 h-9 min-w-64 text-ink"
+                  value={snapshotId == null ? "vivo" : String(snapshotId)}
+                  onChange={(event) => cambiarCorte(event.target.value)}
+                  aria-describedby={snapshots.isError ? "snapshots-error" : undefined}
+                >
+                  <option value="vivo">Ahora · datos vivos</option>
+                  {snapshotId != null && !snapshotActivo && (
+                    <option value={snapshotId}>Foto seleccionada · metadatos no disponibles</option>
+                  )}
+                  {snapshots.data?.map((snapshot) => (
+                    <option key={snapshot.id} value={snapshot.id}>
+                      {etiquetaSnapshot(snapshot)}
+                    </option>
+                  ))}
+                </Select>
+              </label>
             )}
-            <label className="text-xs font-medium text-ink-soft">
-              Corte
-              <Select
-                className="mt-1 h-9 min-w-64 text-ink"
-                value={snapshotId == null ? "vivo" : String(snapshotId)}
-                onChange={(event) => cambiarCorte(event.target.value)}
-                aria-describedby={snapshots.isError ? "snapshots-error" : undefined}
-              >
-                <option value="vivo">Ahora · datos vivos</option>
-                {snapshotId != null && !snapshotActivo && (
-                  <option value={snapshotId}>Foto seleccionada · metadatos no disponibles</option>
-                )}
-                {snapshots.data?.map((snapshot) => (
-                  <option key={snapshot.id} value={snapshot.id}>
-                    {etiquetaSnapshot(snapshot)}
-                  </option>
-                ))}
-                {snapshots.isPending && <option disabled>Cargando fotos…</option>}
-              </Select>
-            </label>
             <label className="text-xs font-medium text-ink-soft">
               Campaña
               <Select
@@ -225,6 +211,8 @@ export function PlanificacionPage() {
               <TabsTrigger value="cartera">Cartera de productores</TabsTrigger>
               <TabsTrigger value="objetivos">Objetivos y avance</TabsTrigger>
               <TabsTrigger value="conciliacion">Conciliación</TabsTrigger>
+              {/* Sobre una foto no hay nada que cargar: la importación va contra los datos vivos. */}
+              {!soloLectura && <TabsTrigger value="datos">Datos</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="cartera">
@@ -255,6 +243,12 @@ export function PlanificacionPage() {
             <TabsContent value="conciliacion">
               <ComparacionFuentes tablero={data} soloLectura={soloLectura} />
             </TabsContent>
+
+            {!soloLectura && (
+              <TabsContent value="datos">
+                <DatosTab campania={data.campania} />
+              </TabsContent>
+            )}
           </Tabs>
 
           {configurando && !soloLectura && (
