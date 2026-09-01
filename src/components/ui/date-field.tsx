@@ -9,20 +9,44 @@ const MESES = [
 ];
 const DIAS = ["lu", "ma", "mi", "ju", "vi", "sá", "do"]; // semana arranca el lunes
 
+/** Cuántos años ofrece el desplegable hacia atrás y hacia adelante. */
+const ANIOS_ALREDEDOR = 10;
+
 const pad = (n: number) => String(n).padStart(2, "0");
 const toISO = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
 function parseISO(iso: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
 }
-/** ISO (YYYY-MM-DD) → dd/mm/yyyy para mostrar. */
+
+/** ISO (yyyy-mm-dd) → dd/mm/yyyy para mostrar. */
 function ddmmaaaa(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }
 
+/**
+ * dd/mm/aaaa escrito a mano → ISO, o `null` si todavía no es una fecha.
+ *
+ * Se valida que la fecha EXISTA y no sólo que tenga el formato: `new Date(2026, 1, 31)` no falla,
+ * se corre al 3 de marzo. Comparando los componentes se detecta que el 31 de febrero no existe.
+ */
+function desdeTexto(texto: string): string | null {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(texto.trim());
+  if (!m) return null;
+
+  const [dia, mes, anio] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const fecha = new Date(anio, mes - 1, dia);
+  const existe = fecha.getFullYear() === anio
+    && fecha.getMonth() === mes - 1
+    && fecha.getDate() === dia;
+
+  return existe ? toISO(fecha) : null;
+}
+
 interface Props {
-  /** Valor en formato ISO (YYYY-MM-DD). */
+  /** Valor en formato ISO (yyyy-mm-dd). */
   value: string;
   onChange: (value: string) => void;
   id?: string;
@@ -30,10 +54,14 @@ interface Props {
 }
 
 /**
- * Selector de fecha propio: muestra dd/mm/yyyy y abre un calendario en español, sin depender del
- * locale del navegador (el <input type="date"> nativo formatea según el idioma del navegador, no el
- * de la página). El valor viaja siempre como ISO YYYY-MM-DD. El panel se renderiza por PORTAL para no
- * quedar recortado por contenedores con overflow.
+ * Selector de fecha propio: se puede escribir dd/mm/aaaa o elegir del calendario, que está en
+ * español sin depender del idioma del navegador (el `<input type="date">` nativo formatea según el
+ * navegador, no según la página). El valor viaja siempre como ISO yyyy-mm-dd.
+ *
+ * <p>Poder escribir no es un lujo: con sólo flechas de mes, cargar una fecha de 2024 estando en
+ * 2026 son veinticinco clics. El calendario además lleva desplegables de mes y año.</p>
+ *
+ * <p>El panel se dibuja por PORTAL para no quedar recortado por contenedores con overflow.</p>
  */
 export function DateField({ value, onChange, id, disabled }: Props) {
   const [open, setOpen] = useState(false);
@@ -41,6 +69,10 @@ export function DateField({ value, onChange, id, disabled }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; arriba: boolean } | null>(null);
+
+  // Lo tipeado mientras se escribe. En null, el campo muestra `value`: así una fecha que cambia
+  // desde afuera se refleja sola, y lo que se está escribiendo no se pisa a mitad de camino.
+  const [borrador, setBorrador] = useState<string | null>(null);
 
   const medir = useCallback(() => {
     const el = rootRef.current;
@@ -82,7 +114,22 @@ export function DateField({ value, onChange, id, disabled }: Props) {
 
   const elegir = (dia: number) => {
     onChange(toISO(new Date(visible.getFullYear(), visible.getMonth(), dia)));
+    setBorrador(null);
     setOpen(false);
+  };
+
+  const escribir = (texto: string) => {
+    setBorrador(texto);
+    if (texto.trim() === "") {
+      onChange("");
+      return;
+    }
+    const iso = desdeTexto(texto);
+    if (iso) {
+      onChange(iso);
+      setVisible(parseISO(iso)!);
+    }
+    // Si no es una fecha todavía ("01/0") no se avisa nada: es alguien tipeando, no un error.
   };
 
   const anio = visible.getFullYear();
@@ -95,22 +142,51 @@ export function DateField({ value, onChange, id, disabled }: Props) {
     ...Array.from({ length: diasEnMes }, (_, i) => i + 1),
   ];
 
+  // El año del valor entra sí o sí, aunque caiga fuera del rango: si no, una fecha vieja no se
+  // podría ni mostrar en el desplegable.
+  const base = new Date().getFullYear();
+  const anios = [...new Set([
+    ...Array.from({ length: ANIOS_ALREDEDOR * 2 + 1 }, (_, i) => base - ANIOS_ALREDEDOR + i),
+    anio,
+  ])].sort((a, b) => a - b);
+
   return (
     <div ref={rootRef} className="relative">
-      <button
-        id={id}
-        type="button"
-        disabled={disabled}
-        onClick={() => (open ? setOpen(false) : abrir())}
+      <div
         className={cn(
-          "flex h-10 w-full items-center justify-between gap-2 rounded-md border border-input bg-panel px-3 text-sm text-ink",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          "disabled:cursor-not-allowed disabled:opacity-50",
+          "flex h-10 w-full items-center rounded-md border border-input bg-panel pr-1 text-sm text-ink",
+          "focus-within:outline-none focus-within:ring-2 focus-within:ring-ring",
+          disabled && "cursor-not-allowed opacity-50",
         )}
       >
-        <span className={value ? "tabular text-ink" : "text-ink-soft"}>{value ? ddmmaaaa(value) : "dd/mm/aaaa"}</span>
-        <Calendar className="size-4 shrink-0 text-ink-soft" />
-      </button>
+        <input
+          id={id}
+          type="text"
+          inputMode="numeric"
+          disabled={disabled}
+          placeholder="dd/mm/aaaa"
+          value={borrador ?? ddmmaaaa(value)}
+          onChange={(e) => escribir(e.target.value)}
+          // Lo que quedó a medias se descarta al salir: el campo vuelve a la fecha vigente.
+          onBlur={() => setBorrador(null)}
+          className={cn(
+            "h-full w-full min-w-0 rounded-md bg-transparent px-3 tabular outline-none",
+            "placeholder:text-ink-soft disabled:cursor-not-allowed",
+          )}
+        />
+        <button
+          type="button"
+          aria-label="Abrir calendario"
+          disabled={disabled}
+          onClick={() => (open ? setOpen(false) : abrir())}
+          className={cn(
+            "grid size-8 shrink-0 place-items-center rounded-md text-ink-soft",
+            "hover:bg-panel-soft hover:text-ink disabled:cursor-not-allowed",
+          )}
+        >
+          <Calendar className="size-4" />
+        </button>
+      </div>
 
       {open &&
         pos &&
@@ -125,7 +201,7 @@ export function DateField({ value, onChange, id, disabled }: Props) {
             }}
             className="w-[17rem] rounded-md border border-line bg-panel p-3 shadow-float"
           >
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2 flex items-center gap-1">
               <button
                 type="button"
                 aria-label="Mes anterior"
@@ -134,9 +210,34 @@ export function DateField({ value, onChange, id, disabled }: Props) {
               >
                 <ChevronLeft className="size-4" />
               </button>
-              <span className="text-sm font-medium capitalize text-ink">
-                {MESES[mes]} {anio}
-              </span>
+
+              {/* Desplegables y no sólo flechas: de 2026 a 2024 son veinticinco clics de flecha. */}
+              <select
+                aria-label="Mes"
+                value={mes}
+                onChange={(e) => setVisible(new Date(anio, Number(e.target.value), 1))}
+                className="min-w-0 flex-1 rounded-md border border-line bg-panel px-1 py-1 text-sm capitalize text-ink"
+              >
+                {MESES.map((m, i) => (
+                  <option key={m} value={i}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                aria-label="Año"
+                value={anio}
+                onChange={(e) => setVisible(new Date(Number(e.target.value), mes, 1))}
+                className="rounded-md border border-line bg-panel px-1 py-1 text-sm tabular text-ink"
+              >
+                {anios.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+
               <button
                 type="button"
                 aria-label="Mes siguiente"
@@ -180,6 +281,7 @@ export function DateField({ value, onChange, id, disabled }: Props) {
                 type="button"
                 onClick={() => {
                   onChange("");
+                  setBorrador(null);
                   setOpen(false);
                 }}
                 className="text-ink-soft hover:text-ink"
@@ -190,6 +292,7 @@ export function DateField({ value, onChange, id, disabled }: Props) {
                 type="button"
                 onClick={() => {
                   onChange(hoyISO);
+                  setBorrador(null);
                   setOpen(false);
                 }}
                 className="font-medium text-clementina-deep hover:underline"
