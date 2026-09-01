@@ -235,4 +235,19 @@ describe("solapa de carga de datos", () => {
     expect(screen.getByText(/62 filas no encontraron productor/i)).toBeInTheDocument();
     expect(screen.getByText("US$ 7.195.518,78")).toBeInTheDocument();
   });
+
+  it("dice en que campania va a quedar el plan antes de confirmar", () => {
+    planPreview = vistaPlan({ campania: "2026-2027" });
+    render(<DatosTab campania="2026-2027" />);
+
+    expect(screen.getByText(/Se va a cargar en la campaña/i)).toBeInTheDocument();
+    expect(screen.getByText("2026-2027")).toBeInTheDocument();
+  });
+
+  it("explica que hojas del Excel se leen, sin tener que preguntar", () => {
+    render(<DatosTab campania="2025-2026" />);
+
+    expect(screen.getByText("Ventas consolidado Clientes")).toBeInTheDocument();
+    expect(screen.getByText("Market Share.")).toBeInTheDocument();
+  });
 });

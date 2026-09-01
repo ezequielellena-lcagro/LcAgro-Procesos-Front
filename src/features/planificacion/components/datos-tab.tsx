@@ -122,10 +122,28 @@ function PlanSiembraCard({ campania }: { campania: string }) {
       descripcion={
         "Las hectáreas por cultivo de cada productor y el costo del insumo por hectárea. Es lo que " +
         "define el mercado: sin esto, mercado, participación y oportunidad quedan en cero aunque " +
-        "haya facturación. Subí el archivo del cliente tal cual, sin tocarlo."
+        "haya facturación."
       }
       error={preview.error ?? confirmar.error}
     >
+      {/* Lo primero que se pregunta cualquiera parado acá: qué archivo y si hay que prepararlo. */}
+      <div className="rounded-md border border-line bg-panel-soft p-3 text-xs leading-relaxed text-ink-soft">
+        Subí el <b className="text-ink">PLAN DE VENTAS.xlsx</b> tal cual, sin tocarlo. Se leen dos
+        hojas:
+        <ul className="mt-1.5 space-y-1">
+          <li>
+            <b className="text-ink">Ventas consolidado Clientes</b> — las hectáreas: razón social en
+            A, CUIT en B y los cultivos en D a G.
+          </li>
+          <li>
+            <b className="text-ink">Market Share.</b> — los costos: cultivo, quintales de insumo,
+            precio y rinde.
+          </li>
+        </ul>
+        <p className="mt-1.5">
+          El resto del archivo se ignora. Cada fila se cruza con el padrón por CUIT o por cuenta.
+        </p>
+      </div>
       <SelectorArchivo
         archivo={archivo}
         onElegir={elegir}
@@ -177,6 +195,15 @@ function ResumenPlanSiembra({ vista }: { vista: ImportacionPlanSiembraDto }) {
         <p className="flex items-center gap-1.5 rounded-md border border-verde/30 bg-verde/5 p-2.5 text-xs text-ink">
           <CheckCircle2 className="size-4 shrink-0 text-verde" aria-hidden />
           Importado. El tablero ya toma estos números.
+        </p>
+      )}
+
+      {/* El destino no es obvio: sale del selector de campaña del encabezado, no del archivo. Un
+          plan cargado en la campaña equivocada no rompe nada y no se nota hasta mucho después. */}
+      {!vista.confirmado && (
+        <p className="rounded-md border border-line bg-panel-soft p-2.5 text-xs text-ink">
+          Se va a cargar en la campaña <b>{vista.campania}</b>. Si no es esa, cambiala en el
+          encabezado y volvé a analizar.
         </p>
       )}
 
