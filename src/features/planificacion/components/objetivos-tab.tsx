@@ -290,16 +290,15 @@ export function ObjetivosTab({ objetivos, actualizando = false, soloLectura = fa
 
       {vista.coherencia.hayContradiccion && (
         <p className="rounded-md border border-rojo/40 bg-rojo/5 p-3 text-xs leading-relaxed text-ink">
-          <b className="text-rojo">Las líneas se contradicen.</b> El objetivo general obliga a Bayer
-          a crecer{" "}
+          <b className="text-rojo">Las líneas se contradicen.</b> El total de Bayer crece{" "}
           <b>
-            {oDash(vista.coherencia.crecimientoBayerImplicitoFraccion, (valor) =>
+            {oDash(vista.coherencia.crecimientoBayerGeneralFraccion, (valor) =>
               crecimiento(valor),
             )}
           </b>
-          , mientras las líneas Bayer declaran{" "}
+          , mientras las líneas Bayer de detalle declaran{" "}
           <b>
-            {oDash(vista.coherencia.crecimientoBayerDeclaradoFraccion, (valor) =>
+            {oDash(vista.coherencia.crecimientoBayerDetalleFraccion, (valor) =>
               crecimiento(valor),
             )}
           </b>

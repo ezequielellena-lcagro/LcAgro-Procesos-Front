@@ -17,6 +17,15 @@ vi.mock("../queries/use-tablero-planificacion", () => ({
   useTableroPlanificacion: vi.fn(),
 }));
 
+// La página consulta qué campañas tienen plan para abrir donde hay datos. Acá no interesa la
+// sugerencia: estos casos fijan la campaña a mano, y sin el mock el hook pide un QueryClient.
+vi.mock("../queries/use-campanias-con-plan", async () => ({
+  ...(await vi.importActual<typeof import("../queries/use-campanias-con-plan")>(
+    "../queries/use-campanias-con-plan",
+  )),
+  useCampaniasConPlan: () => ({ data: undefined }),
+}));
+
 vi.mock("../components/comparacion-fuentes", () => ({
   ComparacionFuentes: () => <div>Tablero visible</div>,
 }));
@@ -126,7 +135,8 @@ describe("cortes del tablero de planificación", () => {
 
     render(<PlanificacionPage />);
 
-    expect(screen.getByText("Tablero visible")).toBeInTheDocument();
+    // La conciliación vive en su propia solapa; lo que tiene que seguir en pie es la cartera.
+    expect(screen.getByText("Cartera")).toBeInTheDocument();
     expect(screen.getByText(/No se pudieron cargar las fotos guardadas/)).toBeInTheDocument();
   });
 

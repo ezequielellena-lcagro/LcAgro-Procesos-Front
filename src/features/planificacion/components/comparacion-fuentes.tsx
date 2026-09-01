@@ -77,7 +77,15 @@ export function ComparacionFuentes({ tablero, soloLectura }: Props) {
                 : usd(referencia.totalActualFuentesUsd)
             }
             totalDisponible={referencia.totalActualFuentesUsd != null}
-            detalle="Lo que la app lee HOY: la facturación de La Clementina en vivo desde MacroGest más el último Excel de Bayer importado. Es el alcance completo, antes de recortar por padrón y por los vendedores del proceso."
+            detalle={
+              soloLectura
+                ? "Lo que la app leyó al sacar la foto: la facturación de La Clementina en " +
+                  "MacroGest más el Excel de Bayer confirmado hasta ese momento. Es el alcance " +
+                  "completo, antes de recortar por padrón y por los vendedores del proceso."
+                : "Lo que la app lee HOY: la facturación de La Clementina en vivo desde " +
+                  "MacroGest más el último Excel de Bayer importado. Es el alcance completo, " +
+                  "antes de recortar por padrón y por los vendedores del proceso."
+            }
           >
             <FilaFuente
               etiqueta={soloLectura ? "LC fotografiado" : "LC vivo"}

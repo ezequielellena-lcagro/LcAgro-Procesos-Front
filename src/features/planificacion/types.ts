@@ -499,18 +499,21 @@ export interface ObjetivoVendedorDto {
   vigenteHasta: string | null;
 }
 
+/**
+ * Contraste entre el total de Bayer que declara la línea general y lo que declaran las líneas
+ * Bayer de detalle (Semilla Maíz, Adengo…). Si el total pide crecer 20% y los productos que lo
+ * componen declaran 8%, alguno de los dos números está mal.
+ */
 export interface CoherenciaObjetivosDto {
   evaluable: boolean;
   hayContradiccion: boolean;
   toleranciaFraccion: number;
   baseGeneralUsd: number | null;
   objetivoGeneralUsd: number | null;
-  baseLcUsd: number | null;
-  objetivoLcUsd: number | null;
-  baseBayerImplicitaUsd: number | null;
-  objetivoBayerImplicitoUsd: number | null;
-  crecimientoBayerImplicitoFraccion: number | null;
-  crecimientoBayerDeclaradoFraccion: number | null;
+  baseBayerDetalleUsd: number | null;
+  objetivoBayerDetalleUsd: number | null;
+  crecimientoBayerGeneralFraccion: number | null;
+  crecimientoBayerDetalleFraccion: number | null;
   motivoNoEvaluable: string | null;
 }
 

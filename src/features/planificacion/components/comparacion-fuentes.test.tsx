@@ -290,7 +290,18 @@ describe("ComparacionFuentes", () => {
       screen.getByRole("heading", { name: "Control indicativo al corte · depósitos 43/53" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Diferencia al momento del corte − histórica")).toBeInTheDocument();
-    expect(screen.queryByText(/actual|vivo/i)).not.toBeInTheDocument();
+    // Ninguno de los rótulos de modo vivo sobrevive a la foto. Se listan uno por uno en lugar de
+    // una regex /actual|vivo/: la prosa explicativa dice "se actualiza" y no es un rótulo.
+    for (const rotuloVivo of [
+      "Dato actual",
+      "Fuentes actuales",
+      "LC vivo",
+      "LC vivo vs. Excel",
+      "Bayer actual vs. Excel",
+      "Diferencia actual − histórica",
+    ]) {
+      expect(screen.queryByText(rotuloVivo)).not.toBeInTheDocument();
+    }
     expect(screen.getByText("US$ 13.396.528,69")).toBeInTheDocument();
     expect(screen.getByText("US$ 13.284.338,65")).toBeInTheDocument();
   });
