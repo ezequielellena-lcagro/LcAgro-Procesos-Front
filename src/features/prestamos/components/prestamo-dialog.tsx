@@ -17,6 +17,7 @@ import type { FilaCuota } from "../cronograma";
 import {
   useActualizarPrestamo,
   useCrearPrestamo,
+  useEliminarPrestamo,
   useReconstruirCronograma,
   useSimularCronograma,
 } from "../queries/use-prestamo-mutations";
@@ -34,6 +35,7 @@ import {
   type PrestamoDetalleDto,
 } from "../types";
 import { CronogramaEditor } from "./cronograma-editor";
+import { EliminarPrestamo } from "./eliminar-prestamo";
 import { ReconstruirCronograma } from "./reconstruir-cronograma";
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
@@ -284,6 +286,7 @@ function PrestamoForm({
   const actualizar = useActualizarPrestamo();
   const simular = useSimularCronograma();
   const reconstruir = useReconstruirCronograma();
+  const eliminar = useEliminarPrestamo();
 
   // Las cuotas anteriores se buscan en MacroGest sólo cuando se lo piden: pega contra la VPN.
   const [buscandoViejas, setBuscandoViejas] = useState(false);
@@ -574,6 +577,19 @@ function PrestamoForm({
       <Campo label="Observaciones" htmlFor="observaciones">
         <Textarea id="observaciones" rows={2} {...form.register("observaciones")} />
       </Campo>
+
+      {detalle && (
+        <EliminarPrestamo
+          prestamoId={detalle.id}
+          nroOperacion={detalle.nroOperacion}
+          cantidadCuotas={detalle.cuotas.length}
+          onEliminar={async (id, confirmacion) => {
+            await eliminar.mutateAsync({ id, confirmacion });
+            onClose();
+          }}
+          eliminando={eliminar.isPending}
+        />
+      )}
 
       {/* Pegado al pie: el formulario es largo y Guardar no se tiene que ir de la vista. */}
       <div className="sticky bottom-0 -mx-5 -mb-5 flex justify-end gap-2 border-t border-line bg-panel px-5 py-3.5">

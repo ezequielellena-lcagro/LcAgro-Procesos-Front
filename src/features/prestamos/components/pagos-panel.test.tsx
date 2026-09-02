@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ConciliacionPagos, PagoSugerido } from "../types";
+import type { ConciliacionPagos, PagoSugerido, VencimientoDto } from "../types";
 import { PagosPanel } from "./pagos-panel";
 
 function sugerido(over: Partial<PagoSugerido> = {}): PagoSugerido {
@@ -18,6 +18,7 @@ function sugerido(over: Partial<PagoSugerido> = {}): PagoSugerido {
     fechaPago: "2027-01-28",
     importeDebitado: 30646027.4,
     concepto: "CAPITAL CUOTA DE PRÉSTAMO · FAC A 00004-28078488",
+    nroComprobante: "28078488",
     importeCoincide: true,
     diferenciaArs: 0,
     ...over,
@@ -32,6 +33,27 @@ const DATOS: ConciliacionPagos = {
   hayPropuestas: true,
 };
 
+/** Las cuotas a las que se puede imputar a mano un débito que el sistema no supo atar. */
+const PENDIENTES: VencimientoDto[] = [1, 2].map((n) => ({
+  cuotaId: 90 + n,
+  prestamoId: 30,
+  banco: "SANTANDER",
+  sucursal: null,
+  linea: "PRENDARIO",
+  nroOperacion: "205796",
+  moneda: "ARS",
+  nroCuota: n,
+  cantidadCuotas: 12,
+  fechaVencimiento: n === 1 ? "2026-09-24" : "2026-10-24",
+  capital: 7143333.33,
+  interes: 0,
+  iva: 0,
+  total: 7143333.33,
+  tasaNominalAnual: 0,
+  estado: "Pendiente",
+  vencida: false,
+}));
+
 function renderPanel(over: Partial<Parameters<typeof PagosPanel>[0]> = {}) {
   return render(
     <PagosPanel
@@ -41,6 +63,7 @@ function renderPanel(over: Partial<Parameters<typeof PagosPanel>[0]> = {}) {
       onReintentar={vi.fn()}
       onConfirmar={vi.fn()}
       confirmando={false}
+      cuotasPendientes={PENDIENTES}
       puedeGestionar
       {...over}
     />,
@@ -61,7 +84,7 @@ describe("PagosPanel", () => {
     renderPanel({ onConfirmar });
 
     // El botón arranca deshabilitado: la propuesta no se aplica sola.
-    expect(screen.getByRole("button", { name: /imputar/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /imputar \d+ cuota/i })).toBeDisabled();
     expect(onConfirmar).not.toHaveBeenCalled();
   });
 
@@ -70,10 +93,10 @@ describe("PagosPanel", () => {
     renderPanel({ onConfirmar });
 
     fireEvent.click(screen.getByLabelText(/imputar la cuota 5/i));
-    fireEvent.click(screen.getByRole("button", { name: /imputar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /imputar \d+ cuota/i }));
 
     expect(onConfirmar).toHaveBeenCalledWith([
-      { cuotaId: 69, fechaPago: "2027-01-28", importePagado: 30646027.4 },
+      expect.objectContaining({ cuotaId: 69, fechaPago: "2027-01-28", importePagado: 30646027.4 }),
     ]);
   });
 
@@ -92,10 +115,10 @@ describe("PagosPanel", () => {
     });
 
     fireEvent.click(screen.getByLabelText(/imputar la cuota 5/i));
-    fireEvent.click(screen.getByRole("button", { name: /imputar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /imputar \d+ cuota/i }));
 
     expect(onConfirmar).toHaveBeenCalledWith([
-      { cuotaId: 69, fechaPago: "2027-01-28", importePagado: null },
+      expect.objectContaining({ cuotaId: 69, fechaPago: "2027-01-28", importePagado: null }),
     ]);
   });
 
@@ -123,7 +146,7 @@ describe("PagosPanel", () => {
     });
 
     fireEvent.click(screen.getByLabelText(/imputar todas/i));
-    fireEvent.click(screen.getByRole("button", { name: /imputar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /imputar \d+ cuota/i }));
 
     expect(onConfirmar.mock.calls[0][0]).toHaveLength(2);
   });
@@ -131,7 +154,7 @@ describe("PagosPanel", () => {
   it("sin gestión no muestra el botón de imputar", () => {
     renderPanel({ puedeGestionar: false });
 
-    expect(screen.queryByRole("button", { name: /imputar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /imputar \d+ cuota/i })).not.toBeInTheDocument();
   });
 
   /**
@@ -209,5 +232,88 @@ describe("PagosPanel", () => {
     renderPanel({ datos: undefined, cargando: true });
 
     expect(screen.getByText(/consultando macrogest/i)).toBeInTheDocument();
+  });
+
+  // ── Mapear a mano (Fase F) ──────────────────────────────────────────────
+
+  const conSinAtar = {
+    ...DATOS,
+    sinPrestamo: [
+      {
+        nroComprobante: "205796",
+        fecha: "2026-09-24",
+        importeArs: 7143333.33,
+        banco: "SANTANDER",
+        concepto: "CAPITAL CUOTA PRENDARIO",
+        prestamoId: null,
+        nroOperacion: null,
+      },
+    ],
+  };
+
+  /**
+   * El sistema no ata todo: un comprobante distinto del guardado, un préstamo cargado después.
+   * Antes eso era un callejón sin salida — se veía el débito y no se podía hacer nada con él.
+   */
+  it("un débito que no ató se puede imputar a mano", () => {
+    renderPanel({ datos: conSinAtar });
+
+    expect(screen.getByRole("button", { name: /imputar a/i })).toBeInTheDocument();
+  });
+
+  it("al imputar a mano se elige entre las cuotas pendientes", () => {
+    renderPanel({ datos: conSinAtar });
+
+    fireEvent.click(screen.getByRole("button", { name: /imputar a/i }));
+
+    expect(screen.getByRole("option", { name: /205796 · cuota 1\/12/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /205796 · cuota 2\/12/i })).toBeInTheDocument();
+  });
+
+  /** La cuota la elige la persona, pero lo que se guarda es lo mismo que en una propuesta. */
+  it("imputar a mano manda la cuota elegida con el débito que la respalda", () => {
+    const onConfirmar = vi.fn();
+    renderPanel({ datos: conSinAtar, onConfirmar });
+
+    fireEvent.click(screen.getByRole("button", { name: /imputar a/i }));
+    fireEvent.change(screen.getByRole("combobox", { name: /cuota/i }), { target: { value: "92" } });
+    fireEvent.click(screen.getByRole("button", { name: /^imputar$/i }));
+
+    expect(onConfirmar).toHaveBeenCalledWith([
+      {
+        cuotaId: 92,
+        fechaPago: "2026-09-24",
+        importePagado: 7143333.33,
+        nroComprobante: "205796",
+        concepto: "CAPITAL CUOTA PRENDARIO",
+      },
+    ]);
+  });
+
+  it("sin elegir cuota no se puede confirmar", () => {
+    renderPanel({ datos: conSinAtar });
+
+    fireEvent.click(screen.getByRole("button", { name: /imputar a/i }));
+
+    expect(screen.getByRole("button", { name: /^imputar$/i })).toBeDisabled();
+  });
+
+  it("sin permiso de gestión no se ofrece imputar", () => {
+    renderPanel({ datos: conSinAtar, puedeGestionar: false });
+
+    expect(screen.queryByRole("button", { name: /imputar a/i })).not.toBeInTheDocument();
+  });
+
+  /** Confirmar una propuesta también deja el débito del que salió. */
+  it("confirmar un sugerido manda su comprobante", () => {
+    const onConfirmar = vi.fn();
+    renderPanel({ onConfirmar });
+
+    fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    fireEvent.click(screen.getByRole("button", { name: /imputar 1 cuota/i }));
+
+    expect(onConfirmar).toHaveBeenCalledWith([
+      expect.objectContaining({ nroComprobante: "28078488" }),
+    ]);
   });
 });

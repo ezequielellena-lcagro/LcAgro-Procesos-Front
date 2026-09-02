@@ -99,6 +99,11 @@ export function PrestamosPage() {
   const confirmarPagos = useConfirmarPagos();
 
   const vencimientos = useVencimientos({ moneda, incluirPagadas });
+
+  // Para imputar a mano hacen falta las cuotas pendientes de LAS DOS monedas: un débito en pesos
+  // puede ser de un préstamo en dólares — el banco debita pesos al cambio del día.
+  const pendientesUsd = useVencimientos({ moneda: "USD" });
+  const pendientesArs = useVencimientos({ moneda: "ARS" });
   const operaciones = usePrestamos({ moneda });
 
   const error = vencimientos.error ?? operaciones.error;
@@ -254,6 +259,10 @@ export function PrestamosPage() {
                 onReintentar={() => void pagos.refetch()}
                 onConfirmar={(items) => confirmarPagos.mutate(items)}
                 confirmando={confirmarPagos.isPending}
+                cuotasPendientes={[
+                  ...(pendientesArs.data?.items ?? []),
+                  ...(pendientesUsd.data?.items ?? []),
+                ]}
                 puedeGestionar={puedeGestionar}
               />
             </TabsContent>

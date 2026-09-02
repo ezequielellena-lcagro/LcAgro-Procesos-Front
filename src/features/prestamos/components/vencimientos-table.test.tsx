@@ -12,6 +12,7 @@ function fila(over: Partial<VencimientoDto> = {}): VencimientoDto {
     sucursal: "SAN JORGE",
     linea: "TEDESCHI",
     nroOperacion: "39646384",
+    moneda: "USD",
     nroCuota: 1,
     cantidadCuotas: 10,
     capital: 31350,

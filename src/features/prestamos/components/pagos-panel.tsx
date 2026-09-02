@@ -1,10 +1,19 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { fecha } from "@/shared/format/format";
-import { importe } from "../format";
-import type { ConciliacionPagos, ConfirmarPagoItem, PagoNoImputado, PagoSugerido } from "../types";
+import { importe, monedaLabel } from "../format";
+import type {
+  ConciliacionPagos,
+  ConfirmarPagoItem,
+  PagoNoImputado,
+  PagoSugerido,
+  VencimientoDto,
+} from "../types";
 
 interface Props {
   datos: ConciliacionPagos | undefined;
@@ -13,7 +22,117 @@ interface Props {
   onReintentar: () => void;
   onConfirmar: (pagos: ConfirmarPagoItem[]) => void;
   confirmando: boolean;
+
+  /** Las cuotas a las que se puede imputar a mano un débito que el sistema no supo atar. */
+  cuotasPendientes: VencimientoDto[];
+
   puedeGestionar: boolean;
+}
+
+/**
+ * Imputar a mano un débito que ninguna regla ató.
+ *
+ * <p>El sistema no ata todo: un comprobante distinto del guardado, un préstamo que se cargó
+ * después. Antes eso era un callejón sin salida — se veía el débito y no había nada que hacer con
+ * él. La cuota la elige la persona, pero lo que se guarda es lo mismo que en una propuesta
+ * automática, incluido el respaldo.</p>
+ */
+function ImputarAMano({
+  pago,
+  cuotasPendientes,
+  onConfirmar,
+  confirmando,
+}: {
+  pago: PagoNoImputado;
+  cuotasPendientes: VencimientoDto[];
+  onConfirmar: (pagos: ConfirmarPagoItem[]) => void;
+  confirmando: boolean;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [cuotaId, setCuotaId] = useState("");
+
+  // Las más cercanas al débito primero: casi siempre la que se busca es una de ésas.
+  const ordenadas = [...cuotasPendientes].sort(
+    (a, b) =>
+      Math.abs(Date.parse(a.fechaVencimiento) - Date.parse(pago.fecha)) -
+      Math.abs(Date.parse(b.fechaVencimiento) - Date.parse(pago.fecha)),
+  );
+
+  const elegida = ordenadas.find((c) => String(c.cuotaId) === cuotaId);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          setCuotaId("");
+          setAbierto(true);
+        }}
+      >
+        Imputar a…
+      </Button>
+
+      <Modal
+        open={abierto}
+        onClose={() => setAbierto(false)}
+        title="Imputar el débito a una cuota"
+        className="max-w-xl"
+      >
+        <p className="text-sm text-ink">
+          {fecha(pago.fecha)} · {pago.banco} · <strong>{importe(pago.importeArs)}</strong>
+          <span className="block text-xs text-ink-soft">{pago.concepto}</span>
+        </p>
+
+        <div className="mt-4">
+          <Label htmlFor="cuota-destino">Cuota</Label>
+          <Select
+            id="cuota-destino"
+            value={cuotaId}
+            onChange={(e) => setCuotaId(e.target.value)}
+            className="mt-1"
+          >
+            <option value="">Elegí…</option>
+            {ordenadas.map((c) => (
+              <option key={c.cuotaId} value={c.cuotaId}>
+                {c.nroOperacion ?? `#${c.prestamoId}`} · cuota {c.nroCuota}/{c.cantidadCuotas} ·
+                vence {fecha(c.fechaVencimiento)} · {monedaLabel(c.moneda)} {importe(c.total)}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={() => setAbierto(false)}>
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="accent"
+            disabled={!elegida || confirmando}
+            onClick={() => {
+              if (!elegida) return;
+              onConfirmar([
+                {
+                  cuotaId: elegida.cuotaId,
+                  fechaPago: pago.fecha,
+                  // En dólares el banco debita PESOS: guardarlo como importe pagado de una cuota
+                  // en dólares dejaría un número sin sentido en el histórico.
+                  importePagado: elegida.moneda === "ARS" ? pago.importeArs : null,
+                  nroComprobante: pago.nroComprobante,
+                  concepto: pago.concepto,
+                },
+              ]);
+              setAbierto(false);
+            }}
+          >
+            Imputar
+          </Button>
+        </div>
+      </Modal>
+    </>
+  );
 }
 
 const COLUMNAS_NO_IMPUTADOS: Column<PagoNoImputado>[] = [
@@ -41,17 +160,44 @@ const COLUMNAS_NO_IMPUTADOS: Column<PagoNoImputado>[] = [
   { key: "concepto", header: "Concepto en MacroGest", cell: (p) => p.concepto },
 ];
 
-/** Sección informativa con su tabla. Fuera del componente: no se redefine en cada render. */
+/** Una sección de débitos que no ataron, cada uno con la salida de imputarlo a mano. */
 function Seccion({
   titulo,
   ayuda,
   filas,
+  cuotasPendientes,
+  onConfirmar,
+  confirmando,
+  puedeGestionar,
 }: {
   titulo: string;
   ayuda: string;
   filas: PagoNoImputado[];
+  cuotasPendientes: VencimientoDto[];
+  onConfirmar: (pagos: ConfirmarPagoItem[]) => void;
+  confirmando: boolean;
+  puedeGestionar: boolean;
 }) {
   if (filas.length === 0) return null;
+
+  const columnas: Column<PagoNoImputado>[] = puedeGestionar
+    ? [
+        ...COLUMNAS_NO_IMPUTADOS,
+        {
+          key: "imputar",
+          header: "",
+          align: "right",
+          cell: (p) => (
+            <ImputarAMano
+              pago={p}
+              cuotasPendientes={cuotasPendientes}
+              onConfirmar={onConfirmar}
+              confirmando={confirmando}
+            />
+          ),
+        },
+      ]
+    : COLUMNAS_NO_IMPUTADOS;
 
   return (
     <section aria-label={titulo} className="space-y-2">
@@ -60,7 +206,7 @@ function Seccion({
       </h3>
       <p className="text-xs text-ink-soft">{ayuda}</p>
       <DataTable
-        columns={COLUMNAS_NO_IMPUTADOS}
+        columns={columnas}
         rows={filas}
         getRowKey={(p, i) => `${p.nroComprobante}-${p.fecha}-${i}`}
       />
@@ -82,6 +228,7 @@ export function PagosPanel({
   onReintentar,
   onConfirmar,
   confirmando,
+  cuotasPendientes,
   puedeGestionar,
 }: Props) {
   const [elegidas, setElegidas] = useState<Set<number>>(new Set());
@@ -131,6 +278,9 @@ export function PagosPanel({
           // En dólares el banco debita PESOS: guardarlo como importe pagado de una cuota en
           // dólares dejaría un número sin sentido en el histórico.
           importePagado: s.moneda === "ARS" ? s.importeDebitado : null,
+          // Queda de qué débito salió: es lo que después permite verificarlo contra MacroGest.
+          nroComprobante: s.nroComprobante,
+          concepto: s.concepto,
         })),
     );
 
@@ -245,12 +395,20 @@ export function PagosPanel({
         titulo="Sin cuota pendiente"
         ayuda="El préstamo está cargado, pero ninguna cuota pendiente vence cerca de este débito. Casi siempre son cuotas anteriores a la carga inicial, que no se cargaron porque ya estaban pagadas."
         filas={datos.sinCuotaPendiente}
+        cuotasPendientes={cuotasPendientes}
+        onConfirmar={onConfirmar}
+        confirmando={confirmando}
+        puedeGestionar={puedeGestionar}
       />
 
       <Seccion
         titulo="Sin préstamo asociado"
         ayuda="El banco debitó una cuota de un préstamo que el sistema no tiene. Puede ser una operación vieja que nunca se cargó, o un número de comprobante distinto del que quedó guardado."
         filas={datos.sinPrestamo}
+        cuotasPendientes={cuotasPendientes}
+        onConfirmar={onConfirmar}
+        confirmando={confirmando}
+        puedeGestionar={puedeGestionar}
       />
 
       <p className="flex items-start gap-1.5 text-xs text-ink-soft">

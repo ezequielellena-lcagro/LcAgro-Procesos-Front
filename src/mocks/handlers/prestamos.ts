@@ -60,6 +60,7 @@ function cuota(nro: number, meses: number, capital: number, interes: number): Cu
     fechaPago: null,
     importePagado: null,
     observacion: null,
+    respaldoMacroGest: null,
   };
 }
 
@@ -246,6 +247,7 @@ export const prestamosHandlers = [
             sucursal: p.sucursal,
             linea: p.linea,
             nroOperacion: p.nroOperacion,
+            moneda: p.moneda,
             nroCuota: c.nroCuota,
             cantidadCuotas: p.cantidadCuotas,
             capital: c.capital,
@@ -340,6 +342,7 @@ export const prestamosHandlers = [
           fechaPago: cuota.fechaVencimiento,
           importeDebitado: cuota.total,
           concepto: "CAPITAL CUOTA DE PRÉSTAMO · FAC A 00004-28078488",
+          nroComprobante: prestamo.nroOperacion ?? "",
           importeCoincide: true,
           diferenciaArs: prestamo.moneda === "ARS" ? 0 : null,
         },
@@ -539,6 +542,7 @@ export const prestamosHandlers = [
   ),
   http.put(`${API}/prestamos/:id`, () => HttpResponse.json(conDerivados(detalles[0]))),
   http.delete(`${API}/prestamos/:id`, () => new HttpResponse(null, { status: 204 })),
+  http.delete(`${API}/prestamos/:id/definitivo`, () => new HttpResponse(null, { status: 204 })),
   http.post(`${API}/prestamos/cuotas/:id/pagar`, () => new HttpResponse(null, { status: 204 })),
   http.post(
     `${API}/prestamos/cuotas/:id/revertir-pago`,

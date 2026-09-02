@@ -70,6 +70,23 @@ export function useAnularPrestamo() {
   });
 }
 
+/**
+ * Borrado real, con su cronograma. Otra cosa que anular: anular deja el préstamo con su historia.
+ * El backend vuelve a exigir la confirmación — no alcanza con que la UI la pida.
+ */
+export function useEliminarPrestamo() {
+  const invalidar = useInvalidarTodo();
+  return useMutation({
+    mutationFn: async ({ id, confirmacion }: { id: number; confirmacion: string }) => {
+      await apiClient.delete(`/prestamos/${id}/definitivo`, { params: { confirmacion } });
+    },
+    onSuccess: () => {
+      invalidar();
+      toast.success("Préstamo eliminado.");
+    },
+  });
+}
+
 export function usePagarCuota() {
   const invalidar = useInvalidarTodo();
   return useMutation({

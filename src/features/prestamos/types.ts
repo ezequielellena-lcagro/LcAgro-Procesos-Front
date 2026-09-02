@@ -114,6 +114,8 @@ export interface VencimientoDto {
   sucursal: string | null;
   linea: string;
   nroOperacion: string | null;
+  /** Hace falta al imputar a mano: en dólares el banco debita PESOS. */
+  moneda: Moneda;
   nroCuota: number;
   cantidadCuotas: number;
   capital: number;
@@ -344,6 +346,8 @@ export interface PagoSugerido {
   /** Lo que debitó el banco, en pesos: capital + intereses + impuestos. */
   importeDebitado: number;
   concepto: string;
+  /** El comprobante del débito. Viaja para que la cuota guarde de dónde salió el pago. */
+  nroComprobante: string;
   importeCoincide: boolean;
   /** `null` en dólares: el banco debita pesos al cambio del día y comparar no significa nada. */
   diferenciaArs: number | null;
@@ -376,6 +380,11 @@ export interface ConfirmarPagoItem {
   cuotaId: number;
   fechaPago: string;
   importePagado?: number | null;
+
+  // De qué débito sale. Van juntos: sin ellos la cuota queda pagada sin respaldo, que es lo
+  // correcto para un pago cargado a mano — pero acá siempre hay un débito detrás.
+  nroComprobante?: string;
+  concepto?: string;
 }
 
 /** Un movimiento del banco descartado del cruce, con el motivo y quién lo puso. */
