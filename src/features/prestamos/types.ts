@@ -235,16 +235,6 @@ export interface PagarCuotaInput {
   observacion?: string | null;
 }
 
-/** Qué hizo (o qué haría) una importación de la plantilla. */
-export interface ImportacionPrestamos {
-  operacionesCreadas: number;
-  operacionesActualizadas: number;
-  cuotasCargadas: number;
-  /** False = fue una vista previa; nada se guardó. */
-  confirmado: boolean;
-  advertencias: string[];
-}
-
 // ── Conciliación con MacroGest ──────────────────────────────────────────────
 
 /** Una operación del sistema, en la vista de conciliación. */

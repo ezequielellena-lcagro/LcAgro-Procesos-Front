@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, FileUp, Plus, Printer, Settings2 } from "lucide-react";
+import { Plus, Printer, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,7 +10,6 @@ import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { ConciliacionPanel } from "../components/conciliacion-panel";
 import { CatalogosDialog } from "../components/catalogos-dialog";
-import { ImportarDialog } from "../components/importar-dialog";
 import { OperacionesTable } from "../components/operaciones-table";
 import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
 import { PagosPanel } from "../components/pagos-panel";
@@ -30,7 +29,7 @@ import {
   useEliminarCatalogo,
 } from "../queries/use-prestamo-mutations";
 import { useResumen } from "../queries/use-resumen";
-import { useExportarPlantilla, useExportarReporte } from "../queries/use-prestamos-excel";
+import { useExportarReporte } from "../queries/use-prestamos-excel";
 import { useCatalogosAdmin, usePrestamos, useVencimientos } from "../queries/use-prestamos";
 import type {
   Agrupacion,
@@ -58,7 +57,6 @@ export function PrestamosPage() {
   const [incluirPagadas, setIncluirPagadas] = useState(false);
   const [editando, setEditando] = useState<number | null>(null);
   const [pagando, setPagando] = useState<VencimientoDto | null>(null);
-  const [importando, setImportando] = useState(false);
   const [agrupacion, setAgrupacion] = useState<Agrupacion>("mes");
   const [agrupaVto, setAgrupaVto] = useState<AgrupacionVencimientos>("ninguna");
   const [precarga, setPrecarga] = useState<PrecargaPrestamo | null>(null);
@@ -91,7 +89,6 @@ export function PrestamosPage() {
     setEditando(0);   // 0 = alta
   };
 
-  const exportarPlantilla = useExportarPlantilla();
   const exportarReporte = useExportarReporte();
   // Sólo se consulta al abrir la pestaña: va por VPN contra la base del cliente.
   const conciliacion = useConciliacion(pestania === "conciliacion");
@@ -128,20 +125,8 @@ export function PrestamosPage() {
               <Printer className="size-4" />
               {exportarReporte.isPending ? "Generando…" : "Reporte"}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportarPlantilla.mutate({ moneda })}
-              disabled={exportarPlantilla.isPending}
-            >
-              <Download className="size-4" />
-              {exportarPlantilla.isPending ? "Generando…" : "Exportar plantilla"}
-            </Button>
             {puedeGestionar && (
               <>
-                <Button variant="outline" size="sm" onClick={() => setImportando(true)}>
-                  <FileUp className="size-4" /> Importar
-                </Button>
                 <Button variant="outline" size="sm" onClick={() => setAdministrando(true)}>
                   <Settings2 className="size-4" /> Bancos y líneas
                 </Button>
@@ -299,8 +284,6 @@ export function PrestamosPage() {
         precarga={precarga}
       />
       <PagarCuotaDialog cuota={pagando} onClose={() => setPagando(null)} />
-      <ImportarDialog open={importando} onClose={() => setImportando(false)} />
-
       <CatalogosDialog
         open={administrando}
         onClose={() => setAdministrando(false)}
