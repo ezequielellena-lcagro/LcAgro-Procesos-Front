@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Printer, Settings2 } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ import { PagosPanel } from "../components/pagos-panel";
 import { PrestamoDialog } from "../components/prestamo-dialog";
 import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
+import { ReportePanel } from "../components/reporte-panel";
 import { ResumenMatriz } from "../components/resumen-matriz";
 import {
   VencimientosTable,
@@ -31,6 +32,7 @@ import {
 import { useResumen } from "../queries/use-resumen";
 import { useExportarReporte } from "../queries/use-prestamos-excel";
 import { useCatalogosAdmin, usePrestamos, useVencimientos } from "../queries/use-prestamos";
+import { imprimirApaisado } from "../imprimir";
 import type {
   Agrupacion,
   FilaPropuesta,
@@ -39,7 +41,13 @@ import type {
   VencimientoDto,
 } from "../types";
 
-type Pestania = "vencimientos" | "operaciones" | "resumen" | "conciliacion" | "pagos";
+type Pestania =
+  | "vencimientos"
+  | "operaciones"
+  | "resumen"
+  | "reporte"
+  | "conciliacion"
+  | "pagos";
 
 /**
  * Préstamos y créditos bancarios. Reemplaza el Excel de Administración (`Prestamos La Clementina`),
@@ -121,15 +129,6 @@ export function PrestamosPage() {
         subtitle="Qué se debe, a qué banco y cuándo vence cada cuota."
         actions={
           <div className="no-print flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => exportarReporte.mutate()}
-              disabled={exportarReporte.isPending}
-            >
-              <Printer className="size-4" />
-              {exportarReporte.isPending ? "Generando…" : "Reporte"}
-            </Button>
             {puedeGestionar && (
               <>
                 <Button variant="outline" size="sm" onClick={() => setAdministrando(true)}>
@@ -203,14 +202,16 @@ export function PrestamosPage() {
         <PrestamosSkeleton />
       ) : (
         <div className="space-y-4">
-          <PrestamosKpis
-            moneda={moneda}
-            vencimientos={datos.vencimientos}
-            operaciones={datos.operaciones}
-          />
+          <div className={pestania === "reporte" ? "no-print" : undefined}>
+            <PrestamosKpis
+              moneda={moneda}
+              vencimientos={datos.vencimientos}
+              operaciones={datos.operaciones}
+            />
+          </div>
 
           <Tabs value={pestania} onValueChange={setPestania} className="space-y-3">
-            <TabsList>
+            <TabsList className={pestania === "reporte" ? "no-print" : undefined}>
               <TabsTrigger value="vencimientos">
                 Vencimientos ({datos.vencimientos.items.length})
               </TabsTrigger>
@@ -218,6 +219,7 @@ export function PrestamosPage() {
                 Operaciones ({datos.operaciones.length})
               </TabsTrigger>
               <TabsTrigger value="resumen">Resumen</TabsTrigger>
+              <TabsTrigger value="reporte">Reporte</TabsTrigger>
               <TabsTrigger value="conciliacion">MacroGest</TabsTrigger>
               <TabsTrigger value="pagos">Pagos del banco</TabsTrigger>
             </TabsList>
@@ -264,6 +266,17 @@ export function PrestamosPage() {
                   ...(pendientesUsd.data?.items ?? []),
                 ]}
                 puedeGestionar={puedeGestionar}
+              />
+            </TabsContent>
+
+            <TabsContent value="reporte">
+              <ReportePanel
+                usd={pendientesUsd.data}
+                ars={pendientesArs.data}
+                cargando={pendientesUsd.isPending || pendientesArs.isPending}
+                onDescargarExcel={() => exportarReporte.mutate()}
+                descargando={exportarReporte.isPending}
+                onImprimir={imprimirApaisado}
               />
             </TabsContent>
 

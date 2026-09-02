@@ -138,4 +138,12 @@
     height: auto !important;
     overflow: visible !important;
   }
+  /* Una tabla ancha vive dentro de un contenedor con scroll horizontal. En papel no hay scroll:
+     lo que queda fuera del recuadro simplemente no se imprime. */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+  table {
+    font-size: 10px;
+  }
 }
