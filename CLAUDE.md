@@ -29,6 +29,20 @@ Responder **siempre en español** (rioplatense, claro y directo). Mantener tilde
 
 Todo el diseño del front está en [`docs/`](docs/README.md) (7 documentos: arquitectura, design system, routing/layout, data/estado, features, setup, plan). El **contrato de la API** que se consume vive en el repo backend: `../LcAgro-Procesos/02-desarrollo/05-api-contratos.md`.
 
+## Verificación
+
+⚠️ **`tsc --noEmit` NO chequea nada en este repo.** El `tsconfig.json` raíz tiene `"files": []` y
+sólo referencias a `tsconfig.app.json` / `tsconfig.node.json`, así que el comando corre sobre cero
+archivos y **siempre pasa**. El correcto es:
+
+```bash
+npx tsc -b
+```
+
+Es lo que usa `npm run build`. Con `--noEmit` a secas se pierden errores reales de tipos.
+
+Antes de dar algo por terminado: `npx tsc -b`, `npx vitest run` y `npx eslint .`.
+
 ## Convenciones
 
 - Archivos y carpetas **nuestros**: minúsculas, con guiones, sin tildes ni espacios.
