@@ -293,4 +293,34 @@ describe("solapa de carga de datos", () => {
     expect(screen.getByText("Ventas consolidado Clientes")).toBeInTheDocument();
     expect(screen.getByText("Market Share.")).toBeInTheDocument();
   });
+
+  it("para una fila que MacroGest no conoce, la unica salida es no importarla", () => {
+    planPreview = vistaPlan({
+      puedeConfirmar: false,
+      pendientes: [
+        {
+          filaId: "legacy:ventas:305",
+          hoja: "Ventas consolidado Clientes",
+          fila: 305,
+          razonSocialArchivo: "FOCO RAMIRO",
+          cuitEnmascarado: null,
+          candidatos: [],
+        },
+      ],
+    });
+    render(<DatosTab campania="2025-2026" />);
+
+    const entrada = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(entrada, { target: { files: [archivo()] } });
+    const selector = screen.getByRole("combobox", { name: /Productor para FOCO RAMIRO/i });
+    fireEvent.change(selector, { target: { value: "0" } });
+
+    // Cero es "omitir" en el contrato del backend, y cuenta como decidida.
+    expect(screen.queryByText(/Falta/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Analizar de nuevo" }));
+    expect(previewPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ resoluciones: { "legacy:ventas:305": 0 } }),
+    );
+  });
 });

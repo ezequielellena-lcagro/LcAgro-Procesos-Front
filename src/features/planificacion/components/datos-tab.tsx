@@ -114,7 +114,7 @@ function PlanSiembraCard({ campania }: { campania: string }) {
   const confirmar = useConfirmarPlanSiembra();
   const vista = confirmar.data ?? preview.data;
   const pendientes = vista?.pendientes ?? [];
-  const faltanElegir = pendientes.filter((p) => !resoluciones[p.filaId]).length;
+  const faltanElegir = pendientes.filter((p) => resoluciones[p.filaId] === undefined).length;
 
   function elegir(nuevo: File | null) {
     setArchivo(nuevo);
@@ -268,10 +268,11 @@ function ResumenPlanSiembra({ vista }: { vista: ImportacionPlanSiembraDto }) {
         </Aviso>
       )}
 
-      {/* Los errores de resolución ya se explican arriba, con el selector para arreglarlos:
-          repetirlos como texto rojo sólo agrega ruido. */}
+      {/* Las filas que esperan una elección ya tienen su selector arriba: repetirlas como texto rojo
+          sólo agrega ruido. Los demás problemas de resolución —dos filas apuntando al mismo
+          productor, por ejemplo— sí hay que mostrarlos: no se arreglan desde el selector. */}
       <Problemas
-        errores={vista.errores.filter((e) => e.codigo !== "resolucion_invalida")}
+        errores={vista.errores.filter((e) => !e.mensaje.includes("requiere una resolución"))}
         advertencias={vista.advertencias}
       />
     </div>
@@ -444,6 +445,9 @@ function ResumenBayer({ vista }: { vista: ImportacionBayerDto }) {
  * razón social ("NO USAR", "USAR 3751"). Por eso se muestran los nombres completos: la pista para
  * elegir bien ya está ahí.
  */
+/** Coincide con `MatchingPlanSiembraLegacy.OmitirFila` del backend: cero no es ningún productor. */
+const OMITIR_FILA = 0;
+
 function ResolverPendientes({
   pendientes,
   elegidos,
@@ -462,9 +466,10 @@ function ResolverPendientes({
         {pendientes.length === 1 ? "fila necesita" : "filas necesitan"} que elijas el productor
       </p>
       <p className="mt-1 text-xs leading-relaxed text-ink-soft">
-        El CUIT del archivo aparece en más de una cuenta de MacroGest. Suele ser el mismo productor
-        con una cuenta vieja y una nueva; fijate que el nombre en MacroGest muchas veces avisa cuál
-        usar. Mientras falte alguna, no se puede importar nada.
+        Cuando hay varias opciones, es porque el CUIT del archivo aparece en más de una cuenta de
+        MacroGest: suele ser el mismo productor con una cuenta vieja y una nueva, y el nombre en
+        MacroGest muchas veces avisa cuál usar. Cuando no hay ninguna, es un productor que el ERP no
+        conoce, y sólo queda dejarlo afuera. Mientras falte definir alguna, no se importa nada.
       </p>
 
       <ul className="mt-3 space-y-2">
@@ -493,13 +498,17 @@ function ResolverPendientes({
               }
               aria-label={`Productor para ${pendiente.razonSocialArchivo ?? `la fila ${pendiente.fila}`}`}
             >
-              <option value="">— elegí el productor —</option>
+              <option value="">
+                {pendiente.candidatos.length > 0 ? "— elegí el productor —" : "— qué hago con esta —"}
+              </option>
               {pendiente.candidatos.map((candidato) => (
                 <option key={candidato.productorId} value={candidato.productorId}>
                   {candidato.cuentaMacroGest != null ? `${candidato.cuentaMacroGest} · ` : ""}
                   {candidato.razonSocial}
                 </option>
               ))}
+              {/* Única salida para las filas sin candidato: no se puede inventar el productor. */}
+              <option value={OMITIR_FILA}>No importar esta fila</option>
             </Select>
           </li>
         ))}
