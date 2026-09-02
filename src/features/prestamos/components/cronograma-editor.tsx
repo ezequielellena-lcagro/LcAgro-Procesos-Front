@@ -95,6 +95,13 @@ export function CronogramaEditor({ cuotas, onChange, bloqueadas = [], disabled =
                         disabled={disabled || bloqueada}
                         onChange={(v) => editar(i, { fechaVencimiento: v })}
                       />
+                      {/* La cuota reconstruida dice de dónde salió: es lo que la hace verificable
+                          contra el banco en vez de tener que creerle al sistema. */}
+                      {c.respaldoMacroGest && (
+                        <p className="mt-0.5 max-w-56 text-[11px] leading-tight text-ink-soft">
+                          {c.respaldoMacroGest.replace(/^MacroGest · /, "")}
+                        </p>
+                      )}
                     </td>
                     <td className="px-2 py-1.5">
                       <Input

@@ -7,6 +7,12 @@ export interface FilaCuota {
   interes: number;
   iva: number;
   observacion?: string | null;
+
+  /**
+   * Sólo en las cuotas RECONSTRUIDAS desde MacroGest. Se muestra en la fila: son filas que el
+   * sistema armó solo, y sin decir de dónde salieron no se distinguirían de un dato inventado.
+   */
+  respaldoMacroGest?: string | null;
 }
 
 /** Redondeo a 2 decimales: sin esto los totales arrastran el error binario del punto flotante. */

@@ -175,3 +175,25 @@ export function useEliminarCatalogo() {
     },
   });
 }
+
+/**
+ * Aplica la reconstrucción del cronograma. Las cuotas que agrega están pagadas, así que el saldo
+ * no se mueve: lo que aparece es la historia que faltaba.
+ */
+export function useReconstruirCronograma() {
+  const invalidar = useInvalidarTodo();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const { data } = await apiClient.post<PrestamoDetalleDto>(
+        `/prestamos/${id}/cronograma/reconstruccion`,
+      );
+      return data;
+    },
+    onSuccess: (prestamo) => {
+      invalidar();
+      const nuevas = prestamo.cuotas.filter((c) => c.respaldoMacroGest !== null).length;
+      toast.success(`Cronograma completo: se agregaron ${nuevas} cuotas ya pagadas.`);
+      for (const aviso of prestamo.advertencias) toast.warning(aviso);
+    },
+  });
+}

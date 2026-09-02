@@ -17,9 +17,14 @@ import type { FilaCuota } from "../cronograma";
 import {
   useActualizarPrestamo,
   useCrearPrestamo,
+  useReconstruirCronograma,
   useSimularCronograma,
 } from "../queries/use-prestamo-mutations";
-import { useCatalogosPrestamos, usePrestamo } from "../queries/use-prestamos";
+import {
+  useCatalogosPrestamos,
+  usePrestamo,
+  useReconstruccion,
+} from "../queries/use-prestamos";
 import {
   PERIODICIDADES,
   TIPOS,
@@ -29,6 +34,7 @@ import {
   type PrestamoDetalleDto,
 } from "../types";
 import { CronogramaEditor } from "./cronograma-editor";
+import { ReconstruirCronograma } from "./reconstruir-cronograma";
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
@@ -277,6 +283,11 @@ function PrestamoForm({
   const crear = useCrearPrestamo();
   const actualizar = useActualizarPrestamo();
   const simular = useSimularCronograma();
+  const reconstruir = useReconstruirCronograma();
+
+  // Las cuotas anteriores se buscan en MacroGest sólo cuando se lo piden: pega contra la VPN.
+  const [buscandoViejas, setBuscandoViejas] = useState(false);
+  const reconstruccion = useReconstruccion(detalle?.id ?? null, buscandoViejas);
 
   const [cuotas, setCuotas] = useState<FilaCuota[]>(() =>
     (detalle?.cuotas ?? []).map((c) => ({
@@ -286,6 +297,7 @@ function PrestamoForm({
       interes: c.interes,
       iva: c.iva,
       observacion: c.observacion,
+      respaldoMacroGest: c.respaldoMacroGest,
     })),
   );
   const [primerVto, setPrimerVto] = useState(
@@ -541,6 +553,22 @@ function PrestamoForm({
           bloqueadas={pagadas}
           disabled={guardando}
         />
+
+        {detalle && (
+          <ReconstruirCronograma
+            faltantes={detalle.cantidadCuotas - detalle.cuotas.length}
+            propuesta={reconstruccion.data}
+            cargando={reconstruccion.isFetching}
+            error={reconstruccion.error ? toAppError(reconstruccion.error).message : null}
+            onBuscar={() => setBuscandoViejas(true)}
+            onConfirmar={async () => {
+              await reconstruir.mutateAsync(detalle.id);
+              onClose();   // el cronograma cambió entero: se vuelve a abrir con lo nuevo
+            }}
+            aplicando={reconstruir.isPending}
+            puedeGestionar
+          />
+        )}
       </Bloque>
 
       <Campo label="Observaciones" htmlFor="observaciones">

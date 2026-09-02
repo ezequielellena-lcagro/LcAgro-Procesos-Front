@@ -3,6 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   AdministrarCatalogos,
   CatalogosPrestamos,
+  ReconstruccionCronograma,
   PrestamoDetalleDto,
   PrestamoFiltros,
   PrestamoListadoDto,
@@ -73,5 +74,23 @@ export function useCatalogosAdmin(habilitado: boolean) {
       return data;
     },
     enabled: habilitado,
+  });
+}
+
+/**
+ * Las cuotas viejas que le faltan al cronograma, armadas desde los débitos de MacroGest. Se pide
+ * sólo cuando el usuario lo pide: pega contra la VPN y es lento.
+ */
+export function useReconstruccion(id: number | null, habilitado: boolean) {
+  return useQuery({
+    queryKey: prestamosKeys.reconstruccion(id ?? 0),
+    queryFn: async () => {
+      const { data } = await apiClient.get<ReconstruccionCronograma>(
+        `/prestamos/${id}/cronograma/reconstruccion`,
+      );
+      return data;
+    },
+    enabled: id !== null && habilitado,
+    retry: false, // si la VPN está caída, reintentar sólo demora el aviso
   });
 }

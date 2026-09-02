@@ -53,6 +53,8 @@ export interface CuotaDto {
   fechaPago: string | null;
   importePagado: number | null;
   observacion: string | null;
+  /** Sólo en las cuotas RECONSTRUIDAS: de qué movimiento de MacroGest salieron. */
+  respaldoMacroGest: string | null;
 }
 
 /** Una operación con su cronograma completo. */
@@ -398,4 +400,30 @@ export interface Descarte {
 export interface DescartarInput {
   nroOperacion: string;
   motivo: string;
+}
+
+/** Una cuota vieja que se propone crear, con el débito de MacroGest que la respalda. */
+export interface CuotaReconstruida {
+  nroCuota: number;
+  fechaVencimiento: string;
+  capital: number;
+  interes: number;
+  iva: number;
+  total: number;
+  fechaPago: string | null;
+  importePagado: number | null;
+  respaldo: string | null;
+}
+
+/**
+ * La vista previa de la reconstrucción del cronograma: qué cuotas anteriores faltan y con qué se
+ * arman. No escribe nada hasta que alguien confirma.
+ */
+export interface ReconstruccionCronograma {
+  prestamoId: number;
+  nroOperacion: string | null;
+  banco: string;
+  faltantes: number;
+  cuotas: CuotaReconstruida[];
+  advertencias: string[];
 }

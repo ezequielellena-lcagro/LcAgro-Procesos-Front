@@ -11,6 +11,7 @@ export const prestamosKeys = {
   resumenes: () => [...prestamosKeys.all, "resumen"] as const,
   resumen: (f: ResumenFiltros) => [...prestamosKeys.resumenes(), f] as const,
   /** Bancos y líneas: no dependen de ningún filtro. */
+  reconstruccion: (id: number) => [...prestamosKeys.all, "reconstruccion", id] as const,
   catalogos: () => [...prestamosKeys.all, "catalogos"] as const,
   catalogosAdmin: () => [...prestamosKeys.all, "catalogos", "administrar"] as const,
   /** Cruce contra MacroGest. */
