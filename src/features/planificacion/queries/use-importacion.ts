@@ -17,10 +17,22 @@ import { planificacionKeys } from "./keys";
  * antes cuántas hectáreas y cuánto mercado quedan después.
  */
 
+/**
+ * La vigencia es desde cuándo rige esta versión del plan. El backend la exige y no acepta futuro,
+ * así que se usa el momento de analizar. Vuelve en la respuesta y hay que reenviarla igual al
+ * confirmar: forma parte del token.
+ */
 export function usePreviewPlanSiembra() {
   return useMutation({
-    mutationFn: ({ archivo, campania }: { archivo: File; campania: string }) =>
-      previsualizarPlanSiembra(archivo, campania),
+    mutationFn: ({
+      archivo,
+      campania,
+      resoluciones,
+    }: {
+      archivo: File;
+      campania: string;
+      resoluciones?: Record<string, number>;
+    }) => previsualizarPlanSiembra(archivo, campania, new Date().toISOString(), resoluciones),
   });
 }
 
@@ -31,14 +43,16 @@ export function useConfirmarPlanSiembra() {
     mutationFn: ({
       archivo,
       campania,
+      vigenteDesde,
       tokenPreview,
       resoluciones,
     }: {
       archivo: File;
       campania: string;
+      vigenteDesde: string;
       tokenPreview: string;
       resoluciones?: Record<string, number>;
-    }) => confirmarPlanSiembra(archivo, campania, tokenPreview, resoluciones),
+    }) => confirmarPlanSiembra(archivo, campania, vigenteDesde, tokenPreview, resoluciones),
     onSuccess: async (resultado) => {
       // Cambia el mercado de cada productor: se recalculan tablero, segmentación y objetivos.
       await queryClient.invalidateQueries({ queryKey: planificacionKeys.all });

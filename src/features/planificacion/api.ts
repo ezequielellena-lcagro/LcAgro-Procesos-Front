@@ -203,13 +203,18 @@ export async function sincronizarPadronProductores(): Promise<SincronizacionProd
 export async function previsualizarPlanSiembra(
   archivo: File,
   campania: string,
+  vigenteDesde: string,
+  resoluciones?: Record<string, number>,
 ): Promise<ImportacionPlanSiembraDto> {
   const cuerpo = new FormData();
   cuerpo.append("file", archivo);
+  if (resoluciones && Object.keys(resoluciones).length > 0) {
+    cuerpo.append("resolucionesJson", JSON.stringify(resoluciones));
+  }
   const { data } = await apiClient.post<ImportacionPlanSiembraDto>(
     `${BASE}/plan-siembra/import`,
     cuerpo,
-    { params: { campania } },
+    { params: { campania, vigenteDesde } },
   );
   return data;
 }
@@ -217,10 +222,14 @@ export async function previsualizarPlanSiembra(
 /**
  * Escribe el plan y los costos. Exige el token de una vista previa vigente: si el archivo cambió
  * entre el análisis y la confirmación, el backend rechaza la operación en vez de importar otra cosa.
+ *
+ * `vigenteDesde` tiene que ser EL MISMO que se usó al previsualizar, porque entra en el cálculo del
+ * token. Sale de `vigenteDesde` de la respuesta anterior, no de un `new Date()` nuevo.
  */
 export async function confirmarPlanSiembra(
   archivo: File,
   campania: string,
+  vigenteDesde: string,
   tokenPreview: string,
   resoluciones?: Record<string, number>,
 ): Promise<ImportacionPlanSiembraDto> {
@@ -232,7 +241,7 @@ export async function confirmarPlanSiembra(
   const { data } = await apiClient.post<ImportacionPlanSiembraDto>(
     `${BASE}/plan-siembra/import`,
     cuerpo,
-    { params: { campania, confirmar: true, tokenPreview } },
+    { params: { campania, vigenteDesde, confirmar: true, tokenPreview } },
   );
   return data;
 }

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { toAppError } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 import { numero, usd } from "@/shared/format/format";
@@ -22,7 +23,11 @@ import {
   usePreviewPlanSiembra,
 } from "../queries/use-importacion";
 import { useSincronizarPadron } from "../queries/use-sincronizar-padron";
-import type { ImportacionBayerDto, ImportacionPlanSiembraDto } from "../types";
+import type {
+  FilaPendienteImportacionDto,
+  ImportacionBayerDto,
+  ImportacionPlanSiembraDto,
+} from "../types";
 
 /**
  * De dónde salen los datos del módulo.
@@ -103,14 +108,23 @@ function PadronCard() {
 
 function PlanSiembraCard({ campania }: { campania: string }) {
   const [archivo, setArchivo] = useState<File | null>(null);
+  // filaId -> productorId elegido a mano para las filas que el cruce automático no pudo resolver.
+  const [resoluciones, setResoluciones] = useState<Record<string, number>>({});
   const preview = usePreviewPlanSiembra();
   const confirmar = useConfirmarPlanSiembra();
   const vista = confirmar.data ?? preview.data;
+  const pendientes = vista?.pendientes ?? [];
+  const faltanElegir = pendientes.filter((p) => !resoluciones[p.filaId]).length;
 
   function elegir(nuevo: File | null) {
     setArchivo(nuevo);
+    setResoluciones({});
     preview.reset();
     confirmar.reset();
+  }
+
+  function analizar() {
+    if (archivo) preview.mutate({ archivo, campania, resoluciones });
   }
 
   return (
@@ -157,10 +171,14 @@ function PlanSiembraCard({ campania }: { campania: string }) {
           variant="outline"
           size="sm"
           disabled={!archivo || preview.isPending || confirmar.isPending}
-          onClick={() => archivo && preview.mutate({ archivo, campania })}
+          onClick={analizar}
         >
           <Upload className="size-3.5" aria-hidden />
-          {preview.isPending ? "Analizando…" : "Analizar archivo"}
+          {preview.isPending
+            ? "Analizando…"
+            : pendientes.length > 0
+              ? "Analizar de nuevo"
+              : "Analizar archivo"}
         </Button>
 
         {vista?.puedeConfirmar && !vista.confirmado && vista.tokenPreview && archivo && (
@@ -172,7 +190,10 @@ function PlanSiembraCard({ campania }: { campania: string }) {
               confirmar.mutate({
                 archivo,
                 campania,
+                // La misma vigencia que devolvió el análisis: entra en el token.
+                vigenteDesde: vista.vigenteDesde,
                 tokenPreview: vista.tokenPreview!,
+                resoluciones,
               })
             }
           >
@@ -180,6 +201,23 @@ function PlanSiembraCard({ campania }: { campania: string }) {
           </Button>
         )}
       </div>
+
+      {pendientes.length > 0 && !vista?.confirmado && (
+        <ResolverPendientes
+          pendientes={pendientes}
+          elegidos={resoluciones}
+          faltan={faltanElegir}
+          onElegir={(filaId, productorId) =>
+            setResoluciones((actuales) => {
+              if (productorId === null) {
+                const { [filaId]: _, ...resto } = actuales;
+                return resto;
+              }
+              return { ...actuales, [filaId]: productorId };
+            })
+          }
+        />
+      )}
 
       {vista && <ResumenPlanSiembra vista={vista} />}
     </Tarjeta>
@@ -230,19 +268,12 @@ function ResumenPlanSiembra({ vista }: { vista: ImportacionPlanSiembraDto }) {
         </Aviso>
       )}
 
-      {vista.pendientes.length > 0 && (
-        <Aviso tono="error">
-          {numero(vista.pendientes.length)} filas no se pudieron asignar a un productor y frenan la
-          importación. Suele ser un CUIT repetido o que no está en el padrón. Ejemplos:{" "}
-          {vista.pendientes
-            .slice(0, 3)
-            .map((p) => p.razonSocialArchivo ?? `fila ${p.fila}`)
-            .join(" · ")}
-          .
-        </Aviso>
-      )}
-
-      <Problemas errores={vista.errores} advertencias={vista.advertencias} />
+      {/* Los errores de resolución ya se explican arriba, con el selector para arreglarlos:
+          repetirlos como texto rojo sólo agrega ruido. */}
+      <Problemas
+        errores={vista.errores.filter((e) => e.codigo !== "resolucion_invalida")}
+        advertencias={vista.advertencias}
+      />
     </div>
   );
 }
@@ -400,6 +431,85 @@ function ResumenBayer({ vista }: { vista: ImportacionBayerDto }) {
           Entran igual, pero quedan sin asignar hasta que se cargue la equivalencia.
         </Aviso>
       )}
+    </div>
+  );
+}
+
+/**
+ * Filas cuyo CUIT existe en más de una cuenta de MacroGest, así que el cruce automático no puede
+ * decidir solo. Frenan la importación entera hasta que alguien elige: importar la mitad sería peor
+ * que no importar.
+ *
+ * Suele ser el mismo productor con una cuenta vieja y una nueva, y MacroGest lo dice en la propia
+ * razón social ("NO USAR", "USAR 3751"). Por eso se muestran los nombres completos: la pista para
+ * elegir bien ya está ahí.
+ */
+function ResolverPendientes({
+  pendientes,
+  elegidos,
+  faltan,
+  onElegir,
+}: {
+  pendientes: FilaPendienteImportacionDto[];
+  elegidos: Record<string, number>;
+  faltan: number;
+  onElegir: (filaId: string, productorId: number | null) => void;
+}) {
+  return (
+    <div className="rounded-md border border-clementina-deep/30 bg-clementina/10 p-3">
+      <p className="text-xs font-semibold text-ink">
+        {numero(pendientes.length)}{" "}
+        {pendientes.length === 1 ? "fila necesita" : "filas necesitan"} que elijas el productor
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+        El CUIT del archivo aparece en más de una cuenta de MacroGest. Suele ser el mismo productor
+        con una cuenta vieja y una nueva; fijate que el nombre en MacroGest muchas veces avisa cuál
+        usar. Mientras falte alguna, no se puede importar nada.
+      </p>
+
+      <ul className="mt-3 space-y-2">
+        {pendientes.map((pendiente) => (
+          <li
+            key={pendiente.filaId}
+            className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-line bg-panel p-2.5"
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-ink">
+                {pendiente.razonSocialArchivo ?? "(sin razón social)"}
+              </p>
+              <p className="text-[11px] text-ink-soft">
+                fila {pendiente.fila}
+                {pendiente.cuitEnmascarado ? ` · CUIT ${pendiente.cuitEnmascarado}` : ""}
+              </p>
+            </div>
+            <Select
+              className="h-8 min-w-72 text-xs"
+              value={elegidos[pendiente.filaId] ?? ""}
+              onChange={(evento) =>
+                onElegir(
+                  pendiente.filaId,
+                  evento.target.value === "" ? null : Number(evento.target.value),
+                )
+              }
+              aria-label={`Productor para ${pendiente.razonSocialArchivo ?? `la fila ${pendiente.fila}`}`}
+            >
+              <option value="">— elegí el productor —</option>
+              {pendiente.candidatos.map((candidato) => (
+                <option key={candidato.productorId} value={candidato.productorId}>
+                  {candidato.cuentaMacroGest != null ? `${candidato.cuentaMacroGest} · ` : ""}
+                  {candidato.razonSocial}
+                </option>
+              ))}
+            </Select>
+          </li>
+        ))}
+      </ul>
+
+      <p className="mt-2.5 text-xs text-ink-soft">
+        {faltan === 0
+          ? "Listo. Volvé a analizar para que el archivo entre completo."
+          : `Falta${faltan === 1 ? "" : "n"} ${numero(faltan)}.`}
+      </p>
     </div>
   );
 }

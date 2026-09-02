@@ -142,25 +142,68 @@ describe("solapa de carga de datos", () => {
     expect(screen.getByText(/US\$ 0,00/)).toBeInTheDocument();
   });
 
-  it("no ofrece confirmar cuando hay filas sin resolver", () => {
+  it("deja elegir el productor de una fila ambigua, con la pista de MacroGest a la vista", () => {
     planPreview = vistaPlan({
       puedeConfirmar: false,
       pendientes: [
         {
-          filaId: "f1",
+          filaId: "legacy:ventas:65",
           hoja: "Ventas consolidado Clientes",
-          fila: 12,
-          razonSocialArchivo: "LAS YERBAS S.A.",
-          cuitEnmascarado: "30-****-9",
-          candidatos: [],
+          fila: 65,
+          razonSocialArchivo: "CAMURRI S.A.",
+          cuitEnmascarado: "*******5153",
+          candidatos: [
+            { productorId: 769, cuentaMacroGest: 769, razonSocial: "CAMURRI S.A." },
+            { productorId: 3131, cuentaMacroGest: 3153, razonSocial: "CAMURRI HERMANOS (NO USAR)" },
+          ],
         },
       ],
     });
     render(<DatosTab campania="2025-2026" />);
 
     expect(screen.queryByRole("button", { name: "Confirmar importación" })).not.toBeInTheDocument();
-    expect(screen.getByText(/no se pudieron asignar a un productor/i)).toBeInTheDocument();
-    expect(screen.getByText(/LAS YERBAS S\.A\./)).toBeInTheDocument();
+    expect(screen.getByText("CAMURRI S.A.")).toBeInTheDocument();
+    // El nombre de MacroGest suele decir cuál no usar: se muestra entero, sin recortar.
+    expect(screen.getByRole("option", { name: /CAMURRI HERMANOS \(NO USAR\)/ })).toBeInTheDocument();
+
+    const selector = screen.getByRole("combobox", { name: /Productor para CAMURRI/i });
+    expect(screen.getByText(/Falta 1/)).toBeInTheDocument();
+
+    fireEvent.change(selector, { target: { value: "769" } });
+    expect(screen.queryByText(/Falta 1/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Listo\. Volvé a analizar para que el archivo entre completo/i),
+    ).toBeInTheDocument();
+  });
+
+  it("reenvia las elecciones al volver a analizar", () => {
+    planPreview = vistaPlan({
+      puedeConfirmar: false,
+      pendientes: [
+        {
+          filaId: "legacy:ventas:65",
+          hoja: "Ventas consolidado Clientes",
+          fila: 65,
+          razonSocialArchivo: "CAMURRI S.A.",
+          cuitEnmascarado: "*******5153",
+          candidatos: [
+            { productorId: 769, cuentaMacroGest: 769, razonSocial: "CAMURRI S.A." },
+          ],
+        },
+      ],
+    });
+    render(<DatosTab campania="2025-2026" />);
+
+    const entrada = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(entrada, { target: { files: [archivo()] } });
+    fireEvent.change(screen.getByRole("combobox", { name: /Productor para CAMURRI/i }), {
+      target: { value: "769" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Analizar de nuevo" }));
+
+    expect(previewPlan).toHaveBeenCalledWith(
+      expect.objectContaining({ resoluciones: { "legacy:ventas:65": 769 } }),
+    );
   });
 
   it("avisa cuando quedan hectareas sin costo, que dejan el mercado incompleto", () => {
