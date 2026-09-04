@@ -3,13 +3,14 @@ import { apiClient } from "@/lib/api-client";
 import { cuentasKeys } from "./keys";
 
 export interface ImportacionResultado {
+  /** Cuentas del archivo que se tomaron: las del vendedor que lo completó. */
+  cuentasImportadas: number;
+  /** De las importadas, en cuántas cambió algún valor. */
+  cuentasActualizadas: number;
   /** Filas con cuenta que tenía el archivo (incluye las de otros vendedores). */
   filasLeidas: number;
   /** Filas descartadas por venir ocultas del autofiltro: son de otros vendedores. */
   filasIgnoradas: number;
-  /** Cuentas en las que efectivamente cambió algún valor. */
-  cuentasActualizadas: number;
-  sinCambios: number;
   /** Único vendedor visible en el archivo, si se pudo determinar. */
   vendedorDetectado: string | null;
   advertencias: string[];

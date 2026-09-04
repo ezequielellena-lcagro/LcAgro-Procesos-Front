@@ -11,11 +11,12 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.f
 
 const como = <R,>(r: unknown): R => r as R;
 
+/** El archivo real de Bravin: 195 filas, 10 son suyas y 6 traen algo distinto de lo guardado. */
 const OK: ImportacionResultado = {
+  cuentasImportadas: 10,
+  cuentasActualizadas: 6,
   filasLeidas: 195,
   filasIgnoradas: 185,
-  cuentasActualizadas: 6,
-  sinCambios: 4,
   vendedorDetectado: "GUILLERMO BRAVIN",
   advertencias: [],
 };
@@ -63,7 +64,7 @@ describe("ImportarCuentasButton", () => {
     );
   });
 
-  it("avisa los cambios reales y el vendedor detectado", async () => {
+  it("avisa cuántas cuentas se importaron y cuántas se modificaron, y de qué vendedor", async () => {
     const mutateAsync = vi.fn().mockResolvedValue(OK);
     const { container } = montar(mutateAsync);
 
@@ -72,21 +73,29 @@ describe("ImportarCuentasButton", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
     const mensaje = vi.mocked(toast.success).mock.calls[0][0] as string;
     expect(mensaje).toContain("GUILLERMO BRAVIN");
-    expect(mensaje).toContain("6");
+    expect(mensaje).toContain("10 cuentas importadas");
+    expect(mensaje).toContain("6 modificadas");
   });
 
-  it("no repite en el resumen el aviso de filas ignoradas que ya manda el backend", async () => {
-    // Todo archivo real viene filtrado, así que esta advertencia sale en cada import: si además la
-    // repitiera el resumen, la usuaria leería dos veces lo mismo justo cuando tiene que prestar atención.
-    const aviso = "Se ignoraron 185 fila(s) que el filtro de Excel dejó ocultas: son de otros vendedores.";
-    const mutateAsync = vi.fn().mockResolvedValue({ ...OK, advertencias: [aviso] });
+  it("no menciona las filas descartadas: pasa en todos los imports y no es lo que se mira", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(OK);
     const { container } = montar(mutateAsync);
 
     elegirArchivo(container);
 
     await waitFor(() => expect(toast.success).toHaveBeenCalled());
-    expect(vi.mocked(toast.success).mock.calls[0][0]).not.toMatch(/ignor/i);
-    expect(toast.info).toHaveBeenCalledWith(aviso);
+    const mensaje = vi.mocked(toast.success).mock.calls[0][0] as string;
+    expect(mensaje).not.toMatch(/ignor|descart|195|185/i);
+  });
+
+  it("sigue mostrando las advertencias que manda el backend", async () => {
+    const aviso = "La cuenta 7021 aparece dos veces en el archivo.";
+    const mutateAsync = vi.fn().mockResolvedValue({ ...OK, advertencias: [aviso] });
+    const { container } = montar(mutateAsync);
+
+    elegirArchivo(container);
+
+    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(aviso));
   });
 
   it("pide confirmación en vez de pisar cuando el archivo tiene varios vendedores", async () => {

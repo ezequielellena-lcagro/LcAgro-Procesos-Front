@@ -91,8 +91,11 @@ export function ImportarCuentasButton() {
   );
 }
 
-/** Las filas ignoradas no van acá: las informa el backend por `advertencias`, con el porqué. */
+/**
+ * Los dos números que se miran: cuántas cuentas entraron y cuántas cambiaron. Las filas descartadas
+ * (las de otros vendedores) no van acá: pasa en todos los imports y sería ruido.
+ */
 function resumen(r: ImportacionResultado): string {
   const de = r.vendedorDetectado ? ` de ${r.vendedorDetectado}` : "";
-  return `Importación lista${de}: ${r.cuentasActualizadas} cuenta(s) con cambios, ${r.sinCambios} sin cambios.`;
+  return `Importación lista${de}: ${r.cuentasImportadas} cuentas importadas, ${r.cuentasActualizadas} modificadas.`;
 }
