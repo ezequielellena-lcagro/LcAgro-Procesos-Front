@@ -18,7 +18,6 @@ const OK: ImportacionResultado = {
   filasLeidas: 195,
   filasIgnoradas: 185,
   vendedorDetectado: "GUILLERMO BRAVIN",
-  advertencias: [],
 };
 
 /** Error tal como llega del backend cuando el archivo no está filtrado por vendedor. */
@@ -88,14 +87,15 @@ describe("ImportarCuentasButton", () => {
     expect(mensaje).not.toMatch(/ignor|descart|195|185/i);
   });
 
-  it("sigue mostrando las advertencias que manda el backend", async () => {
-    const aviso = "La cuenta 7021 aparece dos veces en el archivo.";
-    const mutateAsync = vi.fn().mockResolvedValue({ ...OK, advertencias: [aviso] });
+  it("muestra un solo cartel: dos apilados se tapan entre sí", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(OK);
     const { container } = montar(mutateAsync);
 
     elegirArchivo(container);
 
-    await waitFor(() => expect(toast.info).toHaveBeenCalledWith(aviso));
+    await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+    expect(toast.info).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();   // que no pase por reventar y quedar tapado
   });
 
   it("pide confirmación en vez de pisar cuando el archivo tiene varios vendedores", async () => {

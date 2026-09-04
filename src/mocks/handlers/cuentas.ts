@@ -6,6 +6,7 @@ import type {
   FacturaContado,
   VendedorContado,
 } from "@/features/cuentas/types";
+import type { ImportacionResultado } from "@/features/cuentas/queries/use-importar-cuentas";
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
@@ -401,7 +402,15 @@ export const cuentasHandlers = [
   http.post(`${API}/cuentas/import`, async ({ request }) => {
     await request.formData(); // consume el archivo subido
     OBS[1024] = { devolucion: "Importado desde Excel (demo)", observaciones: OBS[1024]?.observaciones ?? null };
-    return HttpResponse.json({ filasLeidas: 14, cuentasActualizadas: 1, sinCambios: 13, advertencias: [] });
+    // Tipado contra el contrato real: si el DTO cambia, esto no compila en vez de mostrar "undefined".
+    const resultado: ImportacionResultado = {
+      cuentasImportadas: 4,
+      cuentasActualizadas: 1,
+      filasLeidas: 14,
+      filasIgnoradas: 10,
+      vendedorDetectado: "LC AGRO",
+    };
+    return HttpResponse.json(resultado);
   }),
 
   http.put(`${API}/cuentas/:cuenta/observacion`, async ({ request, params }) => {

@@ -27,7 +27,6 @@ export function ImportarCuentasButton() {
       const r = await importar.mutateAsync({ file, confirmarVariosVendedores });
       setAConfirmar(null);
       toast.success(resumen(r));
-      r.advertencias.forEach((a) => toast.info(a));
     } catch (e) {
       const error = toAppError(e);
       if (error.codigo === VARIOS_VENDEDORES) setAConfirmar({ file, motivo: error.message });

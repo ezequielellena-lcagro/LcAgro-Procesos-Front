@@ -13,7 +13,6 @@ export interface ImportacionResultado {
   filasIgnoradas: number;
   /** Único vendedor visible en el archivo, si se pudo determinar. */
   vendedorDetectado: string | null;
-  advertencias: string[];
 }
 
 export interface ImportarCuentasVars {
