@@ -1,35 +1,47 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { cuentasKeys } from "./keys";
 
 export interface ImportacionResultado {
+  /** Filas con cuenta que tenía el archivo (incluye las de otros vendedores). */
   filasLeidas: number;
+  /** Filas descartadas por venir ocultas del autofiltro: son de otros vendedores. */
+  filasIgnoradas: number;
+  /** Cuentas en las que efectivamente cambió algún valor. */
   cuentasActualizadas: number;
   sinCambios: number;
+  /** Único vendedor visible en el archivo, si se pudo determinar. */
+  vendedorDetectado: string | null;
   advertencias: string[];
 }
 
+export interface ImportarCuentasVars {
+  file: File;
+  /** Importar aunque el archivo tenga varios vendedores a la vista (la usuaria lo confirmó). */
+  confirmarVariosVendedores: boolean;
+}
+
 /**
- * Sube el .xlsx completado por los vendedores. El backend solo pisa los campos que vienen con dato
- * (las celdas vacías no tocan lo ya cargado). Al terminar, refresca el listado y avisa el resumen.
+ * Sube el .xlsx completado por un vendedor. El backend se acota a las filas que ese vendedor tenía a
+ * la vista (las que el filtro de Excel dejó ocultas son de otros y no se tocan) y solo pisa campos con
+ * dato. Los errores los muestra el componente: necesita distinguir "varios_vendedores" para ofrecer
+ * importar igual, así que la mutation no dispara el toast global.
  */
 export function useImportarCuentas() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (file: File) => {
+    meta: { silentError: true },
+    mutationFn: async ({ file, confirmarVariosVendedores }: ImportarCuentasVars) => {
       const form = new FormData();
       form.append("file", file);
+      form.append("confirmarVariosVendedores", String(confirmarVariosVendedores));
       const { data } = await apiClient.post<ImportacionResultado>("/cuentas/import", form, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       return data;
     },
-    onSuccess: (r) => {
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: cuentasKeys.lists() });
-      toast.success(
-        `Importación lista: ${r.cuentasActualizadas} cuenta(s) actualizada(s) de ${r.filasLeidas} leída(s).`,
-      );
     },
   });
 }

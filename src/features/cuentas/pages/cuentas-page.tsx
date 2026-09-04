@@ -1,5 +1,5 @@
-import { useRef, useState, type ChangeEvent } from "react";
-import { Link, Upload } from "lucide-react";
+import { useState } from "react";
+import { Link } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,10 +22,10 @@ import { CuentasTable } from "../components/cuentas-table";
 import { ContadoPanel } from "../components/contado-panel";
 import { HistoricoPanel } from "../components/historico-panel";
 import { EnviarLinkDialog } from "../components/enviar-link-dialog";
+import { ImportarCuentasButton } from "../components/importar-cuentas-button";
 import { ObservacionDialog } from "../components/observacion-dialog";
 import { useCuentas } from "../queries/use-cuentas";
 import { useExportarCuentas } from "../queries/use-exportar-cuentas";
-import { useImportarCuentas } from "../queries/use-importar-cuentas";
 import { useVendedores } from "../queries/use-enviar-link";
 import type { CuentaDto } from "../types";
 
@@ -52,15 +52,7 @@ export function CuentasPage() {
   });
 
   const exportar = useExportarCuentas();
-  const importar = useImportarCuentas();
   const vendedores = useVendedores(true); // lista de MacroGest para el filtro y el diálogo de envío
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const onArchivo = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // permite re-seleccionar el mismo archivo
-    if (file) importar.mutate(file);
-  };
 
   const exportColumns: ExportColumn<CuentaDto>[] = [
     { header: "Vendedor", get: (r) => r.vendedor },
@@ -101,22 +93,7 @@ export function CuentasPage() {
           <div className="no-print flex items-center gap-2">
             {puedeEditar && (
               <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                  className="hidden"
-                  onChange={onArchivo}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={importar.isPending}
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="size-4" /> {importar.isPending ? "Importando…" : "Importar"}
-                </Button>
+                <ImportarCuentasButton />
                 <Button
                   type="button"
                   variant="outline"

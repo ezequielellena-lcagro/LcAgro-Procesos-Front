@@ -8,6 +8,8 @@ export interface ProblemDetails {
   detail?: string;
   errors?: Record<string, string[]>; // validación: campo → mensajes
   traceId?: string;
+  /** Código estable del error de negocio (p. ej. "varios_vendedores"), para ramificar sin parsear el texto. */
+  codigo?: string;
 }
 
 /** Error normalizado para que toda la UI lo consuma igual. */
@@ -18,6 +20,8 @@ export interface AppError {
   /** Errores por campo, para mapear a react-hook-form. */
   fieldErrors?: Record<string, string[]>;
   traceId?: string;
+  /** Código estable del error de negocio, cuando la API lo informa. */
+  codigo?: string;
 }
 
 const FALLBACK = "Ocurrió un error inesperado. Probá de nuevo.";
@@ -41,6 +45,7 @@ export function toAppError(error: unknown): AppError {
       message: pd?.detail ?? pd?.title ?? mensajePorStatus(status),
       fieldErrors: pd?.errors,
       traceId: pd?.traceId,
+      codigo: pd?.codigo,
     };
   }
 
