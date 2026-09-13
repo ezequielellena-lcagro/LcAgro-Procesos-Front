@@ -14,8 +14,8 @@ import { useContado } from "../queries/use-contado";
 import type { Contado, CuentaContado, FacturaContado, VendedorContado } from "../types";
 
 const AVISO =
-  "Si la cuenta no tiene saldo vencido, sus facturas vencidas no se muestran: se consideran saldadas. " +
-  "Canje/LPG, retenciones y órdenes de pago bajan el saldo de la cuenta sin imputarse a la factura; manda el saldo total.";
+  "Si la cuenta no tiene saldo vencido, sus facturas vencidas no se muestran: se consideran saldadas por " +
+  "canje (LPG/LSG), retenciones u órdenes de pago, que bajan el saldo sin imputarse a la factura.";
 
 /** Fila plana del Excel: una por factura, con su cuenta y vendedor repetidos. */
 interface FilaExportContado {
@@ -121,7 +121,7 @@ function DatoMonto({ label, valor, className }: { label: string; valor: number; 
 
 /**
  * Saldo GLOBAL de la cuenta (todos sus movimientos). Es el ancla de conciliación: si es menor que
- * el contado impago, la diferencia se pagó por canje/LSG sin imputarse a las facturas.
+ * el contado impago, la diferencia se pagó por canje LPG/LSG sin imputarse a las facturas.
  */
 function SaldoGlobal({ cuenta }: { cuenta: CuentaContado }) {
   return (
@@ -146,7 +146,7 @@ function SaldoGlobal({ cuenta }: { cuenta: CuentaContado }) {
 
 function BloqueCuenta({ cuenta }: { cuenta: CuentaContado }) {
   const totalImporte = cuenta.facturas.reduce((s, f) => s + f.importe, 0);
-  // El saldo global por debajo del contado es el caso "saldada por canje/LSG": se avisa, no es un error.
+  // El saldo global por debajo del contado es el caso "saldada por canje LPG/LSG": se avisa, no es un error.
   const saldadaPorCanje = cuenta.saldo < cuenta.monto;
 
   return (
@@ -166,7 +166,7 @@ function BloqueCuenta({ cuenta }: { cuenta: CuentaContado }) {
           </p>
           {saldadaPorCanje && (
             <p className="mt-1 text-xs text-ink-soft">
-              El saldo global es menor que el monto de contado (canje/LSG): manda el saldo total.
+              El saldo global es menor que el monto de contado (canje LPG/LSG): manda el saldo total.
             </p>
           )}
         </div>
@@ -244,7 +244,7 @@ interface ContadoPanelProps {
   activa: boolean;
 }
 
-/** Solapa "Contado": facturas de contado impagas (vencidas y a vencer), vendedor → cuenta → factura. */
+/** Solapa "Contado": facturas de contado impagas (vencidas y a vencer; el backend ya descarta las vencidas de cuentas sin saldo vencido), vendedor → cuenta → factura. */
 export function ContadoPanel({ vendNro, minUsd, activa }: ContadoPanelProps) {
   const consulta = useContado({ vendNro, minUsd }, activa);
 

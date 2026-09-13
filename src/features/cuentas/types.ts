@@ -57,7 +57,7 @@ export interface ObservacionInput {
   observaciones: string | null;
 }
 
-// ── Contado (facturas de contado impagas: vencidas y a vencer) ────────────────────
+// ── Contado (facturas de contado impagas: vencidas y a vencer; el backend ya descarta las vencidas de cuentas sin saldo vencido) ────────────────────
 // Espeja ContadoDto del backend. Todas las fechas vienen como yyyy-MM-dd.
 
 /** Filtros de la solapa (los mismos de la FilterBar de la pantalla). */
@@ -86,7 +86,7 @@ export interface FacturaContado {
  * Cuenta con facturas de contado impagas. `montoVencido`/`montoAVencer` suman el `pendiente` de las
  * facturas vencidas / a vencer, y `monto` es el total (contado impago de la cuenta). Los tres `saldo*`
  * son el saldo GLOBAL de la cuenta (todos sus movimientos, no solo el contado) y son el ancla de
- * conciliación: pueden ser menores que `monto`, e incluso <= 0, porque los pagos por canje/LSG bajan
+ * conciliación: pueden ser menores que `monto`, e incluso <= 0, porque los pagos por canje LPG/LSG bajan
  * el saldo sin imputarse a la factura.
  */
 export interface CuentaContado {

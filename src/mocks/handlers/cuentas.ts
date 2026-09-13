@@ -28,7 +28,7 @@ const CUENTAS: CuentaBase[] = [
   { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2011, denominacion: "Cabaña Los Aromos", saldoVencido: 42300, saldoAVencer: 12750.25, saldo: 55050.25 },
   { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2044, denominacion: "Siembras del Oeste S.A.", saldoVencido: 980, saldoAVencer: 0, saldo: 980 },
   { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2078, denominacion: "La Carmela Agropecuaria", saldoVencido: 0, saldoAVencer: 6400, saldo: 6400 },
-  { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2099, denominacion: "Hnos. Gutiérrez SRL", saldoVencido: 15600.4, saldoAVencer: 3100, saldo: 18700.4 },
+  { vendedor: "PAMPA SUR", vendNro: 2, cuenta: 2099, denominacion: "Hnos. Gutiérrez SRL", saldoVencido: 0, saldoAVencer: 3100, saldo: 3100 },
   { vendedor: "CENTRO GRANOS", vendNro: 3, cuenta: 3002, denominacion: "El Amanecer S.A.", saldoVencido: 7250, saldoAVencer: 0, saldo: 7250 },
   { vendedor: "CENTRO GRANOS", vendNro: 3, cuenta: 3015, denominacion: "Campos del Norte SRL", saldoVencido: 0, saldoAVencer: 21000, saldo: 21000 },
   { vendedor: "CENTRO GRANOS", vendNro: 3, cuenta: 3033, denominacion: "Agro Don Pedro", saldoVencido: 2890.9, saldoAVencer: 1450, saldo: 4340.9 },
@@ -68,7 +68,8 @@ function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
 //  - las cuentas 2044 y 3088 tienen un monto de contado mayor que su saldo global: es el caso
 //    "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura;
 //  - igual que el backend (regla 2026-09-13): si la cuenta no tiene saldo vencido, sus facturas
-//    VENCIDAS no se muestran (están saldadas por la cuenta). Las a vencer sí.
+//    VENCIDAS no se muestran (están saldadas por la cuenta). Las a vencer sí;
+//  - la cuenta 2099 tiene vencido 0 y una factura vencida: NO aparece en Contado (muestra la regla en la demo).
 interface FacturaContadoBase {
   comprobante: string;
   emisionOffset: number; // días respecto del corte (negativo = pasado)
@@ -94,6 +95,7 @@ const FACTURAS_CONTADO: Record<number, FacturaContadoBase[]> = {
   2044: [
     { comprobante: "A-16988", emisionOffset: -380, vencimientoOffset: -350, importe: 5400, pendiente: 5400 }, // vencida
   ],
+  // Vencido 0 en la cuenta: esta factura vencida no aparece en Contado (regla del saldo vencido).
   2099: [
     { comprobante: "A-19022", emisionOffset: -200, vencimientoOffset: -185, importe: 2750, pendiente: 2750 }, // vencida
   ],
