@@ -244,7 +244,10 @@ interface ContadoPanelProps {
   activa: boolean;
 }
 
-/** Solapa "Contado": facturas de contado impagas (vencidas y a vencer; el backend ya descarta las vencidas de cuentas sin saldo vencido), vendedor → cuenta → factura. */
+/**
+ * Solapa "Contado": facturas de contado impagas (vencidas y a vencer; el backend ya descarta las
+ * vencidas de cuentas sin saldo vencido), vendedor → cuenta → factura.
+ */
 export function ContadoPanel({ vendNro, minUsd, activa }: ContadoPanelProps) {
   const consulta = useContado({ vendNro, minUsd }, activa);
 
@@ -253,7 +256,12 @@ export function ContadoPanel({ vendNro, minUsd, activa }: ContadoPanelProps) {
 
   const datos = consulta.data;
   if (datos.vendedores.length === 0) {
-    return <EmptyState mensaje="No hay facturas de contado impagas con esos filtros." />;
+    return (
+      <div className="space-y-2">
+        <EmptyState mensaje="No hay facturas de contado impagas con esos filtros." />
+        <p className="text-xs text-ink-soft">{AVISO}</p>
+      </div>
+    );
   }
 
   const { totales } = datos;

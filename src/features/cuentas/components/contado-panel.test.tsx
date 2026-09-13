@@ -170,5 +170,6 @@ describe("ContadoPanel", () => {
     );
     render(<ContadoPanel activa />);
     expect(screen.getByText(/No hay facturas de contado impagas/i)).toBeInTheDocument();
+    expect(screen.getByText(/no tiene saldo vencido/i)).toBeVisible(); // explica por qué pudo quedar vacío
   });
 });

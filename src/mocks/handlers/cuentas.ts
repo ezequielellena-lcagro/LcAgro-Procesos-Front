@@ -66,7 +66,7 @@ function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
 //  - la cuenta 3015 tiene SOLO facturas a vencer (vencido 0) y DEBE aparecer igual: el umbral filtra
 //    por el total impago (monto), nunca por lo vencido;
 //  - las cuentas 2044 y 3088 tienen un monto de contado mayor que su saldo global: es el caso
-//    "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura;
+//    "saldada por canje LPG/LSG", donde el pago bajó el saldo sin imputarse a la factura;
 //  - igual que el backend (regla 2026-09-13): si la cuenta no tiene saldo vencido, sus facturas
 //    VENCIDAS no se muestran (están saldadas por la cuenta). Las a vencer sí;
 //  - la cuenta 2099 tiene vencido 0 y una factura vencida: NO aparece en Contado (muestra la regla en la demo).

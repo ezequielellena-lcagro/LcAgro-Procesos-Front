@@ -57,7 +57,8 @@ export interface ObservacionInput {
   observaciones: string | null;
 }
 
-// ── Contado (facturas de contado impagas: vencidas y a vencer; el backend ya descarta las vencidas de cuentas sin saldo vencido) ────────────────────
+// ── Contado (facturas de contado impagas: vencidas y a vencer) ────────────────────
+// El backend ya descarta las vencidas de cuentas sin saldo vencido.
 // Espeja ContadoDto del backend. Todas las fechas vienen como yyyy-MM-dd.
 
 /** Filtros de la solapa (los mismos de la FilterBar de la pantalla). */
