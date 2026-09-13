@@ -150,6 +150,12 @@ describe("ContadoPanel", () => {
     expect(screen.queryByText("2011 — Cabaña Los Aromos")).not.toBeInTheDocument();
   });
 
+  it("explica que las vencidas de una cuenta sin saldo vencido se consideran saldadas", () => {
+    render(<ContadoPanel activa />);
+
+    expect(screen.getByText(/no tiene saldo vencido/i)).toBeVisible();
+  });
+
   it("muestra el estado vacío cuando no hay facturas de contado impagas", () => {
     vi.mocked(useContado).mockReturnValue(
       comoResultado({

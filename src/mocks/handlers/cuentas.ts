@@ -66,7 +66,9 @@ function aplicarFiltros(rows: CuentaDto[], u: URL): CuentaDto[] {
 //  - la cuenta 3015 tiene SOLO facturas a vencer (vencido 0) y DEBE aparecer igual: el umbral filtra
 //    por el total impago (monto), nunca por lo vencido;
 //  - las cuentas 2044 y 3088 tienen un monto de contado mayor que su saldo global: es el caso
-//    "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura.
+//    "saldada por canje/LSG", donde el pago bajó el saldo sin imputarse a la factura;
+//  - igual que el backend (regla 2026-09-13): si la cuenta no tiene saldo vencido, sus facturas
+//    VENCIDAS no se muestran (están saldadas por la cuenta). Las a vencer sí.
 interface FacturaContadoBase {
   comprobante: string;
   emisionOffset: number; // días respecto del corte (negativo = pasado)
@@ -165,8 +167,12 @@ function armarContado(u: URL) {
           pendiente: f.pendiente,
         };
       })
+      // Regla del backend: una cuenta sin saldo vencido no tiene mora de contado.
+      .filter((f) => !(f.vencida && c.saldoVencido <= 0))
       // vencimiento asc → las vencidas (fecha pasada) quedan primero.
       .sort((a, b) => a.vencimiento.localeCompare(b.vencimiento));
+
+    if (facturas.length === 0) continue;
 
     const montoVencido = facturas.filter((f) => f.vencida).reduce((s, f) => s + f.pendiente, 0);
     const montoAVencer = facturas.filter((f) => !f.vencida).reduce((s, f) => s + f.pendiente, 0);

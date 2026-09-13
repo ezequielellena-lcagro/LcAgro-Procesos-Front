@@ -14,8 +14,8 @@ import { useContado } from "../queries/use-contado";
 import type { Contado, CuentaContado, FacturaContado, VendedorContado } from "../types";
 
 const AVISO =
-  "El pendiente por factura es informativo: canje/LSG bajan el saldo global sin imputarse a la factura, " +
-  "así que una factura puede figurar impaga aunque la cuenta ya esté saldada — manda el saldo total.";
+  "Si la cuenta no tiene saldo vencido, sus facturas vencidas no se muestran: se consideran saldadas. " +
+  "Canje/LPG, retenciones y órdenes de pago bajan el saldo de la cuenta sin imputarse a la factura; manda el saldo total.";
 
 /** Fila plana del Excel: una por factura, con su cuenta y vendedor repetidos. */
 interface FilaExportContado {
