@@ -91,6 +91,49 @@ describe("mocks de demo: semillero", () => {
     expect(data.totales.clientes.kgDisponibles).toBeGreaterThan(0);
   });
 
+  it("sin soloConStock un lote en cero queda oculto, igual que el default del backend (StockFiltro.SoloConStock=true)", async () => {
+    const alta = await apiClient.post<LoteDto>("/semillero/lotes", {
+      codigo: "TEST-CERO",
+      campania: "2026-2027",
+      variedadId: 1,
+      envase: "BigBag",
+      pesoUnitarioKg: 800,
+      tratada: false,
+      pg: null,
+      pmil: null,
+      observaciones: null,
+      duenio: "Propio",
+      clienteNumero: null,
+      ubicacionId: 1,
+      cantidad: 5,
+    } satisfies LoteAltaInput);
+    await apiClient.post("/semillero/movimientos/ajuste", {
+      loteId: alta.data.id,
+      ubicacionId: 1,
+      cantidad: -5,
+      motivo: "RoturaPerdida",
+      observacion: null,
+    } satisfies AjusteInput);
+
+    // Sin mandar el parámetro (igual que el front cuando "Mostrar agotados" está sin tildar):
+    // axios omite los filtros undefined, así que el backend recibe la request sin soloConStock
+    // y aplica su default `= true`, que oculta los lotes en cero.
+    const porDefecto = await apiClient.get<StockSemilleroDto>("/semillero/stock");
+    expect(
+      porDefecto.data.filas.some((f) => f.loteId === alta.data.id && f.ubicacionId === 1),
+    ).toBe(false);
+
+    // Con "Mostrar agotados" tildado, el front manda soloConStock=false explícito.
+    const mostrandoAgotados = await apiClient.get<StockSemilleroDto>("/semillero/stock", {
+      params: { soloConStock: false },
+    });
+    const fila = mostrandoAgotados.data.filas.find(
+      (f) => f.loteId === alta.data.id && f.ubicacionId === 1,
+    );
+    expect(fila).toBeDefined();
+    expect(fila!.fisico).toBe(0);
+  });
+
   it("catalogos trae la campaña sugerida en formato AAAA-AAAA, dentro de las opciones", async () => {
     const { data } = await apiClient.get<CatalogosSemilleroDto>("/semillero/catalogos");
     expect(data.campaniaSugerida).toMatch(/^\d{4}-\d{4}$/);

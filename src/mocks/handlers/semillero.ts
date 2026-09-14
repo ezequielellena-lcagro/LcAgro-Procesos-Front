@@ -565,7 +565,13 @@ export const semilleroHandlers = [
     if (campania) filas = filas.filter((f) => f.campania === campania);
     if (duenio) filas = filas.filter((f) => f.duenio === duenio);
     if (clienteNumero) filas = filas.filter((f) => f.clienteNumero === Number(clienteNumero));
-    if (soloConStock === "true") filas = filas.filter((f) => f.fisico > 0);
+    // El backend usa `StockFiltro.SoloConStock` no-nullable con default `= true` (StockDtos.cs).
+    // Cuando el front no manda el parámetro (filtros.soloConStock arranca en `undefined` y axios
+    // omite los params undefined), el backend igual oculta los lotes en cero: hay que replicar ese
+    // default acá. Solo se muestra todo cuando llega explícitamente "false" ("Mostrar agotados" tildado).
+    if (soloConStock !== "false") {
+      filas = filas.filter((f) => f.fisico !== 0 || f.comprometido !== 0);
+    }
 
     return HttpResponse.json({ filas, totales: stockTotales(filas) } satisfies StockSemilleroDto);
   }),
