@@ -1,0 +1,356 @@
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { AxiosError, AxiosHeaders } from "axios";
+import { describe, expect, it, vi } from "vitest";
+import type {
+  ClienteCopiaDto,
+  DestinoDto,
+  EstadoCopiaClientesDto,
+  OrdenCargaDto,
+  StockFilaDto,
+} from "../types";
+import { OrdenDialog } from "./orden-dialog";
+
+const CLIENTES: ClienteCopiaDto[] = [
+  { numero: 500, denominacion: "Cliente Uno", cuit: null },
+  { numero: 600, denominacion: "Cliente Dos", cuit: null },
+];
+
+const DESTINOS_500: DestinoDto[] = [{ id: 10, clienteNumero: 500, nombre: "Campo Norte", activo: true, enUso: 0 }];
+
+const COPIA_OK: EstadoCopiaClientesDto = {
+  ultimaSincronizacion: new Date().toISOString(),
+  ultimoIntentoFallido: null,
+  ultimoError: null,
+  desactualizada: false,
+  sinCopia: false,
+  cantidad: 2,
+};
+
+function fila(over: Partial<StockFilaDto> = {}): StockFilaDto {
+  const base: StockFilaDto = {
+    loteId: 1,
+    loteCodigo: "26S-001",
+    campania: "2026-2027",
+    especie: "Soja",
+    variedadId: 1,
+    variedad: "DM 46E25",
+    envase: "BigBag",
+    pesoUnitarioKg: 800,
+    tratada: false,
+    pg: 95,
+    pmil: 150,
+    observaciones: null,
+    duenio: "Propio",
+    clienteNumero: null,
+    clienteDenominacion: null,
+    ubicacionId: 1,
+    ubicacion: "G1-1",
+    fisico: 10,
+    comprometido: 0,
+    disponible: 10,
+    kgDisponibles: 8000,
+  };
+  const f = { ...base, ...over };
+  return { ...f, disponible: f.fisico - f.comprometido, kgDisponibles: (f.fisico - f.comprometido) * f.pesoUnitarioKg };
+}
+
+const PROPIO = fila({ loteId: 1, loteCodigo: "26S-001", ubicacionId: 1, ubicacion: "G1-1" });
+const CLIENTE_500 = fila({
+  loteId: 2,
+  loteCodigo: "26S-C01",
+  ubicacionId: 2,
+  ubicacion: "PLANTA",
+  duenio: "Cliente",
+  clienteNumero: 500,
+  clienteDenominacion: "Cliente Uno",
+  fisico: 5,
+  comprometido: 0,
+  pesoUnitarioKg: 40,
+  envase: "Bolsa",
+});
+
+const ORDEN_EDITABLE: OrdenCargaDto = {
+  id: 1,
+  numero: 1,
+  fechaAlta: new Date().toISOString(),
+  clienteNumero: 500,
+  clienteDenominacion: "Cliente Uno",
+  destinoId: 10,
+  destinoNombre: "Campo Norte",
+  numeroPedidoVenta: null,
+  numeroRemito: null,
+  observaciones: null,
+  estado: "Pendiente",
+  fechaDespacho: null,
+  fechaAnulacion: null,
+  motivoAnulacion: null,
+  motivoAnulacionDetalle: null,
+  creadoPor: "Admin Demo",
+  despachadoPor: null,
+  anuladoPor: null,
+  items: [
+    {
+      id: 1,
+      loteId: 2,
+      loteCodigo: "26S-C01",
+      campania: "2026-2027",
+      especie: "Soja",
+      variedad: "DM 46E25",
+      envase: "Bolsa",
+      pesoUnitarioKg: 40,
+      tratada: false,
+      pg: null,
+      pmil: null,
+      duenio: "Cliente",
+      clienteNumero: 500,
+      ubicacionId: 2,
+      ubicacion: "PLANTA",
+      cantidad: 3,
+      kg: 120,
+    },
+  ],
+  totalUnidades: 3,
+  totalKgPropio: 0,
+  totalKgCliente: 120,
+};
+
+interface RenderOpts {
+  orden?: OrdenCargaDto | null;
+  filas?: StockFilaDto[];
+  destinos?: DestinoDto[];
+  clientes?: ClienteCopiaDto[];
+}
+
+function renderDialog(opts: RenderOpts = {}) {
+  const onCrear = vi.fn().mockResolvedValue(undefined);
+  const onActualizar = vi.fn().mockResolvedValue(undefined);
+  const onClose = vi.fn();
+  const onActualizarClientes = vi.fn();
+  const onAgregarDestino = vi.fn();
+  const onClienteChange = vi.fn();
+  render(
+    <OrdenDialog
+      open
+      orden={opts.orden ?? null}
+      clientes={opts.clientes ?? CLIENTES}
+      copiaClientes={COPIA_OK}
+      actualizandoClientes={false}
+      onActualizarClientes={onActualizarClientes}
+      filas={opts.filas ?? [PROPIO, CLIENTE_500]}
+      destinos={opts.destinos ?? DESTINOS_500}
+      onClienteChange={onClienteChange}
+      onAgregarDestino={onAgregarDestino}
+      onCrear={onCrear}
+      onActualizar={onActualizar}
+      onClose={onClose}
+    />,
+  );
+  return { onCrear, onActualizar, onClose, onActualizarClientes, onAgregarDestino, onClienteChange };
+}
+
+function elegirCliente(etiqueta: string) {
+  const combo = screen.getByLabelText("Cliente");
+  fireEvent.focus(combo);
+  fireEvent.change(combo, { target: { value: etiqueta } });
+  fireEvent.mouseDown(screen.getByText(new RegExp(etiqueta)));
+}
+
+function agregarRenglon(clave: string, cantidad: string) {
+  fireEvent.change(screen.getByLabelText("Agregar renglón"), { target: { value: clave } });
+  fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: cantidad } });
+  fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+}
+
+function errorServidor(detail: string) {
+  return new AxiosError("Request failed", "409", undefined, null, {
+    status: 409,
+    statusText: "Conflict",
+    headers: new AxiosHeaders(),
+    config: { headers: new AxiosHeaders() },
+    data: { status: 409, detail },
+  });
+}
+
+describe("OrdenDialog", () => {
+  it("el alta manda cliente, destino, pedido normalizado y los renglones cargados", async () => {
+    const { onCrear, onClose } = renderDialog();
+    elegirCliente("Uno");
+    fireEvent.change(screen.getByLabelText("Destino"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Pedido de venta"), { target: { value: "6-45" } });
+    agregarRenglon("2:2", "3");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(onCrear).toHaveBeenCalledWith({
+        clienteNumero: 500,
+        destinoId: 10,
+        numeroPedidoVenta: "06-00045",
+        observaciones: null,
+        items: [{ loteId: 2, ubicacionId: 2, cantidad: 3 }],
+      }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("sin cliente elegido no aparecen lotes de clientes en el listado de renglones (R4.4)", () => {
+    renderDialog();
+    const select = screen.getByLabelText("Agregar renglón");
+    expect(within(select).getByRole("option", { name: /26S-001/ })).toBeInTheDocument();
+    expect(within(select).queryByRole("option", { name: /26S-C01/ })).not.toBeInTheDocument();
+  });
+
+  it("el cliente-select nunca ofrece clientes inactivos, ni siquiera si tienen stock propio en planta (decisión #3)", () => {
+    const deClienteInactivo = fila({
+      loteId: 3,
+      loteCodigo: "26S-C02",
+      ubicacionId: 3,
+      ubicacion: "G1-2",
+      duenio: "Cliente",
+      clienteNumero: 700,
+      clienteDenominacion: "Cliente Inactivo SA",
+    });
+    renderDialog({ filas: [PROPIO, CLIENTE_500, deClienteInactivo] });
+    const combo = screen.getByLabelText("Cliente");
+    fireEvent.focus(combo);
+    fireEvent.change(combo, { target: { value: "" } });
+    expect(screen.queryByText(/Cliente Inactivo SA/)).not.toBeInTheDocument();
+  });
+
+  it("con un cliente elegido, los lotes de otro cliente no aparecen para agregar", () => {
+    const deClienteDos = fila({
+      loteId: 4,
+      loteCodigo: "26S-C03",
+      ubicacionId: 4,
+      ubicacion: "G1-3",
+      duenio: "Cliente",
+      clienteNumero: 600,
+      clienteDenominacion: "Cliente Dos",
+    });
+    renderDialog({ filas: [PROPIO, CLIENTE_500, deClienteDos] });
+    elegirCliente("Uno");
+
+    const select = screen.getByLabelText("Agregar renglón");
+    expect(within(select).getByRole("option", { name: /26S-001/ })).toBeInTheDocument();
+    expect(within(select).getByRole("option", { name: /26S-C01/ })).toBeInTheDocument();
+    expect(within(select).queryByRole("option", { name: /26S-C03/ })).not.toBeInTheDocument();
+  });
+
+  it("no deja agregar un renglón con más cantidad que el máximo disponible", () => {
+    renderDialog();
+    agregarRenglon("1:1", "999");
+    expect(screen.getByText(/Hay 10 disponibles/)).toBeInTheDocument();
+  });
+
+  it("agrega y quita renglones, separando los kilos propios de los del cliente en los totales (ADR-13)", () => {
+    renderDialog();
+    elegirCliente("Uno");
+    agregarRenglon("1:1", "2");
+    agregarRenglon("2:2", "3");
+
+    const totales = screen.getByTestId("totales-orden");
+    expect(totales).toHaveTextContent("5");
+    expect(totales).toHaveTextContent("1.600 kg");
+    expect(totales).toHaveTextContent("120 kg");
+
+    fireEvent.click(screen.getByRole("button", { name: "Quitar 26S-001 en G1-1" }));
+    expect(screen.queryByRole("button", { name: "Quitar 26S-001 en G1-1" })).not.toBeInTheDocument();
+  });
+
+  it("no deja guardar sin al menos un renglón", async () => {
+    const { onCrear } = renderDialog();
+    elegirCliente("Uno");
+    fireEvent.change(screen.getByLabelText("Destino"), { target: { value: "10" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("La orden necesita al menos un renglón.");
+    expect(onCrear).not.toHaveBeenCalled();
+  });
+
+  it("el pedido de venta se normaliza al salir del campo", () => {
+    renderDialog();
+    const campo = screen.getByLabelText("Pedido de venta");
+    fireEvent.change(campo, { target: { value: "6-123" } });
+    fireEvent.blur(campo);
+    expect(campo).toHaveValue("06-00123");
+  });
+
+  it("al cambiar el cliente de una orden en edición, los renglones que quedan de otro cliente se marcan (renglonesDeOtroCliente)", () => {
+    renderDialog({ orden: ORDEN_EDITABLE, filas: [PROPIO, CLIENTE_500], destinos: DESTINOS_500 });
+    elegirCliente("Dos");
+
+    expect(screen.getByText("Ya no corresponde al cliente elegido.")).toBeInTheDocument();
+  });
+
+  it("al editar, la propia reserva de la orden cuenta como disponible al ampliar la cantidad (R6.3)", async () => {
+    const clienteReservado = fila({
+      loteId: 2,
+      loteCodigo: "26S-C01",
+      ubicacionId: 2,
+      ubicacion: "PLANTA",
+      duenio: "Cliente",
+      clienteNumero: 500,
+      clienteDenominacion: "Cliente Uno",
+      fisico: 5,
+      comprometido: 3,
+      pesoUnitarioKg: 40,
+      envase: "Bolsa",
+    });
+    const { onActualizar } = renderDialog({
+      orden: ORDEN_EDITABLE,
+      filas: [PROPIO, clienteReservado],
+      destinos: DESTINOS_500,
+    });
+
+    fireEvent.change(screen.getByLabelText("Cantidad de 26S-C01 en PLANTA"), { target: { value: "5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(onActualizar).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ items: [{ loteId: 2, ubicacionId: 2, cantidad: 5 }] }),
+      ),
+    );
+  });
+
+  it("la edición manda la orden actualizada con el id", async () => {
+    const { onActualizar, onClose } = renderDialog({
+      orden: ORDEN_EDITABLE,
+      filas: [PROPIO, CLIENTE_500],
+      destinos: DESTINOS_500,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(onActualizar).toHaveBeenCalledWith(1, {
+        clienteNumero: 500,
+        destinoId: 10,
+        numeroPedidoVenta: null,
+        observaciones: null,
+        items: [{ loteId: 2, ubicacionId: 2, cantidad: 3 }],
+      }),
+    );
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("la alta rápida de destino llama a onAgregarDestino con el nombre tipeado", async () => {
+    const { onAgregarDestino } = renderDialog({ orden: ORDEN_EDITABLE, filas: [PROPIO, CLIENTE_500], destinos: DESTINOS_500 });
+    onAgregarDestino.mockResolvedValue({ id: 99, clienteNumero: 500, nombre: "Silo Nuevo", activo: true, enUso: 0 });
+
+    fireEvent.change(screen.getByLabelText("Nuevo destino"), { target: { value: "Silo Nuevo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar destino" }));
+
+    await waitFor(() => expect(onAgregarDestino).toHaveBeenCalledWith("Silo Nuevo"));
+  });
+
+  it("muestra el error del servidor dentro del diálogo", async () => {
+    const { onCrear, onClose } = renderDialog();
+    onCrear.mockRejectedValueOnce(errorServidor("Lote 26S-001 en G1-1: se necesitan 4 y hay 3."));
+    elegirCliente("Uno");
+    fireEvent.change(screen.getByLabelText("Destino"), { target: { value: "10" } });
+    agregarRenglon("1:1", "4");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Lote 26S-001 en G1-1");
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
