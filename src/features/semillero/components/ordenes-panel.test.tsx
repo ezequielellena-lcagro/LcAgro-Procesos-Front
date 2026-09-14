@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AxiosError, AxiosHeaders } from "axios";
 import { describe, expect, it, vi } from "vitest";
-import type { ClienteCopiaDto, OrdenCargaDto, OrdenCargaFiltros } from "../types";
+import type { ClienteCopiaDto, EstadoCopiaClientesDto, OrdenCargaDto, OrdenCargaFiltros } from "../types";
+import { OrdenDialog } from "./orden-dialog";
 import { OrdenesPanel } from "./ordenes-panel";
 
 /**
@@ -87,6 +88,15 @@ function renderPanel(opts: RenderOpts = {}) {
   );
   return { onFiltros, onNuevaOrden, onEditarOrden, onDespachar, onAnular, onErrorRefrescarStock, onExcel };
 }
+
+const COPIA_OK: EstadoCopiaClientesDto = {
+  ultimaSincronizacion: new Date().toISOString(),
+  ultimoIntentoFallido: null,
+  ultimoError: null,
+  desactualizada: false,
+  sinCopia: false,
+  cantidad: 2,
+};
 
 function errorServidor(detail: string) {
   return new AxiosError("Request failed", "409", undefined, null, {
@@ -197,5 +207,35 @@ describe("OrdenesPanel", () => {
   it("la tabla vacía explica cómo empezar", () => {
     renderPanel({ datos: [] });
     expect(screen.getByText(/Todavía no hay órdenes/)).toBeInTheDocument();
+  });
+
+  it("el filtro Cliente no colisiona con el campo Cliente de OrdenDialog cuando F13 los monta juntos", () => {
+    // OrdenesPanel es la pestaña activa (queda montada) y OrdenDialog se abre encima, como hará F13
+    // al cablear onEditarOrden/onNuevaOrden (Modal no es un portal: renderiza en el mismo subárbol).
+    renderPanel();
+    render(
+      <OrdenDialog
+        open
+        orden={null}
+        clientes={CLIENTES}
+        copiaClientes={COPIA_OK}
+        actualizandoClientes={false}
+        onActualizarClientes={vi.fn()}
+        filas={[]}
+        destinos={[]}
+        onAgregarDestino={vi.fn()}
+        onCrear={vi.fn()}
+        onActualizar={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // HTML inválido: ningún id puede repetirse en el documento.
+    expect(document.querySelectorAll('[id="clienteNumero"]').length).toBeLessThanOrEqual(1);
+
+    // La etiqueta "Cliente" del diálogo tiene que asociar con SU PROPIO campo, no con el del filtro.
+    const dialogo = screen.getByRole("dialog");
+    const campoClienteDelDialogo = within(dialogo).getByLabelText("Cliente");
+    expect(dialogo.contains(campoClienteDelDialogo)).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { Download, Plus } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -70,6 +70,12 @@ export function OrdenesPanel({
   descargando,
 }: Props) {
   const [transicion, setTransicion] = useState<Transicion | null>(null);
+  // Id propio y no colisionable: `OrdenDialog`/`LoteDialog` usan id="clienteNumero" para su propio
+  // campo Cliente dentro de un `Modal` (que no es un portal, renderiza en el mismo subárbol del DOM).
+  // Como este filtro queda montado debajo de esos diálogos al abrirlos, compartir el id duplicaría
+  // el id en el documento (HTML inválido) y desasociaría el <Label htmlFor="clienteNumero"> del
+  // diálogo. Mismo patrón que `detalleId` en `motivo-select.tsx`.
+  const clienteFiltroId = useId();
 
   const columns: Column<OrdenCargaDto>[] = [
     { key: "numero", header: "N°", sortBy: (o) => o.numero, cell: (o) => o.numero, className: "whitespace-nowrap" },
@@ -159,7 +165,7 @@ export function OrdenesPanel({
         </FilterField>
         <FilterField label="Cliente">
           <ClienteSelect
-            id="clienteNumero"
+            id={clienteFiltroId}
             clientes={clientes}
             value={filtros.clienteNumero ?? null}
             onChange={(numero) => onFiltros({ ...filtros, clienteNumero: numero ?? undefined })}
