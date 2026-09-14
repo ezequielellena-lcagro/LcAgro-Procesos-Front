@@ -9,6 +9,8 @@ import type {
   DestinoAltaInput,
   DestinoDto,
   EstadoCopiaClientesDto,
+  LoteDatosInput,
+  LoteDto,
   OrdenCargaDto,
   OrdenCargaInput,
   StockSemilleroDto,
@@ -197,5 +199,50 @@ describe("mocks de demo: semillero", () => {
       (f) => f.loteId === deA.loteId && f.ubicacionId === deA.ubicacionId,
     )!;
     expect(filaLuego.disponible).toBe(deA.disponible); // la reserva se liberó al anular
+  });
+
+  it("un lote reservado por una orden Pendiente pierde la edición de envase, peso y dueño aunque sólo tenga el ingreso inicial (decisión #4)", async () => {
+    const { data: lotes } = await apiClient.get<LoteDto[]>("/semillero/lotes");
+    // 26S-C01 (id=3): sólo tiene el ingreso inicial, pero la orden 1 (Pendiente) del fixture lo reserva.
+    const reservado = lotes.find((l) => l.codigo === "26S-C01")!;
+    expect(reservado).toBeDefined();
+    expect(reservado.duenioEditable).toBe(false);
+    expect(reservado.envaseYPesoEditables).toBe(false);
+
+    const input: LoteDatosInput = {
+      codigo: reservado.codigo,
+      campania: reservado.campania,
+      variedadId: reservado.variedadId,
+      envase: "Bolsa", // distinto del actual (BigBag): intenta cambiarlo pese a la reserva
+      pesoUnitarioKg: 40,
+      tratada: reservado.tratada,
+      pg: reservado.pg,
+      pmil: reservado.pmil,
+      observaciones: reservado.observaciones,
+      duenio: reservado.duenio,
+      clienteNumero: reservado.clienteNumero,
+    };
+    const error = await apiClient
+      .put(`/semillero/lotes/${reservado.id}`, input)
+      .catch((e) => e.response);
+    expect(error.status).toBe(409);
+  });
+
+  it("catálogos y destinos traen el enUso recalculado desde el arranque, sin depender de un PUT previo", async () => {
+    const { data } = await apiClient.get<CatalogosSemilleroDto>("/semillero/catalogos");
+    // El fixture ya trae lotes en esas variedades y stock en esas ubicaciones desde el arranque
+    // (la variedad "BAGUETTE 620" queda aparte a propósito: ninguna lote la usa, enUso=0 es correcto).
+    const variedadesUsadas = data.variedades.filter((v) => v.nombre !== "BAGUETTE 620");
+    expect(variedadesUsadas.length).toBeGreaterThan(0);
+    expect(variedadesUsadas.every((v) => v.enUso > 0)).toBe(true);
+    expect(data.ubicaciones.every((u) => u.enUso > 0)).toBe(true);
+
+    const destinosA = await apiClient.get<DestinoDto[]>(
+      `/semillero/clientes/${CLIENTE_A}/destinos`,
+    );
+    // El destino "Campo Norte" (id=1) ya lo usa la orden 1 (Pendiente) del fixture.
+    const campoNorte = destinosA.data.find((d) => d.nombre === "Campo Norte")!;
+    expect(campoNorte).toBeDefined();
+    expect(campoNorte.enUso).toBeGreaterThan(0);
   });
 });

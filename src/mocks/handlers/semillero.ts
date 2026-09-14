@@ -79,6 +79,7 @@ function opcionesCampania(): string[] {
 
 const enUsoVariedad = (id: number) => LOTES.filter((l) => l.variedadId === id).length;
 const enUsoUbicacion = (id: number) => STOCK.filter((r) => r.ubicacionId === id).length;
+const enUsoDestino = (id: number) => ORDENES.filter((o) => o.destinoId === id).length;
 
 // ── Clientes de MacroGest (copia local, R2.1-R2.5) — SIEMPRE ficticios ────
 
@@ -255,6 +256,22 @@ function comprometido(loteId: number, ubicacionId: number, excluirOrdenId?: numb
     .reduce((suma, it) => suma + it.cantidad, 0);
 }
 
+/** Ningún renglón de una orden Pendiente reserva stock de este lote, en ninguna ubicación. */
+function sinReservas(loteId: number): boolean {
+  return STOCK.filter((r) => r.loteId === loteId).every(
+    (r) => comprometido(r.loteId, r.ubicacionId) === 0,
+  );
+}
+
+/**
+ * Envase, peso unitario y dueño quedan bloqueados una vez que el lote tuvo movimientos más allá del
+ * ingreso inicial (decisión #4): ajustes, reubicaciones, despachos, o estar reservado por una orden
+ * Pendiente, aunque el ingreso siga siendo el único movimiento registrado.
+ */
+function atributosSensiblesEditables(l: LoteFicticio): boolean {
+  return l.soloIngresoInicial && sinReservas(l.id);
+}
+
 function loteDto(l: LoteFicticio): LoteDto {
   return {
     id: l.id,
@@ -272,8 +289,8 @@ function loteDto(l: LoteFicticio): LoteDto {
     duenio: l.duenio,
     clienteNumero: l.clienteNumero,
     clienteDenominacion: nombreCliente(l.clienteNumero),
-    duenioEditable: l.soloIngresoInicial,
-    envaseYPesoEditables: l.soloIngresoInicial,
+    duenioEditable: atributosSensiblesEditables(l),
+    envaseYPesoEditables: atributosSensiblesEditables(l),
   };
 }
 
@@ -594,7 +611,7 @@ export const semilleroHandlers = [
     if (!lote) return errorResponse({ status: 400, detail: "Lote no encontrado." });
 
     const input = (await request.json()) as LoteDatosInput;
-    if (!lote.soloIngresoInicial) {
+    if (!atributosSensiblesEditables(lote)) {
       if (lote.envase !== input.envase || lote.pesoUnitarioKg !== input.pesoUnitarioKg) {
         return errorResponse({
           status: 409,
@@ -861,8 +878,8 @@ export const semilleroHandlers = [
   // Catálogos
   http.get(`${API}/semillero/catalogos`, () =>
     HttpResponse.json({
-      variedades: VARIEDADES,
-      ubicaciones: UBICACIONES,
+      variedades: VARIEDADES.map((v) => ({ ...v, enUso: enUsoVariedad(v.id) })),
+      ubicaciones: UBICACIONES.map((u) => ({ ...u, enUso: enUsoUbicacion(u.id) })),
       campanias: opcionesCampania(),
       campaniaSugerida: campaniaSugerida(),
     } satisfies CatalogosSemilleroDto),
@@ -937,7 +954,7 @@ export const semilleroHandlers = [
     if (!destino) return errorResponse({ status: 400, detail: "Destino no encontrado." });
     const input = (await request.json()) as DestinoActualizarInput;
     Object.assign(destino, input);
-    destino.enUso = ORDENES.filter((o) => o.destinoId === destino.id).length;
+    destino.enUso = enUsoDestino(destino.id);
     return HttpResponse.json(destino);
   }),
 
@@ -978,7 +995,7 @@ export const semilleroHandlers = [
     const incluirInactivos = new URL(request.url).searchParams.get("incluirInactivos") === "true";
     const destinos = DESTINOS.filter(
       (d) => d.clienteNumero === numero && (incluirInactivos || d.activo),
-    );
+    ).map((d) => ({ ...d, enUso: enUsoDestino(d.id) }));
     return HttpResponse.json(destinos satisfies DestinoDto[]);
   }),
 
