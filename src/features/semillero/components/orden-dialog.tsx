@@ -148,6 +148,11 @@ function OrdenForm({
   const esAlta = orden === null;
   const [errorMensaje, setErrorMensaje] = useState<string | null>(null);
   const [renglones, setRenglones] = useState<RenglonEditable[]>(() => aRenglones(orden));
+  // Foto fija de lo que la orden YA reservaba al abrir el diálogo (nunca se reasigna): es lo que pide
+  // el JSDoc de `lotesElegibles` ("lo que YA reservaba la propia orden", tiempo pasado). Si en cambio
+  // se le pasara el estado vivo `renglones`, el máximo de cada renglón ya cargado se autoinflaría con
+  // la propia cantidad recién tipeada y el chequeo de "excede lo disponible" quedaría tautológico.
+  const [reservaOriginal] = useState<RenglonEditable[]>(() => aRenglones(orden));
   const [nuevaClave, setNuevaClave] = useState("");
   const [nuevaCantidad, setNuevaCantidad] = useState("");
   const [errorNuevoRenglon, setErrorNuevoRenglon] = useState<string | null>(null);
@@ -159,9 +164,10 @@ function OrdenForm({
   // releer el cliente y el destino en cada cambio (mismo patrón que `duenioElegido` en `lote-dialog.tsx`).
   const clienteNumero = useWatch({ control: form.control, name: "clienteNumero" });
 
-  const elegibles: LoteElegible[] = lotesElegibles(filas, renglones, clienteNumero ?? undefined);
+  const elegibles: LoteElegible[] = lotesElegibles(filas, reservaOriginal, clienteNumero ?? undefined);
   const invalidos = renglonesDeOtroCliente(renglones, filas, clienteNumero ?? undefined);
   const excedidosActuales = excedidos(renglones, elegibles);
+  const cantidadesInvalidas = renglones.filter((r) => !(r.cantidad > 0));
   const totales = totalesOrden(renglones, filas);
 
   const yaAgregado = (loteId: number, ubicacionId: number) =>
@@ -171,6 +177,7 @@ function OrdenForm({
   const filaDe = (r: RenglonEditable) => filas.find((f) => mismaClave(f, r));
   const esInvalido = (r: RenglonEditable) => invalidos.some((i) => mismaClave(i, r));
   const excede = (r: RenglonEditable) => excedidosActuales.some((e) => mismaClave(e, r));
+  const esCantidadInvalida = (r: RenglonEditable) => cantidadesInvalidas.some((c) => mismaClave(c, r));
 
   const agregarRenglon = () => {
     setErrorNuevoRenglon(null);
@@ -210,6 +217,10 @@ function OrdenForm({
     }
     if (invalidos.length > 0) {
       setErrorMensaje("Sacá los renglones que ya no corresponden al cliente elegido antes de guardar.");
+      return;
+    }
+    if (cantidadesInvalidas.length > 0) {
+      setErrorMensaje("Alguna cantidad no es válida: revisá los renglones marcados.");
       return;
     }
     if (excedidosActuales.length > 0) {
@@ -307,10 +318,14 @@ function OrdenForm({
               const filaRenglon = filaDe(r);
               const invalido = esInvalido(r);
               const excedido = excede(r);
+              const cantidadInvalida = esCantidadInvalida(r);
               return (
                 <li
                   key={`${r.loteId}-${r.ubicacionId}`}
-                  className={cn("flex flex-wrap items-center gap-2 px-3 py-2 text-sm", invalido && "bg-rojo-bg")}
+                  className={cn(
+                    "flex flex-wrap items-center gap-2 px-3 py-2 text-sm",
+                    (invalido || cantidadInvalida) && "bg-rojo-bg",
+                  )}
                 >
                   <div className="min-w-40 flex-1">
                     <p className="font-medium text-ink">
@@ -319,6 +334,9 @@ function OrdenForm({
                     <p className="text-xs text-ink-soft">{filaRenglon ? duenioEtiqueta(filaRenglon) : ""}</p>
                     {invalido && <p className="text-xs font-medium text-rojo">Ya no corresponde al cliente elegido.</p>}
                     {!invalido && excedido && <p className="text-xs font-medium text-rojo">Supera lo disponible.</p>}
+                    {!invalido && !excedido && cantidadInvalida && (
+                      <p className="text-xs font-medium text-rojo">La cantidad tiene que ser mayor a 0.</p>
+                    )}
                   </div>
                   <Input
                     aria-label={`Cantidad de ${filaRenglon?.loteCodigo} en ${filaRenglon?.ubicacion}`}

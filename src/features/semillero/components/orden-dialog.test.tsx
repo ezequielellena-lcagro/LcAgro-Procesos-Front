@@ -312,6 +312,47 @@ describe("OrdenDialog", () => {
     );
   });
 
+  it("al editar, una cantidad por encima del máximo real bloquea el guardado (no el límite inflado en vivo)", async () => {
+    const clienteReservado = fila({
+      loteId: 2,
+      loteCodigo: "26S-C01",
+      ubicacionId: 2,
+      ubicacion: "PLANTA",
+      duenio: "Cliente",
+      clienteNumero: 500,
+      clienteDenominacion: "Cliente Uno",
+      fisico: 5,
+      comprometido: 3,
+      pesoUnitarioKg: 40,
+      envase: "Bolsa",
+    });
+    const { onActualizar } = renderDialog({
+      orden: ORDEN_EDITABLE,
+      filas: [PROPIO, clienteReservado],
+      destinos: DESTINOS_500,
+    });
+
+    fireEvent.change(screen.getByLabelText("Cantidad de 26S-C01 en PLANTA"), { target: { value: "9999" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByText("Supera lo disponible.")).toBeInTheDocument();
+    expect(onActualizar).not.toHaveBeenCalled();
+  });
+
+  it("no deja tipear una cantidad menor o igual a cero en un renglón ya cargado", async () => {
+    const { onActualizar } = renderDialog({
+      orden: ORDEN_EDITABLE,
+      filas: [PROPIO, CLIENTE_500],
+      destinos: DESTINOS_500,
+    });
+
+    fireEvent.change(screen.getByLabelText("Cantidad de 26S-C01 en PLANTA"), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByText("La cantidad tiene que ser mayor a 0.")).toBeInTheDocument();
+    expect(onActualizar).not.toHaveBeenCalled();
+  });
+
   it("la edición manda la orden actualizada con el id", async () => {
     const { onActualizar, onClose } = renderDialog({
       orden: ORDEN_EDITABLE,
