@@ -159,7 +159,7 @@ export function ProveedoresPage() {
           <ProveedoresKpis
             tramos={proveedores.data.tramos}
             totales={proveedores.data.totales}
-            fechaBase={proveedores.data.fechaBase}
+            hoy={proveedores.data.hoy}
           />
 
           {proveedores.data.items.length === 0 ? (

@@ -9,8 +9,8 @@ import type { ProveedorDto, TotalesProveedores, TramoDto } from "../types";
  * siguiente las columnas corren solas y el día que el backend agregue un horizonte la tabla lo
  * muestra sin tocar UI. `montos[i]` es posicional y va con `tramos[i]`: se itera SIEMPRE por
  * `tramos` y se indexa `montos`, nunca al revés.
- * Las ventanas son mutuamente excluyentes y suman el saldo total; "ya vencido" es un memo
- * informativo contenido en el primer tramo, por eso va separado, en gris y fuera de la suma.
+ * Las ventanas son mutuamente excluyentes y suman el saldo total; "vencido hoy" es un memo
+ * informativo (lo vencido a la fecha de consulta), por eso va separado, en gris y fuera de la suma.
  */
 export function ProveedoresTable({
   filas,
@@ -50,16 +50,16 @@ export function ProveedoresTable({
       cell: (r) => <span className="font-semibold text-ink">{usd(r.saldoTotal)}</span>,
     },
     {
-      key: "yaVencido",
+      key: "vencidoHoy",
       // Fuera de la suma: el "(memo)" viaja en el encabezado —y por lo tanto también al papel—
       // porque un title no se ve impreso, ni en touch, ni con teclado. El borde y el fondo propios
       // lo separan además visualmente de las ventanas.
-      header: "Ya vencido (memo)",
+      header: "Vencido hoy (memo)",
       align: "right",
       className: "whitespace-nowrap border-l border-line bg-panel-soft/50 italic",
       cell: (r) => (
-        <span className={cn("text-ink-soft", r.yaVencido > 0 && "font-medium text-rojo")}>
-          {usd(r.yaVencido)}
+        <span className={cn("text-ink-soft", r.vencidoHoy > 0 && "font-medium text-rojo")}>
+          {usd(r.vencidoHoy)}
         </span>
       ),
     },
@@ -71,7 +71,7 @@ export function ProveedoresTable({
     `TOTAL (${totales.proveedores} ${totales.proveedores === 1 ? "proveedor" : "proveedores"})`,
     ...tramos.map((_, i) => usd(totales.montos[i] ?? 0)),
     usd(totales.saldoTotal),
-    usd(totales.yaVencido),
+    usd(totales.vencidoHoy),
   ];
 
   return (
@@ -86,8 +86,7 @@ export function ProveedoresTable({
       {/* Sin `no-print`: es la aclaración contable del informe y tiene que salir impresa. */}
       <p className="px-1 text-xs text-ink-soft">
         Las ventanas de vencimiento no se pisan: los {tramos.length} tramos suman el saldo total.
-        «Ya vencido» es un memo al cierre del mes base, ya está contenido en el primer tramo y no
-        suma.
+        «Vencido hoy» es un memo: lo que ya venció a la fecha de consulta. No suma con los tramos.
       </p>
     </div>
   );

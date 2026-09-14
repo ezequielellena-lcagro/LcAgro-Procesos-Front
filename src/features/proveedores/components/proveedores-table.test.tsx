@@ -21,7 +21,7 @@ const FILA: ProveedorDto = {
   denominacion: "Agroquímica del Litoral S.A.",
   montos: [100, 200, 300, 400],
   saldoTotal: 1000, // invariante del backend: Σ montos = saldoTotal
-  yaVencido: -50, // memo: NO suma
+  vencidoHoy: -50, // memo: NO suma
 };
 
 // A propósito NO coincide con la suma de `filas`: la página muestra 1 proveedor de 1.000, pero el
@@ -30,7 +30,7 @@ const FILA: ProveedorDto = {
 const TOTALES: TotalesProveedores = {
   montos: [12000, 25000, 30000, 15000, 5000],
   saldoTotal: 87000,
-  yaVencido: -1500,
+  vencidoHoy: -1500,
   proveedores: 87,
 };
 
@@ -88,7 +88,7 @@ describe("ProveedoresTable", () => {
     const totales: TotalesProveedores = {
       montos: [4000, 5000, 6000],
       saldoTotal: 15000,
-      yaVencido: -300,
+      vencidoHoy: -300,
       proveedores: 12,
     };
 
@@ -100,7 +100,7 @@ describe("ProveedoresTable", () => {
       "Proveedor",
       ...tresTramos.map((t) => t.etiqueta),
       "Saldo total",
-      "Ya vencido (memo)",
+      "Vencido hoy (memo)",
     ]);
 
     const celdas = within(screen.getAllByRole("row")[1])
@@ -128,13 +128,13 @@ describe("ProveedoresTable", () => {
     const totales: TotalesProveedores = {
       montos: montosTotales,
       saldoTotal: 280,
-      yaVencido: 0,
+      vencidoHoy: 0,
       proveedores: 2,
     };
 
     render(<ProveedoresTable filas={[fila]} tramos={sieteTramos} totales={totales} />);
 
-    // 2 columnas fijas + 7 tramos + saldo total + ya vencido
+    // 2 columnas fijas + 7 tramos + saldo total + vencido hoy
     expect(screen.getAllByRole("columnheader")).toHaveLength(11);
 
     const filas = screen.getAllByRole("row");
@@ -147,10 +147,10 @@ describe("ProveedoresTable", () => {
     expect(pie[9]).toBe(usd(280));
   });
 
-  it("aclara —en pantalla y en el papel— que 'ya vencido' es un memo y no suma", () => {
+  it("aclara —en pantalla y en el papel— que 'vencido hoy' es un memo y no suma", () => {
     render(<ProveedoresTable filas={[FILA]} tramos={TRAMOS} totales={TOTALES} />);
     // Visible, no en un title: el title no se ve al imprimir ni en touch, y esta pantalla se imprime.
-    expect(screen.getByRole("columnheader", { name: "Ya vencido (memo)" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Vencido hoy (memo)" })).toBeInTheDocument();
     const nota = screen.getByText(/no suma/i);
     expect(nota).toBeVisible();
     expect(nota).not.toHaveClass("no-print");

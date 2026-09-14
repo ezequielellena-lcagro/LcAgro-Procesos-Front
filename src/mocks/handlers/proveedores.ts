@@ -67,7 +67,7 @@ interface ProveedorDemo {
   denominacion: string;
   /** 5 valores posicionales, alineados con `tramos`. saldoTotal se calcula sumándolos. */
   montos: number[];
-  yaVencido: number;
+  vencidoHoy: number;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -83,21 +83,21 @@ const PRIMER_NUMERO_GENERADO = 90101;
 
 // Proveedores de insumo FICTICIOS (nunca razones sociales, cuentas ni saldos reales del cliente:
 // los importes de acá son inventados, NO salen de ninguna consulta validada contra la base).
-// Estos 12 son casos elegidos a mano: ceros en distintas ventanas, deuda sólo al final, "ya vencido"
+// Estos 12 son casos elegidos a mano: ceros en distintas ventanas, deuda sólo al final, "vencido hoy"
 // positivo, en cero y negativo (anticipos / notas de crédito).
 const CURADOS: ProveedorDemo[] = [
-  { denominacion: "Agroquímica del Litoral S.A.", montos: [64250.4, 22180.75, 51900, 73640.2, 0], yaVencido: -35400.6 },
-  { denominacion: "Fertilizantes Pampeanos SRL", montos: [120400.5, 44200, 0, 18900.25, 7500], yaVencido: 22100.4 },
-  { denominacion: "Semillas del Centro S.A.", montos: [0, 98750.4, 32100, 12000, 0], yaVencido: 0 },
-  { denominacion: "Nutrientes del Sur S.A.", montos: [18250.75, 0, 41300.6, 0, 25600], yaVencido: 9800.15 },
-  { denominacion: "Protección Vegetal Argentina SRL", montos: [76900, 51230.4, 19870.9, 30400, 11200.55], yaVencido: -14320.8 },
-  { denominacion: "Insumos Don Bosco SRL", montos: [9400.3, 12800, 0, 0, 0], yaVencido: 3100.2 },
-  { denominacion: "Distribuidora Agro Litoral S.A.", montos: [33500, 27400.6, 15900, 42800.4, 0], yaVencido: 12750 },
-  { denominacion: "Cereales y Servicios del Oeste SRL", montos: [0, 0, 64300.25, 21500, 38900], yaVencido: 0 },
-  { denominacion: "Bioinsumos Río Cuarto S.A.", montos: [14200.9, 8600, 5400.35, 0, 0], yaVencido: -2400.5 },
-  { denominacion: "Maquinaria y Repuestos La Estrella SRL", montos: [42800, 0, 0, 16750.8, 9300], yaVencido: 18400.6 },
-  { denominacion: "Lubricantes y Combustibles Aurora S.A.", montos: [61300.45, 33900, 27600, 0, 4800.2], yaVencido: 25100.9 },
-  { denominacion: "Envases y Bolsas del Plata SRL", montos: [7800, 4200.75, 0, 3100, 0], yaVencido: 1900.35 },
+  { denominacion: "Agroquímica del Litoral S.A.", montos: [64250.4, 22180.75, 51900, 73640.2, 0], vencidoHoy: -35400.6 },
+  { denominacion: "Fertilizantes Pampeanos SRL", montos: [120400.5, 44200, 0, 18900.25, 7500], vencidoHoy: 22100.4 },
+  { denominacion: "Semillas del Centro S.A.", montos: [0, 98750.4, 32100, 12000, 0], vencidoHoy: 0 },
+  { denominacion: "Nutrientes del Sur S.A.", montos: [18250.75, 0, 41300.6, 0, 25600], vencidoHoy: 9800.15 },
+  { denominacion: "Protección Vegetal Argentina SRL", montos: [76900, 51230.4, 19870.9, 30400, 11200.55], vencidoHoy: -14320.8 },
+  { denominacion: "Insumos Don Bosco SRL", montos: [9400.3, 12800, 0, 0, 0], vencidoHoy: 3100.2 },
+  { denominacion: "Distribuidora Agro Litoral S.A.", montos: [33500, 27400.6, 15900, 42800.4, 0], vencidoHoy: 12750 },
+  { denominacion: "Cereales y Servicios del Oeste SRL", montos: [0, 0, 64300.25, 21500, 38900], vencidoHoy: 0 },
+  { denominacion: "Bioinsumos Río Cuarto S.A.", montos: [14200.9, 8600, 5400.35, 0, 0], vencidoHoy: -2400.5 },
+  { denominacion: "Maquinaria y Repuestos La Estrella SRL", montos: [42800, 0, 0, 16750.8, 9300], vencidoHoy: 18400.6 },
+  { denominacion: "Lubricantes y Combustibles Aurora S.A.", montos: [61300.45, 33900, 27600, 0, 4800.2], vencidoHoy: 25100.9 },
+  { denominacion: "Envases y Bolsas del Plata SRL", montos: [7800, 4200.75, 0, 3100, 0], vencidoHoy: 1900.35 },
 ].map((p, i) => ({ ...p, numero: PRIMER_NUMERO_CURADO + i }));
 
 // Relleno, también FICTICIO: con sólo 12 filas la demo nunca pasaría de la página 1 (pageSize 50) y
@@ -169,11 +169,11 @@ function generador(semilla: number): () => number {
 }
 
 /**
- * "Ya vencido" es un memo contenido en el primer tramo, así que se deriva de él: o no hay nada
- * vencido, o es un saldo a favor (negativo, por anticipos o notas de crédito), o es una porción de
- * lo que vence en la primera ventana. Nunca un positivo que el primer tramo no pueda contener.
+ * "Vencido hoy" es un memo. El mock no reparte vencimientos por fecha, así que lo deriva del primer
+ * tramo: o no hay nada vencido, o es un saldo a favor (negativo, por anticipos o notas de crédito), o
+ * es una porción de lo que vence en la primera ventana.
  */
-function memoYaVencido(primerTramo: number, siguiente: () => number): number {
+function memoVencidoHoy(primerTramo: number, siguiente: () => number): number {
   const dado = siguiente();
   if (dado < 0.2) return 0;
   if (dado < 0.45) return -r2(1_000 + siguiente() * 45_000);
@@ -189,7 +189,7 @@ function demoGenerada(): ProveedorDemo[] {
       const monto = r2(2_000 + siguiente() * 138_000);
       return hayDeuda ? monto : 0;
     });
-    return { numero, denominacion, montos, yaVencido: memoYaVencido(montos[0], siguiente) };
+    return { numero, denominacion, montos, vencidoHoy: memoVencidoHoy(montos[0], siguiente) };
   });
 }
 
@@ -206,7 +206,7 @@ function filas(): ProveedorDto[] {
     denominacion: p.denominacion,
     montos: p.montos,
     saldoTotal: r2(p.montos.reduce((s, m) => s + m, 0)),
-    yaVencido: p.yaVencido,
+    vencidoHoy: p.vencidoHoy,
   }));
 }
 
@@ -230,7 +230,7 @@ function totalizar(rows: ProveedorDto[], cantTramos: number): TotalesProveedores
       r2(rows.reduce((s, p) => s + (p.montos[i] ?? 0), 0)),
     ),
     saldoTotal: r2(rows.reduce((s, p) => s + p.saldoTotal, 0)),
-    yaVencido: r2(rows.reduce((s, p) => s + p.yaVencido, 0)),
+    vencidoHoy: r2(rows.reduce((s, p) => s + p.vencidoHoy, 0)),
     proveedores: rows.length,
   };
 }
@@ -265,6 +265,7 @@ export const proveedoresHandlers = [
       hasNext: page < totalPages,
       hasPrevious: page > 1,
       fechaBase,
+      hoy: iso(new Date()),
       tramos,
       totales: totalizar(rows, tramos.length),
     };
@@ -306,7 +307,7 @@ export const proveedoresHandlers = [
           cell: (r: ProveedorDto) => num(r.montos[i] ?? 0),
         })),
         { header: "SALDO TOTAL", width: 16, cell: (r: ProveedorDto) => num(r.saldoTotal) },
-        { header: "Ya vencido", width: 16, cell: (r: ProveedorDto) => num(r.yaVencido) },
+        { header: "Vencido hoy", width: 16, cell: (r: ProveedorDto) => num(r.vencidoHoy) },
       ],
     }).toBlob();
 

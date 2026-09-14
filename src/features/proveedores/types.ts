@@ -14,7 +14,7 @@ export interface TramoDto {
 /**
  * Fila del listado (espeja ProveedorDto). `montos` son 5 valores POSICIONALES, alineados índice a
  * índice con `tramos` de la respuesta. Invariante garantizada por el backend: Σ montos = saldoTotal.
- * `yaVencido` es un memo informativo (está contenido en montos[0]): NO suma.
+ * `vencidoHoy` es un memo informativo: lo vencido a la fecha de consulta (`hoy` de la respuesta). NO suma.
  * `denominacion` es PII: nunca versionar exports ni usar razones sociales reales en los mocks.
  */
 export interface ProveedorDto {
@@ -22,14 +22,14 @@ export interface ProveedorDto {
   denominacion: string;
   montos: number[];
   saldoTotal: number;
-  yaVencido: number;
+  vencidoHoy: number;
 }
 
 /** Totales USD del set filtrado COMPLETO (no la página). Alimentan los KPIs y el pie de la tabla. */
 export interface TotalesProveedores {
   montos: number[];
   saldoTotal: number;
-  yaVencido: number;
+  vencidoHoy: number;
   proveedores: number;
 }
 
@@ -42,8 +42,10 @@ export interface ProveedoresListado {
   totalPages: number;
   hasNext: boolean;
   hasPrevious: boolean;
-  /** Último día del mes base (yyyy-MM-dd): es el corte del memo "ya vencido". */
+  /** Último día del mes base (yyyy-MM-dd): de acá cuelgan los tramos. */
   fechaBase: string;
+  /** Fecha de la consulta (yyyy-MM-dd): corte del memo "vencido hoy" (lo que vence ese día no cuenta). */
+  hoy: string;
   tramos: TramoDto[];
   totales: TotalesProveedores;
 }
