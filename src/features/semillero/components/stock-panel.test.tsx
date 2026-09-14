@@ -1,0 +1,141 @@
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { StockFilaDto, StockSemilleroDto, VariedadDto } from "../types";
+import { StockPanel } from "./stock-panel";
+
+const fila = (over: Partial<StockFilaDto> = {}): StockFilaDto => ({
+  loteId: 1,
+  loteCodigo: "26S-001",
+  campania: "2026-2027",
+  especie: "Soja",
+  variedadId: 1,
+  variedad: "DM 46E25",
+  envase: "BigBag",
+  pesoUnitarioKg: 800,
+  tratada: true,
+  pg: 95,
+  pmil: 152,
+  observaciones: null,
+  duenio: "Propio",
+  clienteNumero: null,
+  clienteDenominacion: null,
+  ubicacionId: 1,
+  ubicacion: "G1-6",
+  fisico: 10,
+  comprometido: 3,
+  disponible: 7,
+  kgDisponibles: 5600,
+  ...over,
+});
+
+const totalesVacios = {
+  propio: { bigBagsDisponibles: 0, bolsasDisponibles: 0, kgDisponibles: 0 },
+  clientes: { bigBagsDisponibles: 0, bolsasDisponibles: 0, kgDisponibles: 0 },
+  kgComprometidos: 0,
+  ordenesPendientes: 0,
+};
+
+const datos = (filas: StockFilaDto[]): StockSemilleroDto => ({ filas, totales: totalesVacios });
+
+const variedades: VariedadDto[] = [
+  { id: 1, especie: "Soja", nombre: "DM 46E25", activo: true, enUso: 1 },
+  { id: 3, especie: "Trigo", nombre: "DM CATALPA", activo: true, enUso: 0 },
+];
+
+function renderPanel(over: Partial<Parameters<typeof StockPanel>[0]> = {}) {
+  const props = {
+    datos: datos([fila()]),
+    cargando: false,
+    variedades,
+    filtros: {},
+    onFiltros: vi.fn(),
+    onNuevoLote: vi.fn(),
+    onEditarLote: vi.fn(),
+    onMovimiento: vi.fn(),
+    onExcel: vi.fn(),
+    descargando: false,
+    ...over,
+  };
+  render(<StockPanel {...props} />);
+  return props;
+}
+
+describe("StockPanel", () => {
+  it("muestra físico, reservado y disponible de cada lote en su ubicación", () => {
+    renderPanel();
+    const fila26 = screen.getByText("26S-001").closest("tr") as HTMLElement;
+    expect(within(fila26).getByText("G1-6")).toBeInTheDocument();
+    expect(within(fila26).getByText("10")).toBeInTheDocument();
+    expect(within(fila26).getByText("3")).toBeInTheDocument();
+    expect(within(fila26).getByText("7")).toBeInTheDocument();
+    expect(within(fila26).getByText("5.600 kg")).toBeInTheDocument();
+  });
+
+  it("marca en rojo cuando las órdenes reservan más de lo que hay", () => {
+    renderPanel({
+      datos: datos([fila({ fisico: 1, comprometido: 3, disponible: -2, kgDisponibles: -1600 })]),
+    });
+    expect(screen.getByText("-2")).toHaveClass("text-rojo");
+  });
+
+  it("las acciones de la fila avisan qué lote y qué operación", () => {
+    const props = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Ingreso 26S-001 en G1-6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ajuste 26S-001 en G1-6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reubicar 26S-001 en G1-6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Editar lote 26S-001" }));
+    expect(props.onMovimiento).toHaveBeenNthCalledWith(1, "ingreso", expect.objectContaining({ loteId: 1 }));
+    expect(props.onMovimiento).toHaveBeenNthCalledWith(2, "ajuste", expect.objectContaining({ loteId: 1 }));
+    expect(props.onMovimiento).toHaveBeenNthCalledWith(3, "reubicacion", expect.objectContaining({ loteId: 1 }));
+    expect(props.onEditarLote).toHaveBeenCalledWith(1);
+  });
+
+  it("al cambiar de especie se limpia la variedad elegida", () => {
+    const props = renderPanel({ filtros: { variedadId: 1 } });
+    fireEvent.change(screen.getByLabelText("Especie"), { target: { value: "Trigo" } });
+    expect(props.onFiltros).toHaveBeenCalledWith({ especie: "Trigo", variedadId: undefined });
+  });
+
+  it("el filtro de variedad sólo ofrece las de la especie elegida", () => {
+    renderPanel({ filtros: { especie: "Trigo" } });
+    const opciones = within(screen.getByLabelText("Variedad"))
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(opciones).toEqual(["Todas", "DM CATALPA"]);
+  });
+
+  it("sin filas explica cómo empezar", () => {
+    renderPanel({ datos: datos([]) });
+    expect(screen.getByText(/Todavía no hay stock/)).toBeInTheDocument();
+  });
+
+  it("filtra por dueño entre Todos, Propio y Clientes", () => {
+    const props = renderPanel({ filtros: { duenio: "Propio" } });
+    expect(screen.getByLabelText("Dueño")).toHaveValue("Propio");
+
+    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "Cliente" } });
+    expect(props.onFiltros).toHaveBeenCalledWith({ duenio: "Cliente" });
+
+    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "" } });
+    expect(props.onFiltros).toHaveBeenCalledWith({ duenio: undefined });
+  });
+
+  it("la columna Dueño distingue la semilla propia de la de un cliente", () => {
+    renderPanel({
+      datos: datos([
+        fila({ loteId: 1, loteCodigo: "26S-001" }),
+        fila({
+          loteId: 2,
+          loteCodigo: "26S-002",
+          duenio: "Cliente",
+          clienteNumero: 1234,
+          clienteDenominacion: "Juan Pérez",
+        }),
+      ]),
+    });
+    const filaPropia = screen.getByText("26S-001").closest("tr") as HTMLElement;
+    const filaCliente = screen.getByText("26S-002").closest("tr") as HTMLElement;
+    expect(within(filaPropia).getByText("Propio")).toBeInTheDocument();
+    expect(within(filaCliente).getByText("Cliente · Juan Pérez")).toBeInTheDocument();
+  });
+});
