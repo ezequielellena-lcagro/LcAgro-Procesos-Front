@@ -2,6 +2,7 @@ import { Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { CampaniaSelect } from "@/shared/components/campania-select";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { kg, unidades } from "../format";
@@ -23,6 +24,7 @@ interface Props {
   datos: StockSemilleroDto | undefined;
   cargando: boolean;
   variedades: VariedadDto[];
+  campanias: string[];
   filtros: StockFiltros;
   onFiltros: (filtros: StockFiltros) => void;
   onNuevoLote: () => void;
@@ -48,6 +50,7 @@ export function StockPanel({
   datos,
   cargando,
   variedades,
+  campanias,
   filtros,
   onFiltros,
   onNuevoLote,
@@ -180,6 +183,14 @@ export function StockPanel({
             <option value="true">Tratada</option>
             <option value="false">Sin tratar</option>
           </Select>
+        </FilterField>
+        <FilterField label="Campaña">
+          <CampaniaSelect
+            value={filtros.campania}
+            campanias={campanias}
+            onChange={(campania) => onFiltros({ ...filtros, campania: campania || undefined })}
+            todasLabel="Todas"
+          />
         </FilterField>
         <FilterField label="Dueño" title="La semilla de un cliente no es stock vendible propio (ADR-13).">
           <Select

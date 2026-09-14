@@ -42,11 +42,14 @@ const variedades: VariedadDto[] = [
   { id: 3, especie: "Trigo", nombre: "DM CATALPA", activo: true, enUso: 0 },
 ];
 
+const campanias = ["2025-2026", "2026-2027"];
+
 function renderPanel(over: Partial<Parameters<typeof StockPanel>[0]> = {}) {
   const props = {
     datos: datos([fila()]),
     cargando: false,
     variedades,
+    campanias,
     filtros: {},
     onFiltros: vi.fn(),
     onNuevoLote: vi.fn(),
@@ -107,6 +110,17 @@ describe("StockPanel", () => {
   it("sin filas explica cómo empezar", () => {
     renderPanel({ datos: datos([]) });
     expect(screen.getByText(/Todavía no hay stock/)).toBeInTheDocument();
+  });
+
+  it("filtra por campaña", () => {
+    const props = renderPanel({ filtros: { campania: "2026-2027" } });
+    expect(screen.getByLabelText("Campaña")).toHaveValue("2026-2027");
+
+    fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025-2026" } });
+    expect(props.onFiltros).toHaveBeenCalledWith({ campania: "2025-2026" });
+
+    fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "" } });
+    expect(props.onFiltros).toHaveBeenCalledWith({ campania: undefined });
   });
 
   it("filtra por dueño entre Todos, Propio y Clientes", () => {
