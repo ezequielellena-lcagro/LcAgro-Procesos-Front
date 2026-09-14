@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { BarChart3, Box, DollarSign, Home, Settings, Sprout, Wheat } from "lucide-react";
+import { BarChart3, Box, DollarSign, Home, Settings, Sprout, Warehouse, Wheat } from "lucide-react";
 import type { RolNombre } from "@/features/auth/types";
 
 /** Proceso ya implementado: navega a una ruta real. */
@@ -143,6 +143,24 @@ export const NAV: Area[] = [
       { kind: "futuro", label: "Resumen de cuenta a clientes" },
       { kind: "futuro", label: "Cotizador de presupuestos" },
       { kind: "futuro", label: "Mercadería pendiente de recibir" },
+    ],
+  },
+  {
+    id: "semillero",
+    icon: Warehouse,
+    label: "Semillero",
+    area: "Semillero",
+    procesos: [
+      {
+        kind: "activo",
+        label: "Stock y Órdenes de Carga",
+        title: "Stock y Órdenes de Carga",
+        to: "/semillero",
+        roles: ["semillero"],
+      },
+      { kind: "futuro", label: "Trazabilidad por lote" },
+      { kind: "futuro", label: "Pedidos pendientes vs. stock" },
+      { kind: "futuro", label: "Traspasos a acopio" },
     ],
   },
   {

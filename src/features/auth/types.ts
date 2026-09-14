@@ -14,6 +14,7 @@ export type RolNombre =
   | "volumenacopiado"
   | "comisiones"
   | "prestamos"
+  | "semillero"
   | "usuarios"
   | "config"
   | "auditoria";
@@ -31,6 +32,7 @@ export const ETIQUETA_PANTALLA: Record<RolNombre, string> = {
   volumenacopiado: "Volumen Acopiado por Vendedor",
   comisiones: "Liquidación de Comisiones",
   prestamos: "Préstamos Bancarios",
+  semillero: "Semillero · Stock y Órdenes de Carga",
   usuarios: "Usuarios",
   config: "Configuración",
   auditoria: "Auditoría",
