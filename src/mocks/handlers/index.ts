@@ -10,6 +10,7 @@ import { prestamosHandlers } from "./prestamos";
 import { produccionPropiaHandlers } from "./produccionpropia";
 import { proveedoresHandlers } from "./proveedores";
 import { semillaHandlers } from "./semilla";
+import { semilleroHandlers } from "./semillero";
 import { stockHandlers } from "./stock";
 import { stockfisicoHandlers } from "./stockfisico";
 import { usuariosHandlers } from "./usuarios";
@@ -26,6 +27,7 @@ export const handlers = [
   ...prestamosHandlers,
   ...devolucionHandlers,
   ...semillaHandlers,
+  ...semilleroHandlers,
   ...stockHandlers,
   ...stockfisicoHandlers,
   ...comisionesHandlers,
