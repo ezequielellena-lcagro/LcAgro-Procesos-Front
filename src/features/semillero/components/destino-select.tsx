@@ -32,6 +32,9 @@ export function DestinoSelect({ destinos, value, onChange, onAgregar, id, disabl
       const destino = await onAgregar(nombre);
       onChange(destino.id);
       setNuevo("");
+    } catch {
+      // El toast global de error (mutationCache.onError) ya le avisa a la planta que
+      // falló el alta; acá sólo evitamos dejar la promesa de `onAgregar` sin manejar.
     } finally {
       setAgregando(false);
     }
