@@ -47,6 +47,8 @@ interface Props {
   onErrorRefrescarStock: () => void;
   onExcel: () => void;
   descargando: boolean;
+  /** Abre `OrdenImprimible` (R7.1) con la orden completa; disponible en Pendiente y Despachada. */
+  onImprimir: (orden: OrdenCargaDto) => void;
 }
 
 /**
@@ -68,6 +70,7 @@ export function OrdenesPanel({
   onErrorRefrescarStock,
   onExcel,
   descargando,
+  onImprimir,
 }: Props) {
   const [transicion, setTransicion] = useState<Transicion | null>(null);
   // Id propio y no colisionable: `OrdenDialog`/`LoteDialog` usan id="clienteNumero" para su propio
@@ -112,35 +115,49 @@ export function OrdenesPanel({
       key: "acciones",
       header: "",
       align: "right",
-      cell: (o) =>
-        o.estado === "Pendiente" ? (
-          <div className="flex justify-end gap-1">
+      cell: (o) => (
+        <div className="flex justify-end gap-1">
+          {/* R7.1: se imprime una Pendiente o una Despachada; una Anulada no tiene sentido imprimirla. */}
+          {o.estado !== "Anulada" && (
             <Button
               variant="ghost"
               size="sm"
-              aria-label={`Despachar orden N° ${o.numero}`}
-              onClick={() => setTransicion({ tipo: "despachar", orden: o })}
+              aria-label={`Imprimir orden N° ${o.numero}`}
+              onClick={() => onImprimir(o)}
             >
-              Despachar
+              Imprimir
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={`Anular orden N° ${o.numero}`}
-              onClick={() => setTransicion({ tipo: "anular", orden: o })}
-            >
-              Anular
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              aria-label={`Editar orden N° ${o.numero}`}
-              onClick={() => onEditarOrden(o)}
-            >
-              Editar
-            </Button>
-          </div>
-        ) : null,
+          )}
+          {o.estado === "Pendiente" && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Despachar orden N° ${o.numero}`}
+                onClick={() => setTransicion({ tipo: "despachar", orden: o })}
+              >
+                Despachar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label={`Anular orden N° ${o.numero}`}
+                onClick={() => setTransicion({ tipo: "anular", orden: o })}
+              >
+                Anular
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                aria-label={`Editar orden N° ${o.numero}`}
+                onClick={() => onEditarOrden(o)}
+              >
+                Editar
+              </Button>
+            </>
+          )}
+        </div>
+      ),
     },
   ];
 

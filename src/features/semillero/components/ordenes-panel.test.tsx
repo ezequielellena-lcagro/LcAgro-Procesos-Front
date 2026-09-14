@@ -70,6 +70,7 @@ function renderPanel(opts: RenderOpts = {}) {
   const onAnular = vi.fn().mockResolvedValue(undefined);
   const onErrorRefrescarStock = vi.fn();
   const onExcel = vi.fn();
+  const onImprimir = vi.fn();
   render(
     <OrdenesPanel
       datos={opts.datos ?? [PENDIENTE, DESPACHADA]}
@@ -84,9 +85,19 @@ function renderPanel(opts: RenderOpts = {}) {
       onErrorRefrescarStock={onErrorRefrescarStock}
       onExcel={onExcel}
       descargando={false}
+      onImprimir={onImprimir}
     />,
   );
-  return { onFiltros, onNuevaOrden, onEditarOrden, onDespachar, onAnular, onErrorRefrescarStock, onExcel };
+  return {
+    onFiltros,
+    onNuevaOrden,
+    onEditarOrden,
+    onDespachar,
+    onAnular,
+    onErrorRefrescarStock,
+    onExcel,
+    onImprimir,
+  };
 }
 
 const COPIA_OK: EstadoCopiaClientesDto = {
@@ -207,6 +218,21 @@ describe("OrdenesPanel", () => {
   it("la tabla vacía explica cómo empezar", () => {
     renderPanel({ datos: [] });
     expect(screen.getByText(/Todavía no hay órdenes/)).toBeInTheDocument();
+  });
+
+  it('"Imprimir" está disponible en Pendiente y en Despachada, y llama a onImprimir con la orden completa (R7.1)', () => {
+    const { onImprimir } = renderPanel();
+    fireEvent.click(screen.getByRole("button", { name: "Imprimir orden N° 7" }));
+    expect(onImprimir).toHaveBeenCalledWith(PENDIENTE);
+    fireEvent.click(screen.getByRole("button", { name: "Imprimir orden N° 3" }));
+    expect(onImprimir).toHaveBeenCalledWith(DESPACHADA);
+  });
+
+  it('"Imprimir" no aparece en una orden Anulada (R7.1 sólo cubre Pendiente y Despachada)', () => {
+    renderPanel({
+      datos: [orden({ id: 3, numero: 9, estado: "Anulada", motivoAnulacion: "Duplicada" })],
+    });
+    expect(screen.queryByRole("button", { name: "Imprimir orden N° 9" })).not.toBeInTheDocument();
   });
 
   it("el filtro Cliente no colisiona con el campo Cliente de OrdenDialog cuando F13 los monta juntos", () => {
