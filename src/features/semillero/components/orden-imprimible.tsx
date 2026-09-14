@@ -103,7 +103,7 @@ export function OrdenImprimible({ orden, onClose }: Props) {
               Total
             </td>
             <td className="py-1.5 pr-2 text-right tabular">{unidades(orden.totalUnidades)}</td>
-            <td className="py-1.5 text-right tabular">{kg(orden.totalKgPropio + orden.totalKgCliente)}</td>
+            <td className="py-1.5 text-right tabular">{kg(orden.totalKg)}</td>
           </tr>
         </tfoot>
       </table>

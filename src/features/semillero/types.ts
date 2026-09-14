@@ -352,6 +352,9 @@ export interface OrdenCargaDto {
   anuladoPor: string | null;
   items: OrdenCargaItemDto[];
   totalUnidades: number;
+  /** Suma de `totalKgPropio` + `totalKgCliente`, ya calculada por el backend (`OrdenCargaDtos.cs`):
+   * para el total de la orden (impresión, columna Kg del listado) usar este campo, no recalcularlo. */
+  totalKg: number;
   /** Partidos (ADR-13): la semilla del cliente no es stock vendible, así que no se suman entre sí. */
   totalKgPropio: number;
   totalKgCliente: number;

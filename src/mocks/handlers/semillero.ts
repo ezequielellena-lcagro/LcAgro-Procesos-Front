@@ -431,6 +431,9 @@ function itemDto(loteId: number, ubicacionId: number, cantidad: number): OrdenCa
 function totalesDeItems(items: OrdenCargaItemDto[]) {
   return {
     totalUnidades: items.reduce((s, it) => s + it.cantidad, 0),
+    // Igual que el backend (`OrdenCargaDtos.cs`): totalKg = totalKgPropio + totalKgCliente, siempre
+    // (Duenio sólo es Propio o Cliente). Se calcula acá, no como una suma en cada consumidor.
+    totalKg: items.reduce((s, it) => s + it.kg, 0),
     totalKgPropio: items.filter((it) => it.duenio === "Propio").reduce((s, it) => s + it.kg, 0),
     totalKgCliente: items.filter((it) => it.duenio === "Cliente").reduce((s, it) => s + it.kg, 0),
   };
@@ -487,7 +490,10 @@ const ORDENES: OrdenCargaDto[] = [
 ];
 
 interface ErrorNegocio {
-  status: 400 | 409;
+  // 404 sólo para "el recurso direccionado por id en la URL no existe" (igual que el backend,
+  // Error.NotFound → 404 en los controllers, `SemilleroController`/`OrdenesCargaController`/
+  // `CatalogosSemilleroController`); 400 queda para la validación del body.
+  status: 400 | 404 | 409;
   detail: string;
 }
 
@@ -619,7 +625,7 @@ export const semilleroHandlers = [
 
   http.put(`${API}/semillero/lotes/:id`, async ({ params, request }) => {
     const lote = LOTES.find((l) => l.id === Number(params.id));
-    if (!lote) return errorResponse({ status: 400, detail: "Lote no encontrado." });
+    if (!lote) return errorResponse({ status: 404, detail: "Lote no encontrado." });
 
     const input = (await request.json()) as LoteDatosInput;
     if (!atributosSensiblesEditables(lote)) {
@@ -796,7 +802,7 @@ export const semilleroHandlers = [
 
   http.put(`${API}/semillero/ordenes/:id`, async ({ params, request }) => {
     const orden = ORDENES.find((o) => o.id === Number(params.id));
-    if (!orden) return errorResponse({ status: 400, detail: "Orden no encontrada." });
+    if (!orden) return errorResponse({ status: 404, detail: "Orden no encontrada." });
     if (orden.estado !== "Pendiente")
       return errorResponse({ status: 409, detail: "Sólo se puede editar una orden Pendiente." });
 
@@ -821,7 +827,7 @@ export const semilleroHandlers = [
 
   http.post(`${API}/semillero/ordenes/:id/despachar`, async ({ params, request }) => {
     const orden = ORDENES.find((o) => o.id === Number(params.id));
-    if (!orden) return errorResponse({ status: 400, detail: "Orden no encontrada." });
+    if (!orden) return errorResponse({ status: 404, detail: "Orden no encontrada." });
     if (orden.estado !== "Pendiente")
       return errorResponse({ status: 409, detail: "Sólo se puede despachar una orden Pendiente." });
 
@@ -859,7 +865,7 @@ export const semilleroHandlers = [
 
   http.post(`${API}/semillero/ordenes/:id/anular`, async ({ params, request }) => {
     const orden = ORDENES.find((o) => o.id === Number(params.id));
-    if (!orden) return errorResponse({ status: 400, detail: "Orden no encontrada." });
+    if (!orden) return errorResponse({ status: 404, detail: "Orden no encontrada." });
     if (orden.estado !== "Pendiente")
       return errorResponse({ status: 409, detail: "Sólo se puede anular una orden Pendiente." });
 
@@ -879,7 +885,7 @@ export const semilleroHandlers = [
     const orden = ORDENES.find((o) => o.id === Number(params.id));
     return orden
       ? HttpResponse.json(orden)
-      : errorResponse({ status: 400, detail: "Orden no encontrada." });
+      : errorResponse({ status: 404, detail: "Orden no encontrada." });
   }),
 
   // Catálogos
@@ -916,7 +922,7 @@ export const semilleroHandlers = [
 
   http.put(`${API}/semillero/catalogos/variedades/:id`, async ({ params, request }) => {
     const variedad = VARIEDADES.find((v) => v.id === Number(params.id));
-    if (!variedad) return errorResponse({ status: 400, detail: "Variedad no encontrada." });
+    if (!variedad) return errorResponse({ status: 404, detail: "Variedad no encontrada." });
     const input = (await request.json()) as VariedadInput;
     const enUso = enUsoVariedad(variedad.id);
     if (enUso > 0 && input.especie !== variedad.especie) {
@@ -949,7 +955,7 @@ export const semilleroHandlers = [
 
   http.put(`${API}/semillero/catalogos/ubicaciones/:id`, async ({ params, request }) => {
     const ubicacion = UBICACIONES.find((u) => u.id === Number(params.id));
-    if (!ubicacion) return errorResponse({ status: 400, detail: "Ubicación no encontrada." });
+    if (!ubicacion) return errorResponse({ status: 404, detail: "Ubicación no encontrada." });
     const input = (await request.json()) as UbicacionInput;
     Object.assign(ubicacion, input);
     ubicacion.enUso = enUsoUbicacion(ubicacion.id);
@@ -958,7 +964,7 @@ export const semilleroHandlers = [
 
   http.put(`${API}/semillero/catalogos/destinos/:id`, async ({ params, request }) => {
     const destino = DESTINOS.find((d) => d.id === Number(params.id));
-    if (!destino) return errorResponse({ status: 400, detail: "Destino no encontrado." });
+    if (!destino) return errorResponse({ status: 404, detail: "Destino no encontrado." });
     const input = (await request.json()) as DestinoActualizarInput;
     Object.assign(destino, input);
     destino.enUso = enUsoDestino(destino.id);

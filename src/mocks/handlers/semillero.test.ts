@@ -7,6 +7,7 @@ import type {
   CatalogosSemilleroDto,
   ClientesCopiaDto,
   DespacharOrdenInput,
+  DestinoActualizarInput,
   DestinoAltaInput,
   DestinoDto,
   EstadoCopiaClientesDto,
@@ -18,6 +19,8 @@ import type {
   OrdenCargaInput,
   ReubicacionInput,
   StockSemilleroDto,
+  UbicacionInput,
+  VariedadInput,
 } from "@/features/semillero/types";
 import { semilleroHandlers } from "./semillero";
 
@@ -194,6 +197,10 @@ describe("mocks de demo: semillero", () => {
     expect(data.estado).toBe("Pendiente");
     expect(data.totalKgPropio).toBeGreaterThan(0);
     expect(data.totalKgCliente).toBeGreaterThan(0);
+    // OrdenCargaDto.totalKg existe en el backend (OrdenCargaDtos.cs) y siempre vale lo mismo que
+    // totalKgPropio + totalKgCliente (Duenio sólo es Propio o Cliente): el mock lo tiene que calcular
+    // igual, no sólo declararlo en el tipo.
+    expect(data.totalKg).toBe(data.totalKgPropio + data.totalKgCliente);
   });
 
   it('el motivo "Otro" exige detalle al ajustar stock', async () => {
@@ -393,5 +400,90 @@ describe("mocks de demo: semillero", () => {
     const campoNorte = destinosA.data.find((d) => d.nombre === "Campo Norte")!;
     expect(campoNorte).toBeDefined();
     expect(campoNorte.enUso).toBeGreaterThan(0);
+  });
+
+  describe("paridad de contrato: 404 por id inexistente, no 400 (el backend usa Error.NotFound acá)", () => {
+    const ID_INEXISTENTE = 999999;
+
+    it("PUT /semillero/lotes/:id", async () => {
+      const input: LoteDatosInput = {
+        codigo: "NO-EXISTE",
+        campania: "2026-2027",
+        variedadId: 1,
+        envase: "BigBag",
+        pesoUnitarioKg: 800,
+        tratada: false,
+        pg: null,
+        pmil: null,
+        observaciones: null,
+        duenio: "Propio",
+        clienteNumero: null,
+      };
+      const error = await apiClient
+        .put(`/semillero/lotes/${ID_INEXISTENTE}`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("GET /semillero/ordenes/:id", async () => {
+      const error = await apiClient
+        .get(`/semillero/ordenes/${ID_INEXISTENTE}`)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("PUT /semillero/ordenes/:id", async () => {
+      const input: OrdenCargaInput = {
+        clienteNumero: CLIENTE_A,
+        destinoId: 1,
+        numeroPedidoVenta: null,
+        observaciones: null,
+        items: [],
+      };
+      const error = await apiClient
+        .put(`/semillero/ordenes/${ID_INEXISTENTE}`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("POST /semillero/ordenes/:id/despachar", async () => {
+      const input: DespacharOrdenInput = { numeroRemito: "06-00001", numeroPedidoVenta: null };
+      const error = await apiClient
+        .post(`/semillero/ordenes/${ID_INEXISTENTE}/despachar`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("POST /semillero/ordenes/:id/anular", async () => {
+      const input: AnularOrdenInput = { motivo: "ClienteNoRetiro", detalle: null };
+      const error = await apiClient
+        .post(`/semillero/ordenes/${ID_INEXISTENTE}/anular`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("PUT /semillero/catalogos/variedades/:id", async () => {
+      const input: VariedadInput = { especie: "Soja", nombre: "NO EXISTE", activo: true };
+      const error = await apiClient
+        .put(`/semillero/catalogos/variedades/${ID_INEXISTENTE}`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("PUT /semillero/catalogos/ubicaciones/:id", async () => {
+      const input: UbicacionInput = { codigo: "NO-EXISTE", descripcion: null, activo: true };
+      const error = await apiClient
+        .put(`/semillero/catalogos/ubicaciones/${ID_INEXISTENTE}`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
+
+    it("PUT /semillero/catalogos/destinos/:id", async () => {
+      const input: DestinoActualizarInput = { nombre: "NO EXISTE", activo: true };
+      const error = await apiClient
+        .put(`/semillero/catalogos/destinos/${ID_INEXISTENTE}`, input)
+        .catch((e) => e.response);
+      expect(error.status).toBe(404);
+    });
   });
 });

@@ -110,6 +110,7 @@ const ORDEN_EDITABLE: OrdenCargaDto = {
     },
   ],
   totalUnidades: 3,
+  totalKg: 120,
   totalKgPropio: 0,
   totalKgCliente: 120,
 };

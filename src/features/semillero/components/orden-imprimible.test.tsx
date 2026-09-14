@@ -30,6 +30,7 @@ function orden(over: Partial<OrdenCargaDto> = {}): OrdenCargaDto {
     anuladoPor: null,
     items: [],
     totalUnidades: 5,
+    totalKg: 4000,
     totalKgPropio: 4000,
     totalKgCliente: 0,
   };

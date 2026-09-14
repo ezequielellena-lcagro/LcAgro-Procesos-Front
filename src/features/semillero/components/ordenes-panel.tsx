@@ -107,7 +107,7 @@ export function OrdenesPanel({
       key: "kg",
       header: "Kg",
       align: "right",
-      sortBy: (o) => o.totalKgPropio + o.totalKgCliente,
+      sortBy: (o) => o.totalKg,
       cell: (o) => kgTexto(o),
       className: "whitespace-nowrap",
     },
