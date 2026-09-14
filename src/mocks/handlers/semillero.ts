@@ -837,6 +837,8 @@ export const semilleroHandlers = [
     }
     for (const it of orden.items) {
       stockRow(it.loteId, it.ubicacionId).fisico -= it.cantidad;
+      const lote = LOTES.find((l) => l.id === it.loteId);
+      if (lote) lote.soloIngresoInicial = false;
       nuevoMovimiento("Despacho", it.loteId, it.ubicacionId, -it.cantidad, {
         ordenCargaNumero: orden.numero,
       });

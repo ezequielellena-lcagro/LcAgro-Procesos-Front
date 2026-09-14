@@ -6,6 +6,7 @@ import type {
   AnularOrdenInput,
   CatalogosSemilleroDto,
   ClientesCopiaDto,
+  DespacharOrdenInput,
   DestinoAltaInput,
   DestinoDto,
   EstadoCopiaClientesDto,
@@ -226,6 +227,41 @@ describe("mocks de demo: semillero", () => {
       .put(`/semillero/lotes/${reservado.id}`, input)
       .catch((e) => e.response);
     expect(error.status).toBe(409);
+  });
+
+  it("un lote despachado pierde la edición de envase, peso y dueño aunque la orden ya no esté Pendiente (decisión #4)", async () => {
+    // 26S-002 (id=2): sólo tiene el ingreso inicial y ninguna orden lo reserva todavía en el fixture.
+    const { data: lotesAntes } = await apiClient.get<LoteDto[]>("/semillero/lotes");
+    const sinDespachar = lotesAntes.find((l) => l.codigo === "26S-002")!;
+    expect(sinDespachar).toBeDefined();
+    expect(sinDespachar.duenioEditable).toBe(true);
+    expect(sinDespachar.envaseYPesoEditables).toBe(true);
+
+    const stock = await apiClient.get<StockSemilleroDto>("/semillero/stock");
+    const fila = stock.data.filas.find((f) => f.loteId === sinDespachar.id)!;
+    const destinosA = await apiClient.get<DestinoDto[]>(
+      `/semillero/clientes/${CLIENTE_A}/destinos`,
+    );
+    const orden = await apiClient.post<OrdenCargaDto>("/semillero/ordenes", {
+      clienteNumero: CLIENTE_A,
+      destinoId: destinosA.data[0].id,
+      numeroPedidoVenta: null,
+      observaciones: null,
+      items: [{ loteId: fila.loteId, ubicacionId: fila.ubicacionId, cantidad: 1 }],
+    } satisfies OrdenCargaInput);
+
+    await apiClient.post<OrdenCargaDto>(`/semillero/ordenes/${orden.data.id}/despachar`, {
+      numeroRemito: "06-00080",
+      numeroPedidoVenta: null,
+    } satisfies DespacharOrdenInput);
+
+    // Una vez despachada, la orden ya no es Pendiente: comprometido()/sinReservas() dejan de
+    // contarla. Si `soloIngresoInicial` no se actualizó al despachar, el lote recupera edición pese
+    // a tener ya un movimiento de Despacho además del ingreso inicial.
+    const { data: lotesDespues } = await apiClient.get<LoteDto[]>("/semillero/lotes");
+    const despachado = lotesDespues.find((l) => l.id === sinDespachar.id)!;
+    expect(despachado.duenioEditable).toBe(false);
+    expect(despachado.envaseYPesoEditables).toBe(false);
   });
 
   it("catálogos y destinos traen el enUso recalculado desde el arranque, sin depender de un PUT previo", async () => {
