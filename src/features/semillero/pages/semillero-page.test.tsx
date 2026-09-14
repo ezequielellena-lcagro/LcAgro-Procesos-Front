@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { env } from "@/lib/env";
 import { semilleroHandlers } from "@/mocks/handlers/semillero";
 import { semilleroKeys } from "../queries/keys";
 import { SemilleroPage } from "./semillero-page";
@@ -58,6 +60,29 @@ describe("SemilleroPage", () => {
     await waitFor(() =>
       expect(queryClient.getQueryData(semilleroKeys.movimientos({}))).toBeDefined(),
     );
+    expect(await screen.findByText("Ingreso de cosecha propia.")).toBeInTheDocument();
+  });
+
+  /**
+   * Si el backend cae (5xx) mientras se piden los movimientos, la pestaña tiene que decirlo y
+   * ofrecer reintentar — no mostrar "No hay movimientos", que se lee como historial vacío.
+   */
+  it("si el backend no responde al pedir los movimientos muestra el error y permite reintentar", async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+
+    server.use(
+      http.get(`${env.apiUrl}/semillero/movimientos`, () => HttpResponse.json(null, { status: 500 })),
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Movimientos/ }));
+
+    expect(await screen.findByText(/error del servidor/i)).toBeInTheDocument();
+    expect(screen.queryByText("Ingreso de cosecha propia.")).not.toBeInTheDocument();
+
+    server.resetHandlers(...semilleroHandlers);
+    fireEvent.click(screen.getByRole("button", { name: /reintentar/i }));
+
     expect(await screen.findByText("Ingreso de cosecha propia.")).toBeInTheDocument();
   });
 

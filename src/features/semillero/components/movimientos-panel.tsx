@@ -4,6 +4,7 @@ import { DateField } from "@/components/ui/date-field";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "@/shared/components/data-table";
+import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { fechaHora, kg, unidades } from "../format";
 import {
@@ -18,6 +19,8 @@ import {
 interface Props {
   movimientos: MovimientoDto[] | undefined;
   cargando: boolean;
+  error: unknown;
+  onReintentar: () => void;
   filtros: MovimientoFiltros;
   onFiltros: (filtros: MovimientoFiltros) => void;
   onExcel: () => void;
@@ -48,7 +51,18 @@ function opcionesLote(movimientos: MovimientoDto[]): { loteId: number; loteCodig
  * qué orden de carga pertenece el despacho (si corresponde). La semilla de cliente se distingue de
  * la propia igual que en el resto del módulo (ADR-13).
  */
-export function MovimientosPanel({ movimientos, cargando, filtros, onFiltros, onExcel, descargando }: Props) {
+export function MovimientosPanel({
+  movimientos,
+  cargando,
+  error,
+  onReintentar,
+  filtros,
+  onFiltros,
+  onExcel,
+  descargando,
+}: Props) {
+  if (error) return <ErrorState error={error} onRetry={onReintentar} />;
+
   const columns: Column<MovimientoDto>[] = [
     { key: "fecha", header: "Fecha", sortBy: (m) => m.fecha, cell: (m) => fechaHora(m.fecha), className: "whitespace-nowrap" },
     { key: "tipo", header: "Tipo", sortBy: (m) => m.tipo, cell: (m) => TIPOS_MOVIMIENTO[m.tipo] },

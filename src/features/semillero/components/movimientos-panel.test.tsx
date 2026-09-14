@@ -1,7 +1,18 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { AxiosError, AxiosHeaders } from "axios";
 import { describe, expect, it, vi } from "vitest";
 import type { MovimientoDto } from "../types";
 import { MovimientosPanel } from "./movimientos-panel";
+
+function errorServidor(detail: string) {
+  return new AxiosError("Request failed", "500", undefined, null, {
+    status: 500,
+    statusText: "Internal Server Error",
+    headers: new AxiosHeaders(),
+    config: { headers: new AxiosHeaders() },
+    data: { status: 500, detail },
+  });
+}
 
 const ajuste: MovimientoDto = {
   id: 1,
@@ -73,6 +84,8 @@ function renderPanel(over: Partial<Parameters<typeof MovimientosPanel>[0]> = {})
   const props = {
     movimientos: [ajuste, despacho, ingreso],
     cargando: false,
+    error: null,
+    onReintentar: vi.fn(),
     filtros: {},
     onFiltros: vi.fn(),
     onExcel: vi.fn(),
@@ -156,5 +169,24 @@ describe("MovimientosPanel", () => {
   it("sin movimientos lo dice", () => {
     renderPanel({ movimientos: [] });
     expect(screen.getByText("No hay movimientos con esos filtros.")).toBeInTheDocument();
+  });
+
+  /**
+   * Si el backend no responde (caído, timeout, 5xx) hay que decirlo: un historial vacío se lee
+   * como "no hubo movimientos", no como "no se pudo consultar".
+   */
+  it("si el backend no responde muestra el error y ofrece reintentar", () => {
+    const onReintentar = vi.fn();
+    renderPanel({
+      movimientos: undefined,
+      error: errorServidor("Error del servidor. Avisale al equipo si persiste."),
+      onReintentar,
+    });
+
+    expect(screen.getByText(/error del servidor/i)).toBeInTheDocument();
+    expect(screen.queryByText("No hay movimientos con esos filtros.")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /reintentar/i }));
+    expect(onReintentar).toHaveBeenCalled();
   });
 });

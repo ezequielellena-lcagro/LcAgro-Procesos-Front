@@ -238,6 +238,8 @@ export function SemilleroPage() {
               <MovimientosPanel
                 movimientos={movimientos.data}
                 cargando={movimientos.isPending || movimientos.isFetching}
+                error={movimientos.error}
+                onReintentar={() => void movimientos.refetch()}
                 filtros={movimientosFiltros}
                 onFiltros={setMovimientosFiltros}
                 onExcel={() => exportarMovimientos.mutate(movimientosFiltros)}
