@@ -289,6 +289,10 @@ export const proveedoresHandlers = [
     const { tramos } = calendario(anio, mes);
     const rows = aplicarFiltros(filas(), u);
 
+    const hoy = new Date();
+    // Mismo título que arma el backend real: "Vencido al dd-MM-yyyy (memo)", con la fecha de hoy.
+    const fechaExcel = largo(hoy);
+
     const { default: writeXlsxFile } = await import("write-excel-file/browser");
     const FMT = '#,##0.00;(#,##0.00);"-"';
     const num = (value: number) => ({ type: Number, value, format: FMT });
@@ -307,11 +311,14 @@ export const proveedoresHandlers = [
           cell: (r: ProveedorDto) => num(r.montos[i] ?? 0),
         })),
         { header: "SALDO TOTAL", width: 16, cell: (r: ProveedorDto) => num(r.saldoTotal) },
-        { header: "Vencido hoy", width: 16, cell: (r: ProveedorDto) => num(r.vencidoHoy) },
+        {
+          header: `Vencido al ${fechaExcel} (memo)`,
+          width: 16,
+          cell: (r: ProveedorDto) => num(r.vencidoHoy),
+        },
       ],
     }).toBlob();
 
-    const hoy = new Date();
     const sello = `${hoy.getFullYear()}${p2(hoy.getMonth() + 1)}${p2(hoy.getDate())}`;
     return new HttpResponse(blob, {
       headers: {
