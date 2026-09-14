@@ -10,10 +10,13 @@ import type {
   DestinoAltaInput,
   DestinoDto,
   EstadoCopiaClientesDto,
+  IngresoInput,
+  LoteAltaInput,
   LoteDatosInput,
   LoteDto,
   OrdenCargaDto,
   OrdenCargaInput,
+  ReubicacionInput,
   StockSemilleroDto,
 } from "@/features/semillero/types";
 import { semilleroHandlers } from "./semillero";
@@ -200,6 +203,73 @@ describe("mocks de demo: semillero", () => {
       (f) => f.loteId === deA.loteId && f.ubicacionId === deA.ubicacionId,
     )!;
     expect(filaLuego.disponible).toBe(deA.disponible); // la reserva se liberó al anular
+  });
+
+  it("cualquier segunda operación de stock bloquea dueño, envase y peso, igual que el backend (decisión #4): ingreso adicional, ajuste y reubicación", async () => {
+    // Lote fresco por caso, para que cada operación se pruebe aislada sin pisar el estado de otro test.
+    const loteEditableNuevo = async (sufijo: string): Promise<LoteDto> => {
+      const { data: nuevo } = await apiClient.post<LoteDto>("/semillero/lotes", {
+        codigo: `TEST-${sufijo}`,
+        campania: "2026-2027",
+        variedadId: 1,
+        envase: "BigBag",
+        pesoUnitarioKg: 800,
+        tratada: false,
+        pg: null,
+        pmil: null,
+        observaciones: null,
+        duenio: "Propio",
+        clienteNumero: null,
+        ubicacionId: 1,
+        cantidad: 10,
+      } satisfies LoteAltaInput);
+      expect(nuevo.duenioEditable).toBe(true);
+      expect(nuevo.envaseYPesoEditables).toBe(true);
+      return nuevo;
+    };
+    const editableTrasOperacion = async (loteId: number): Promise<LoteDto> => {
+      const { data: lotes } = await apiClient.get<LoteDto[]>("/semillero/lotes");
+      return lotes.find((l) => l.id === loteId)!;
+    };
+
+    // Ingreso adicional (decisión #2): antes de esta corrección era el único de los cuatro caminos
+    // que NO marcaba el lote como usado, dejando dueño/envase/peso editables por error.
+    const loteIngreso = await loteEditableNuevo("ING");
+    await apiClient.post("/semillero/movimientos/ingreso", {
+      loteId: loteIngreso.id,
+      ubicacionId: 1,
+      cantidad: 5,
+      observacion: null,
+    } satisfies IngresoInput);
+    const trasIngreso = await editableTrasOperacion(loteIngreso.id);
+    expect(trasIngreso.duenioEditable).toBe(false);
+    expect(trasIngreso.envaseYPesoEditables).toBe(false);
+
+    // Ajuste
+    const loteAjuste = await loteEditableNuevo("AJU");
+    await apiClient.post("/semillero/movimientos/ajuste", {
+      loteId: loteAjuste.id,
+      ubicacionId: 1,
+      cantidad: -1,
+      motivo: "RecuentoFisico",
+      observacion: null,
+    } satisfies AjusteInput);
+    const trasAjuste = await editableTrasOperacion(loteAjuste.id);
+    expect(trasAjuste.duenioEditable).toBe(false);
+    expect(trasAjuste.envaseYPesoEditables).toBe(false);
+
+    // Reubicación
+    const loteReubicacion = await loteEditableNuevo("REU");
+    await apiClient.post("/semillero/movimientos/reubicacion", {
+      loteId: loteReubicacion.id,
+      ubicacionOrigenId: 1,
+      ubicacionDestinoId: 2,
+      cantidad: 1,
+      observacion: null,
+    } satisfies ReubicacionInput);
+    const trasReubicacion = await editableTrasOperacion(loteReubicacion.id);
+    expect(trasReubicacion.duenioEditable).toBe(false);
+    expect(trasReubicacion.envaseYPesoEditables).toBe(false);
   });
 
   it("un lote reservado por una orden Pendiente pierde la edición de envase, peso y dueño aunque sólo tenga el ingreso inicial (decisión #4)", async () => {

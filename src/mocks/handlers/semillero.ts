@@ -155,8 +155,6 @@ interface LoteFicticio {
   observaciones: string | null;
   duenio: DuenioLote;
   clienteNumero: number | null;
-  /** Controla `duenioEditable`/`envaseYPesoEditables` (decisión #4): sólo mientras no tuvo más que el ingreso inicial. */
-  soloIngresoInicial: boolean;
 }
 
 let seqLote = 4;
@@ -175,7 +173,6 @@ const LOTES: LoteFicticio[] = [
     observaciones: null,
     duenio: "Propio",
     clienteNumero: null,
-    soloIngresoInicial: false,
   },
   {
     id: 2,
@@ -191,7 +188,6 @@ const LOTES: LoteFicticio[] = [
     observaciones: null,
     duenio: "Propio",
     clienteNumero: null,
-    soloIngresoInicial: true,
   },
   {
     id: 3,
@@ -207,7 +203,6 @@ const LOTES: LoteFicticio[] = [
     observaciones: "Semilla del cliente, para multiplicación.",
     duenio: "Cliente",
     clienteNumero: 900001,
-    soloIngresoInicial: true,
   },
   {
     id: 4,
@@ -223,7 +218,6 @@ const LOTES: LoteFicticio[] = [
     observaciones: null,
     duenio: "Propio",
     clienteNumero: null,
-    soloIngresoInicial: false,
   },
 ];
 
@@ -263,13 +257,21 @@ function sinReservas(loteId: number): boolean {
   );
 }
 
+/** Total de movimientos del lote, en cualquier ubicación (incluye el ingreso inicial). */
+function movimientosDeLote(loteId: number): number {
+  return MOVIMIENTOS.filter((m) => m.loteId === loteId).length;
+}
+
 /**
  * Envase, peso unitario y dueño quedan bloqueados una vez que el lote tuvo movimientos más allá del
- * ingreso inicial (decisión #4): ajustes, reubicaciones, despachos, o estar reservado por una orden
- * Pendiente, aunque el ingreso siga siendo el único movimiento registrado.
+ * ingreso inicial (decisión #4): un segundo ingreso, un ajuste, una reubicación, un despacho, o estar
+ * reservado por una orden Pendiente, aunque el ingreso siga siendo el único movimiento registrado.
+ * Se deriva de la cantidad real de movimientos y de las reservas pendientes —igual que el backend
+ * (`ReglaDuenio.AtributosSensiblesEditables`, `cantidadMovimientos <= 1 && !reservado`)—, en vez de un
+ * flag que cada handler que agrega un movimiento tendría que acordarse de actualizar.
  */
 function atributosSensiblesEditables(l: LoteFicticio): boolean {
-  return l.soloIngresoInicial && sinReservas(l.id);
+  return movimientosDeLote(l.id) <= 1 && sinReservas(l.id);
 }
 
 function loteDto(l: LoteFicticio): LoteDto {
@@ -389,6 +391,10 @@ function nuevoMovimiento(
 
 // Historial inicial: los ingresos que originaron los lotes sembrados arriba.
 nuevoMovimiento("Ingreso", 1, 1, 40, { observacion: "Ingreso de cosecha propia." });
+// La orden 2 (ver más abajo) ya nace "Despachada" con 4 unidades de este lote: se deja también el
+// movimiento de despacho correspondiente, para que duenioEditable/envaseYPesoEditables arranquen
+// bloqueados (decisión #4) igual que si hubiera pasado por el handler de despacho.
+nuevoMovimiento("Despacho", 1, 1, -4, { ordenCargaNumero: 2 });
 nuevoMovimiento("Ingreso", 2, 2, 500);
 nuevoMovimiento("Ingreso", 3, 3, 10, { observacion: "Recepción de semilla del cliente." });
 nuevoMovimiento("Ingreso", 4, 1, 5);
@@ -598,7 +604,6 @@ export const semilleroHandlers = [
       observaciones: input.observaciones,
       duenio: input.duenio,
       clienteNumero: input.duenio === "Cliente" ? input.clienteNumero : null,
-      soloIngresoInicial: true,
     };
     LOTES.push(nuevo);
     stockRow(nuevo.id, input.ubicacionId).fisico += input.cantidad;
@@ -667,8 +672,6 @@ export const semilleroHandlers = [
       });
     }
     row.fisico += input.cantidad;
-    const lote = LOTES.find((l) => l.id === input.loteId);
-    if (lote) lote.soloIngresoInicial = false;
     nuevoMovimiento(
       input.cantidad >= 0 ? "AjustePositivo" : "AjusteNegativo",
       input.loteId,
@@ -694,8 +697,6 @@ export const semilleroHandlers = [
     }
     origen.fisico -= input.cantidad;
     stockRow(input.loteId, input.ubicacionDestinoId).fisico += input.cantidad;
-    const lote = LOTES.find((l) => l.id === input.loteId);
-    if (lote) lote.soloIngresoInicial = false;
     nuevoMovimiento("ReubicacionSalida", input.loteId, input.ubicacionOrigenId, -input.cantidad, {
       observacion: input.observacion,
     });
@@ -837,8 +838,6 @@ export const semilleroHandlers = [
     }
     for (const it of orden.items) {
       stockRow(it.loteId, it.ubicacionId).fisico -= it.cantidad;
-      const lote = LOTES.find((l) => l.id === it.loteId);
-      if (lote) lote.soloIngresoInicial = false;
       nuevoMovimiento("Despacho", it.loteId, it.ubicacionId, -it.cantidad, {
         ordenCargaNumero: orden.numero,
       });
