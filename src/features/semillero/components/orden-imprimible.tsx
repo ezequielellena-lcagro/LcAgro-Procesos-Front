@@ -77,36 +77,41 @@ export function OrdenImprimible({ orden, onClose }: Props) {
         </p>
       )}
 
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-soft">
-            <th className="py-1.5 pr-2">Variedad</th>
-            <th className="py-1.5 pr-2">Lote</th>
-            <th className="py-1.5 pr-2">Ubicación</th>
-            <th className="py-1.5 pr-2">Envase</th>
-            <th className="py-1.5 pr-2">Tratamiento</th>
-            <th className="py-1.5 pr-2 text-right">PG</th>
-            <th className="py-1.5 pr-2 text-right">PMIL</th>
-            <th className="py-1.5 pr-2">Dueño</th>
-            <th className="py-1.5 pr-2 text-right">Cantidad</th>
-            <th className="py-1.5 text-right">Kg</th>
-          </tr>
-        </thead>
-        <tbody>
-          {orden.items.map((it) => (
-            <Renglon key={it.id} item={it} />
-          ))}
-        </tbody>
-        <tfoot>
-          <tr className="border-t-2 border-line font-semibold">
-            <td colSpan={8} className="py-1.5 pr-2">
-              Total
-            </td>
-            <td className="py-1.5 pr-2 text-right tabular">{unidades(orden.totalUnidades)}</td>
-            <td className="py-1.5 text-right tabular">{kg(orden.totalKg)}</td>
-          </tr>
-        </tfoot>
-      </table>
+      {/* Contenedor con scroll horizontal en pantalla (viewports angostos, ~550px, no cortan la
+          columna Kg); en @media print (src/index.css) `.overflow-x-auto` vuelve a `overflow: visible`
+          y la tabla sale completa en el papel. */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-line text-left text-xs uppercase tracking-wide text-ink-soft">
+              <th className="py-1.5 pr-2">Variedad</th>
+              <th className="py-1.5 pr-2">Lote</th>
+              <th className="py-1.5 pr-2">Ubicación</th>
+              <th className="py-1.5 pr-2">Envase</th>
+              <th className="py-1.5 pr-2">Tratamiento</th>
+              <th className="py-1.5 pr-2 text-right">PG</th>
+              <th className="py-1.5 pr-2 text-right">PMIL</th>
+              <th className="py-1.5 pr-2">Dueño</th>
+              <th className="py-1.5 pr-2 text-right">Cantidad</th>
+              <th className="py-1.5 text-right">Kg</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orden.items.map((it) => (
+              <Renglon key={it.id} item={it} />
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-line font-semibold">
+              <td colSpan={8} className="py-1.5 pr-2">
+                Total
+              </td>
+              <td className="py-1.5 pr-2 text-right tabular">{unidades(orden.totalUnidades)}</td>
+              <td className="py-1.5 text-right tabular">{kg(orden.totalKg)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       {mixta && (
         <p className="mt-2 text-xs text-ink-soft">

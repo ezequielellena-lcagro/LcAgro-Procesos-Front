@@ -173,4 +173,10 @@ describe("OrdenImprimible", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("la tabla de renglones vive en un contenedor con scroll horizontal para no cortarse en pantallas angostas", () => {
+    render(<OrdenImprimible orden={orden({ items: [item()] })} onClose={vi.fn()} />);
+    const tabla = screen.getByRole("table");
+    expect(tabla.closest(".overflow-x-auto")).not.toBeNull();
+  });
 });
