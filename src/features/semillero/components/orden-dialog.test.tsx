@@ -275,6 +275,11 @@ describe("OrdenDialog", () => {
     expect(campo).toHaveValue("06-00123");
   });
 
+  it("el placeholder del pedido de venta usa la sucursal 02 de MacroGest, no la 06 del remito", () => {
+    renderDialog();
+    expect(screen.getByLabelText("Pedido de venta").getAttribute("placeholder")).toMatch(/^02-/);
+  });
+
   it("al cambiar el cliente de una orden en edición, los renglones que quedan de otro cliente se marcan (renglonesDeOtroCliente)", () => {
     renderDialog({ orden: ORDEN_EDITABLE, filas: [PROPIO, CLIENTE_500], destinos: DESTINOS_500 });
     elegirCliente("Dos");

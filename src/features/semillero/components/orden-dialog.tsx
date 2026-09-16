@@ -294,7 +294,7 @@ function OrdenForm({
         >
           <Input
             id="numeroPedidoVenta"
-            placeholder="06-00045"
+            placeholder="02-55202"
             {...form.register("numeroPedidoVenta", {
               onBlur: (e) => {
                 const normalizado = normalizarComprobante(e.target.value);

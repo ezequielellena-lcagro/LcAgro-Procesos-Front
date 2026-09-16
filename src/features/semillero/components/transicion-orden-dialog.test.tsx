@@ -100,6 +100,11 @@ describe("TransicionOrdenDialog", () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  it("al despachar, el placeholder del pedido usa la sucursal 02 de MacroGest, no la 06 del remito", () => {
+    renderDialog({ tipo: "despachar", orden: ORDEN });
+    expect(screen.getByLabelText("Pedido de venta").getAttribute("placeholder")).toMatch(/^02-/);
+  });
+
   it("al despachar, el pedido es opcional pero si se completa mal lo avisa", async () => {
     renderDialog({ tipo: "despachar", orden: ORDEN });
     escribir("Remito", "6-1");
