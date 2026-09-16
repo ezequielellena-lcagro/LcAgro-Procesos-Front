@@ -195,7 +195,11 @@ export function SemilleroPage() {
           <Tabs value={pestania} onValueChange={setPestania} className="space-y-3">
             <TabsList>
               <TabsTrigger value="stock">Stock</TabsTrigger>
-              <TabsTrigger value="ordenes">Órdenes de carga ({ordenes.data.length})</TabsTrigger>
+              {/* Mismo dato que el KPI "Órdenes pendientes" (`SemilleroKpis`): nunca el total de
+                  órdenes, que se queda alto aunque no quede ninguna accionable (recorrida 2026-09-16). */}
+              <TabsTrigger value="ordenes">
+                Órdenes de carga ({stock.data.totales.ordenesPendientes})
+              </TabsTrigger>
               <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
               <TabsTrigger value="catalogos">Catálogos</TabsTrigger>
             </TabsList>

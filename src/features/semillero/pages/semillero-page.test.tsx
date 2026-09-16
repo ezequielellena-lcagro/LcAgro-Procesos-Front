@@ -96,6 +96,29 @@ describe("SemilleroPage", () => {
     await waitFor(() => expect(queryClient.getQueryData(semilleroKeys.clientes())).toBeDefined());
   });
 
+  /**
+   * La pestaña "Órdenes de carga (N)" tiene que contar sólo las Pendientes, el mismo dato que el KPI
+   * "Órdenes pendientes" — nunca el total de órdenes (que se queda alto aunque no quede ninguna
+   * accionable, hallazgo de la recorrida manual del 2026-09-16).
+   */
+  it('la pestaña "Órdenes de carga" cuenta sólo las pendientes, no el total (recorrida 2026-09-16)', async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    await screen.findByText("VIVERO DEMO SANTA ROSA SA");
+
+    expect(screen.getByRole("tab", { name: "Órdenes de carga (1)" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Despachar orden N° 1" }));
+    fireEvent.change(await screen.findByLabelText("Remito"), { target: { value: "06-00099" } });
+    fireEvent.click(screen.getByRole("button", { name: "Despachar" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "Órdenes de carga (0)" })).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("tab", { name: "Órdenes de carga (1)" })).not.toBeInTheDocument();
+  });
+
   it('"Imprimir" en una orden Despachada abre la vista imprimible con la orden completa (R7.1)', async () => {
     renderPagina();
     await screen.findByText("BigBags propios");
