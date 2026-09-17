@@ -32,15 +32,23 @@ function etiquetaOpcion(e: LoteElegible): string {
     : base;
 }
 
+interface CantidadesDeOpciones {
+  cantidadElegibles: number;
+  cantidadPorAgregar: number;
+  cantidadVisibles: number;
+}
+
+/** Por qué el selector no ofrece nada (R2.4); `null` si ofrece algo. */
 function mensajeSinOpciones(
-  cantidadPorAgregar: number,
-  cantidadVisibles: number,
+  { cantidadElegibles, cantidadPorAgregar, cantidadVisibles }: CantidadesDeOpciones,
   hayCliente: boolean,
 ): string | null {
+  // Sin cliente, la semilla de clientes todavía no se ofrece: se aclara para que no se la busque.
+  const conNotaDeClientes = (texto: string) =>
+    hayCliente ? texto : `${texto} La semilla de clientes aparece al elegir el cliente.`;
+  if (cantidadElegibles === 0) return conNotaDeClientes("No hay lotes con disponible.");
   if (cantidadPorAgregar === 0) {
-    return hayCliente
-      ? "No hay lotes con disponible."
-      : "No hay lotes con disponible. La semilla de clientes aparece al elegir el cliente.";
+    return conNotaDeClientes("Todos los lotes con disponible ya están en la orden.");
   }
   return cantidadVisibles === 0 ? "No hay lotes disponibles con esos filtros." : null;
 }
@@ -91,7 +99,14 @@ export function AgregarRenglon({
   const visibles = visiblesCon(filtros);
   // Nunca queda elegido un lote que no se ve (R3.3): ni para mostrarlo ni para agregarlo.
   const elegido = visibles.find((e) => claveDe(e) === clave);
-  const mensaje = mensajeSinOpciones(quedanPorAgregar.length, visibles.length, hayCliente);
+  const mensaje = mensajeSinOpciones(
+    {
+      cantidadElegibles: elegibles.length,
+      cantidadPorAgregar: quedanPorAgregar.length,
+      cantidadVisibles: visibles.length,
+    },
+    hayCliente,
+  );
 
   const cambiarFiltros = (cambio: FiltrosElegibles) => {
     const nuevos = { ...filtros, ...cambio };

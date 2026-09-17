@@ -500,6 +500,26 @@ describe("OrdenDialog", () => {
     expect(lotesOfrecidos()).toEqual(["26S-C01"]);
   });
 
+  /**
+   * Hallazgo de la revisión (ronda 2): el mensaje miraba lo que quedaba por agregar, no los elegibles,
+   * así que con todo lo disponible ya cargado decía "No hay lotes con disponible.", que es falso.
+   */
+  it("si todos los lotes con disponible ya están en la orden, lo dice sin negar que haya disponible (R2.4)", () => {
+    renderDialog({ filas: [PROPIO] });
+    agregarRenglon("1:1", "1");
+
+    expect(screen.queryByText(/No hay lotes con disponible/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Todos los lotes con disponible ya están en la orden. La semilla de clientes aparece al elegir el cliente.",
+      ),
+    ).toBeInTheDocument();
+
+    elegirCliente("Uno");
+    agregarRenglon("2:2", "1");
+    expect(screen.getByText("Todos los lotes con disponible ya están en la orden.")).toBeInTheDocument();
+  });
+
   it("con el cliente elegido y nada disponible, no habla de la semilla de clientes (R2.4)", () => {
     renderDialog({ filas: [fila({ fisico: 0 })] });
     elegirCliente("Uno");
