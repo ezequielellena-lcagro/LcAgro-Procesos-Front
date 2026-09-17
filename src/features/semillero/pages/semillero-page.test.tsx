@@ -168,7 +168,8 @@ describe("SemilleroPage", () => {
 
     await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("fetching"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByText("Preparando la orden…")).toBeInTheDocument();
+    // Fijo en pantalla: se ve aunque la tabla de Stock esté desplazada y no corre el contenido.
+    expect(screen.getByText("Preparando la orden…").closest('[role="status"]')).toHaveClass("fixed");
 
     liberarStock();
     const dialogo = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
@@ -262,6 +263,114 @@ describe("SemilleroPage", () => {
     const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
     expect(within(dialogo).getByLabelText("Agregar renglón")).toHaveValue("1:1");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  /** Hace que el stock completo (sin filtros) responda 400; el filtrado sigue al handler de la fixture. */
+  function fallarStockCompleto() {
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, ({ request }) =>
+        new URL(request.url).search === ""
+          ? HttpResponse.json({ detail: "Stock no disponible." }, { status: 400 })
+          : undefined,
+      ),
+    );
+  }
+
+  /**
+   * Hallazgo de la revisión (ronda 2): tras un fallo, el pedido seguía vivo y cualquier recarga
+   * posterior del stock completo que saliera bien (la de cualquier escritura del módulo) abría el
+   * diálogo solo, sin que el usuario lo pidiera de nuevo.
+   */
+  it("si falla el stock completo, la orden no se abre sola con una recarga posterior: espera Reintentar (R1.2)", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    fallarStockCompleto();
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/^No se pudo traer el stock para armar la orden/);
+
+    // Con el backend repuesto, lo mismo que hace cualquier escritura del módulo (p. ej. un Ingreso).
+    server.resetHandlers(...semilleroHandlers);
+    const antes = queryClient.getQueryState(semilleroKeys.stock({}))?.dataUpdatedAt ?? 0;
+    await queryClient.invalidateQueries({ queryKey: semilleroKeys.all });
+    await waitFor(() =>
+      expect(queryClient.getQueryState(semilleroKeys.stock({}))?.dataUpdatedAt).toBeGreaterThan(antes),
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const aviso = screen.getByRole("alert");
+    fireEvent.click(within(aviso).getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByRole("dialog", { name: "Nueva orden de carga" })).toBeInTheDocument();
+  });
+
+  /**
+   * Hallazgo de la revisión (ronda 2): la pestaña Stock sin filtros comparte la query del stock
+   * completo, así que el fallo del pedido de la orden reemplazaba además la página entera por el
+   * error (sin pestañas, con dos "Reintentar"), aun después de cancelar.
+   */
+  it("si falla el stock completo con la pestaña Stock sin filtros, la página no se reemplaza por el error (R1.2)", async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+    fallarStockCompleto();
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+    const aviso = await screen.findByRole("alert");
+
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getAllByRole("button", { name: "Reintentar" })).toHaveLength(1);
+
+    fireEvent.click(within(aviso).getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getByRole("button", { name: "Editar lote 26S-001" })).toBeInTheDocument();
+  });
+
+  /**
+   * Hallazgo de la revisión (ronda 2): mientras se preparaba la orden la página seguía respondiendo;
+   * si se abría otro diálogo, al llegar el stock quedaban dos apilados.
+   */
+  it("abrir otro diálogo mientras se prepara la orden desiste de ella (R1.2)", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    const liberarStock = demorarStockCompleto();
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+    expect(await screen.findByText("Preparando la orden…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ingreso 26S-002 en G1-2" }));
+    expect(screen.queryByText("Preparando la orden…")).not.toBeInTheDocument();
+
+    liberarStock();
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("idle"));
+    expect(screen.getAllByRole("dialog").map((d) => d.getAttribute("aria-label"))).toEqual([
+      "Ingreso de stock",
+    ]);
+
+    // Lo mismo con "Nuevo lote".
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancelar" }));
+    const liberarOtraVez = demorarStockCompleto();
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+    expect(await screen.findByText("Preparando la orden…")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Nuevo lote" }));
+    expect(screen.queryByText("Preparando la orden…")).not.toBeInTheDocument();
+
+    liberarOtraVez();
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("idle"));
+    expect(screen.getAllByRole("dialog").map((d) => d.getAttribute("aria-label"))).toEqual(["Nuevo lote"]);
+  });
+
+  it("Escape desiste de la orden que se está preparando (R1.2)", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    const liberarStock = demorarStockCompleto();
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+    expect(await screen.findByText("Preparando la orden…")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByText("Preparando la orden…")).not.toBeInTheDocument();
+
+    liberarStock();
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("idle"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   /**

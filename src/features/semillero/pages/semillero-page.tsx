@@ -123,16 +123,31 @@ export function SemilleroPage() {
   const exportarOrdenes = useExportarOrdenes();
   const exportarMovimientos = useExportarMovimientos();
 
-  const error = stock.error ?? ordenes.error ?? catalogos.error;
+  // Un fallo del stock completo que ya informó el aviso del pedido de orden no tapa además la página
+  // (la pestaña Stock sin filtros comparte esa query); cualquier otro error del stock, sí.
+  const errorStock = stock.error === pedidoOrden.falloAvisado ? null : stock.error;
+  const error = errorStock ?? ordenes.error ?? catalogos.error;
   const listoParaMostrar = stock.data && ordenes.data && catalogos.data;
 
+  // Abrir otro diálogo desiste de una orden que todavía se está preparando: si no, al llegar el stock
+  // quedarían dos diálogos apilados.
   const abrirNuevoLote = () => {
+    pedidoOrden.desistir();
     setLoteEditandoId(null);
     setLoteDialogAbierto(true);
   };
   const abrirEditarLote = (loteId: number) => {
+    pedidoOrden.desistir();
     setLoteEditandoId(loteId);
     setLoteDialogAbierto(true);
+  };
+  const abrirMovimiento = (operacion: OperacionStock, fila: StockFilaDto) => {
+    pedidoOrden.desistir();
+    setMovimiento({ operacion, fila });
+  };
+  const abrirImprimible = (orden: OrdenCargaDto) => {
+    pedidoOrden.desistir();
+    setOrdenImprimiendo(orden);
   };
   const cerrarLoteDialog = () => {
     setLoteDialogAbierto(false);
@@ -209,7 +224,7 @@ export function SemilleroPage() {
                 onFiltros={setStockFiltros}
                 onNuevoLote={abrirNuevoLote}
                 onEditarLote={abrirEditarLote}
-                onMovimiento={(operacion, fila) => setMovimiento({ operacion, fila })}
+                onMovimiento={abrirMovimiento}
                 onOrden={pedidoOrden.abrirDesdeStock}
                 onExcel={() => exportarStock.mutate(stockFiltros)}
                 descargando={exportarStock.isPending}
@@ -230,7 +245,7 @@ export function SemilleroPage() {
                 onErrorRefrescarStock={() => void stock.refetch()}
                 onExcel={() => exportarOrdenes.mutate(ordenesFiltros)}
                 descargando={exportarOrdenes.isPending}
-                onImprimir={setOrdenImprimiendo}
+                onImprimir={abrirImprimible}
               />
             </TabsContent>
 

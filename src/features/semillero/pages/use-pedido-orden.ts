@@ -19,6 +19,11 @@ interface PedidoOrden {
   orden: OrdenCargaDto | null;
   filaOrigen: StockFilaDto | null;
   pedidoEn: number;
+  /**
+   * Por qué no se pudo traer ese stock. Deja el pedido en pausa hasta "Reintentar": si no, cualquier
+   * recarga posterior que saliera bien (la de cualquier escritura del módulo) abriría el diálogo solo.
+   */
+  fallo: Error | null;
 }
 
 /**
@@ -40,16 +45,22 @@ export function usePedidoOrden() {
   const [pedido, setPedido] = useState<PedidoOrden | null>(null);
   // `undefined` mientras un lote de Cliente espera la copia de clientes (ver abajo).
   const [cliente, setCliente] = useState<number | null | undefined>(null);
+  // El último fallo que informó el aviso del pedido: la página no lo repite tapándose entera.
+  const [falloAvisado, setFalloAvisado] = useState<Error | null>(null);
 
   const hayPedido = pedido !== null;
-  const stock = useStockSemillero(STOCK_COMPLETO, hayPedido);
-  const clientes = useClientesSemillero(hayPedido);
+  const vigente = hayPedido && pedido.fallo === null;
+  const stock = useStockSemillero(STOCK_COMPLETO, vigente);
+  const clientes = useClientesSemillero(vigente);
 
   // El stock completo tiene que haber llegado DESPUÉS del pedido: con una copia vieja, el renglón de
   // un lote nuevo se vería vacío y con un "Supera lo disponible" que no es real (R1.2). Ya abierto,
   // volver a pedirlo no lo cierra: `dataUpdatedAt` sólo avanza.
-  const stockAlDia = hayPedido && stock.dataUpdatedAt >= pedido.pedidoEn;
-  const fallo = hayPedido && !stockAlDia && stock.errorUpdatedAt >= pedido.pedidoEn ? stock.error : null;
+  const stockAlDia = vigente && stock.dataUpdatedAt >= pedido.pedidoEn;
+  if (vigente && !stockAlDia && stock.error && stock.errorUpdatedAt >= pedido.pedidoEn) {
+    setPedido({ ...pedido, fallo: stock.error });
+    setFalloAvisado(stock.error);
+  }
   // Desde una fila de un Cliente, además, hay que saber si ese cliente está activo antes de armar el
   // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla. Se
   // espera también la copia que se está pidiendo aunque haya una vieja en caché (vencida, se pide al
@@ -65,7 +76,7 @@ export function usePedidoOrden() {
   }
 
   const abrir = (orden: OrdenCargaDto | null, filaOrigen: StockFilaDto | null) => {
-    setPedido({ orden, filaOrigen, pedidoEn: Date.now() });
+    setPedido({ orden, filaOrigen, pedidoEn: Date.now(), fallo: null });
     setCliente(clienteAlPedirOrden(orden, filaOrigen));
     // Con el diálogo cerrado nadie vuelve a pedir el stock completo (una escritura sólo lo marca
     // como vencido): la copia en caché puede ser vieja, así que se pide siempre al abrir (R1.2).
@@ -79,10 +90,15 @@ export function usePedidoOrden() {
   return {
     /** El diálogo se puede mostrar: ya llegó todo lo que espera. */
     abierto: listo,
-    /** Hay un pedido que todavía no se puede mostrar (esperando o con `fallo`). */
+    /** Hay un pedido que todavía no se puede mostrar (esperando datos o en pausa por un `fallo`). */
     esperando: hayPedido && !listo,
     /** Por qué no se pudo traer el stock completo del pedido, si falló. */
-    fallo,
+    fallo: pedido?.fallo ?? null,
+    /**
+     * El último fallo que ya se informó en el aviso del pedido (se conserva al cancelarlo): si la
+     * pestaña Stock comparte la query del stock completo, la página no lo repite tapándose entera.
+     */
+    falloAvisado,
     /** `null` = alta. */
     orden: pedido?.orden ?? null,
     filaOrigen: pedido?.filaOrigen ?? null,
@@ -97,5 +113,9 @@ export function usePedidoOrden() {
     },
     /** Cierra el diálogo, o desiste del pedido si todavía no se mostró. */
     cerrar,
+    /** Desiste del pedido sólo si todavía no se mostró (p. ej. porque se abre otro diálogo). */
+    desistir: () => {
+      if (!listo) cerrar();
+    },
   };
 }
