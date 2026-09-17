@@ -13,15 +13,17 @@ const STOCK_COMPLETO: StockFiltros = {};
 
 /**
  * Pedido de abrir el diálogo de orden (alta, edición o desde una fila de Stock). `pedidoEn` marca
- * desde cuándo vale el stock completo: el diálogo abre recién con datos recibidos después (R1.2).
+ * desde cuándo vale el stock completo: el diálogo abre recién con datos recibidos después
+ * (R1.2).
  */
 interface PedidoOrden {
   orden: OrdenCargaDto | null;
   filaOrigen: StockFilaDto | null;
   pedidoEn: number;
   /**
-   * Por qué no se pudo traer ese stock. Deja el pedido en pausa hasta "Reintentar": si no, cualquier
-   * recarga posterior que saliera bien (la de cualquier escritura del módulo) abriría el diálogo solo.
+   * Por qué no se pudo traer ese stock. Deja el pedido en pausa hasta "Reintentar": si no,
+   * cualquier recarga posterior que saliera bien (la de cualquier escritura del módulo) abriría el
+   * diálogo solo.
    */
   fallo: Error | null;
 }
@@ -38,8 +40,8 @@ function clienteAlPedirOrden(orden: OrdenCargaDto | null, filaOrigen: StockFilaD
 /**
  * El pedido de abrir el diálogo de orden y lo que ese diálogo espera antes de abrirse: el stock
  * completo recién pedido (R1.1/R1.2) y, desde un lote de Cliente, la copia de clientes al día para
- * saber si ese dueño está activo (R4.3). También es dueño del cliente de la orden en armado, el mismo
- * que tiene el formulario: de él salen los destinos y su alta rápida.
+ * saber si ese dueño está activo (R4.3). También es dueño del cliente de la orden en armado, el
+ * mismo que tiene el formulario: de él salen los destinos y su alta rápida.
  */
 export function usePedidoOrden() {
   const [pedido, setPedido] = useState<PedidoOrden | null>(null);
@@ -53,24 +55,25 @@ export function usePedidoOrden() {
   const stock = useStockSemillero(STOCK_COMPLETO, vigente);
   const clientes = useClientesSemillero(vigente);
 
-  // El stock completo tiene que haber llegado DESPUÉS del pedido: con una copia vieja, el renglón de
-  // un lote nuevo se vería vacío y con un "Supera lo disponible" que no es real (R1.2). Ya abierto,
-  // volver a pedirlo no lo cierra: `dataUpdatedAt` sólo avanza.
+  // El stock completo tiene que haber llegado DESPUÉS del pedido: con una copia vieja, el renglón
+  // de un lote nuevo se vería vacío y con un "Supera lo disponible" que no es real (R1.2). Ya
+  // abierto, volver a pedirlo no lo cierra: `dataUpdatedAt` sólo avanza.
   const stockAlDia = vigente && stock.dataUpdatedAt >= pedido.pedidoEn;
   if (vigente && !stockAlDia && stock.error && stock.errorUpdatedAt >= pedido.pedidoEn) {
     setPedido({ ...pedido, fallo: stock.error });
     setFalloAvisado(stock.error);
   }
-  // Desde una fila de un Cliente, además, hay que saber si ese cliente está activo antes de armar el
-  // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla. Se
-  // espera también la copia que se está pidiendo aunque haya una vieja en caché (vencida, se pide al
-  // abrir): con la vieja, un cliente dado de baja quedaría precargado. Ya fijado el cliente, un
-  // pedido posterior no cierra el diálogo.
+  // Desde una fila de un Cliente, además, hay que saber si ese cliente está activo antes de armar
+  // el formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla.
+  // Se espera también la copia que se está pidiendo aunque haya una vieja en caché (vencida, se
+  // pide al abrir): con la vieja, un cliente dado de baja quedaría precargado. Ya fijado el
+  // cliente, un pedido posterior no cierra el diálogo.
   const esperandoClientes = cliente === undefined && (clientes.isPending || clientes.isFetching);
   const listo = stockAlDia && !esperandoClientes;
-  // Ese dueño se fija UNA sola vez, al quedar listo el diálogo, y sólo si está activo: de un cliente
-  // dado de baja no se piden ni sus destinos. Si después la copia se refresca sin él, la página y el
-  // formulario siguen hablando del mismo cliente (antes la página pasaba al "cliente 0").
+  // Ese dueño se fija UNA sola vez, al quedar listo el diálogo, y sólo si está activo: de un
+  // cliente dado de baja no se piden ni sus destinos. Si después la copia se refresca sin él, la
+  // página y el formulario siguen hablando del mismo cliente (antes la página pasaba al
+  // "cliente 0").
   if (listo && cliente === undefined) {
     setCliente(clienteActivoDeLote(pedido.filaOrigen, clientes.data?.clientes ?? []));
   }
@@ -90,7 +93,7 @@ export function usePedidoOrden() {
   return {
     /** El diálogo se puede mostrar: ya llegó todo lo que espera. */
     abierto: listo,
-    /** Hay un pedido que todavía no se puede mostrar (esperando datos o en pausa por un `fallo`). */
+    /** Hay un pedido que todavía no se puede mostrar (esperando datos o en pausa por un fallo). */
     esperando: hayPedido && !listo,
     /** Por qué no se pudo traer el stock completo del pedido, si falló. */
     fallo: pedido?.fallo ?? null,
