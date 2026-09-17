@@ -66,6 +66,27 @@ describe("mocks de demo: planificación de ventas", () => {
     expect(consolidadoAjeno.status).toBe(403);
   });
 
+  it("muestra diez productores Norte sólo al incluir activos sin movimiento", async () => {
+    const campania = (await contexto()).campaniaVigente;
+    const normal = await plan(campania);
+    const ampliado = await plan(campania, 1, true);
+    expect(normal.filas).toHaveLength(3);
+    expect(ampliado.filas).toHaveLength(10);
+    const adicionales = ampliado.filas.filter((fila) =>
+      !normal.filas.some((visible) => visible.cuit === fila.cuit));
+    expect(adicionales).toHaveLength(7);
+    expect(adicionales.every((fila) => !fila.conMovimiento && fila.plan === null)).toBe(true);
+    const control = (await apiClient.get<ControlPadron>(ruta + "/control-padron", {
+      params: { campania },
+    })).data;
+    expect(control.productoresPorVendedor).toContainEqual({ vendedorId: 1, productores: 10 });
+    const consolidado = (await apiClient.get<ConsolidadoResponse>(ruta + "/consolidado", {
+      params: { campania, vendedorId: 1 },
+    })).data;
+    expect(consolidado.filas).toHaveLength(3);
+    expect(consolidado.total.hectareas.total).toBe(210);
+  });
+
   it("guarda plan en memoria, refleja mercado y consolidado y refresca fecha", async () => {
     const { campaniaVigente: campania } = await contexto();
     const inicial = await plan(campania);
