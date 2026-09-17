@@ -458,6 +458,10 @@ describe("OrdenDialog", () => {
 
     expect(screen.getByText("Disponible: 10 unidades · 8.000 kg")).toBeInTheDocument();
     expect(screen.getByText(OBS_LARGA)).toBeInTheDocument();
+    // Quien usa lector de pantalla oye lo mismo al pasar por el selector (la opción va recortada).
+    expect(screen.getByLabelText("Agregar renglón")).toHaveAccessibleDescription(
+      `Disponible: 10 unidades · 8.000 kg ${OBS_LARGA}`,
+    );
   });
 
   it("cada renglón muestra el producto, el lote con ubicación y dueño, y las observaciones (R2.3)", () => {
@@ -492,6 +496,9 @@ describe("OrdenDialog", () => {
     renderDialog({ filas: [PROPIO] });
     fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "true" } });
     expect(screen.getByText("No hay lotes disponibles con esos filtros.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Agregar renglón")).toHaveAccessibleDescription(
+      "No hay lotes disponibles con esos filtros.",
+    );
     expect(lotesOfrecidos()).toEqual([]);
   });
 
@@ -606,7 +613,7 @@ describe("OrdenDialog", () => {
   it("el aviso del cliente del lote sigue a la copia de clientes actual (R4.3)", () => {
     const { actualizar } = renderDialog({ filaOrigen: CLIENTE_500, clientes: [] });
     const avisoInactivo = /El lote es de un cliente que no está activo en la copia de MacroGest/;
-    expect(screen.getByText(avisoInactivo)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(avisoInactivo);
 
     actualizar({ clientes: CLIENTES });
 

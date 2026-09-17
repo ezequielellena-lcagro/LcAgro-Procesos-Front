@@ -10,9 +10,9 @@ interface Props {
 }
 
 /**
- * Lo que se ve entre el clic en "Nueva orden"/"Editar"/"Orden" y la apertura del diálogo, que espera
- * el stock completo recién pedido (R1.2). Sin este aviso el clic parecería no hacer nada; y si el
- * pedido falla, se puede reintentar o desistir sin perder la página.
+ * Lo que se ve entre el clic en "Nueva orden"/"Editar"/"Orden" y la apertura del diálogo, que
+ * espera el stock completo recién pedido (R1.2). Sin este aviso el clic parecería no hacer nada; y
+ * si el pedido falla, se puede reintentar o desistir sin perder la página.
  */
 export function PedidoOrdenAviso({ error, onReintentar, onCancelar }: Props) {
   return (

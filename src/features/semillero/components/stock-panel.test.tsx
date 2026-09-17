@@ -136,15 +136,22 @@ describe("StockPanel", () => {
     expect(props.onOrden).toHaveBeenNthCalledWith(2, deCliente);
   });
 
-  it('"Orden" queda deshabilitado si la fila no tiene disponible (R4.1)', () => {
+  it('"Orden" queda deshabilitado si la fila no tiene disponible, y dice por qué (R4.1)', () => {
     renderPanel({
       datos: datos([
         fila({ loteId: 1, loteCodigo: "26S-001", fisico: 3, comprometido: 3, disponible: 0, kgDisponibles: 0 }),
         fila({ loteId: 2, loteCodigo: "26S-002", fisico: 1, comprometido: 3, disponible: -2, kgDisponibles: -1600 }),
+        fila({ loteId: 3, loteCodigo: "26S-003", fisico: 3, comprometido: 0, disponible: 3, kgDisponibles: 2400 }),
       ]),
     });
-    expect(screen.getByRole("button", { name: "Orden con 26S-001 en G1-6" })).toBeDisabled();
+    const sinDisponible = screen.getByRole("button", { name: "Orden con 26S-001 en G1-6" });
+    expect(sinDisponible).toBeDisabled();
+    expect(sinDisponible).toHaveAccessibleDescription("Sin disponible para cargar en una orden.");
     expect(screen.getByRole("button", { name: "Orden con 26S-002 en G1-6" })).toBeDisabled();
+
+    const conDisponible = screen.getByRole("button", { name: "Orden con 26S-003 en G1-6" });
+    expect(conDisponible).toBeEnabled();
+    expect(conDisponible).not.toHaveAttribute("title");
   });
 
   it("al cambiar de especie se limpia la variedad elegida", () => {

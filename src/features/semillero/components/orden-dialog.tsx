@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertTriangle } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -248,9 +249,13 @@ function OrdenForm({
         actualizando={actualizandoClientes}
       />
       {problemaCliente && (
-        <p className="rounded-card border border-rojo/30 bg-rojo-bg px-3 py-2 text-sm text-rojo">
-          {AVISO_CLIENTE_DEL_LOTE[problemaCliente]}
-        </p>
+        <div
+          role="status"
+          className="flex items-center gap-2 rounded-card border border-rojo/30 bg-rojo-bg px-3 py-2 text-sm text-rojo"
+        >
+          <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
+          <p>{AVISO_CLIENTE_DEL_LOTE[problemaCliente]}</p>
+        </div>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">

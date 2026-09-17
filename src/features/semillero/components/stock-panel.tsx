@@ -39,6 +39,11 @@ interface Props {
 
 const oDash = (n: number | null, sufijo = "") => (n === null ? "—" : `${unidades(n)}${sufijo}`);
 
+/** Una orden sólo puede cargar lo que está disponible (R4.1). */
+const sePuedeOrdenar = (f: StockFilaDto) => f.disponible > 0;
+/** Por qué "Orden" está deshabilitado: sin este texto el botón gris no se explica. */
+const MOTIVO_SIN_DISPONIBLE = "Sin disponible para cargar en una orden.";
+
 /** ADR-13: la semilla de cliente se distingue visualmente, nunca se confunde con la propia. */
 const DUENIO_BADGE_CLS: Record<DuenioLote, string> = {
   Propio: "bg-verde-bg text-verde",
@@ -127,7 +132,8 @@ export function StockPanel({
             variant="outline"
             size="sm"
             aria-label={`Orden con ${f.loteCodigo} en ${f.ubicacion}`}
-            disabled={f.disponible <= 0}
+            disabled={!sePuedeOrdenar(f)}
+            title={sePuedeOrdenar(f) ? undefined : MOTIVO_SIN_DISPONIBLE}
             onClick={() => onOrden(f)}
           >
             Orden

@@ -25,18 +25,28 @@ const claveDe = (l: { loteId: number; ubicacionId: number }) => `${l.loteId}:${l
 const kgMaximo = (e: LoteElegible) => kg(e.maximo * e.pesoUnitarioKg);
 
 function etiquetaOpcion(e: LoteElegible): string {
-  const base = `Lote ${e.loteCodigo} · ${e.ubicacion} · ${duenioEtiqueta(e)} · disp. ${unidades(e.maximo)} (${kgMaximo(e)})`;
-  return e.observaciones ? `${base} · ${recortar(e.observaciones, LARGO_OBSERVACIONES_EN_OPCION)}` : base;
+  const disponible = `disp. ${unidades(e.maximo)} (${kgMaximo(e)})`;
+  const base = `Lote ${e.loteCodigo} · ${e.ubicacion} · ${duenioEtiqueta(e)} · ${disponible}`;
+  return e.observaciones
+    ? `${base} · ${recortar(e.observaciones, LARGO_OBSERVACIONES_EN_OPCION)}`
+    : base;
 }
 
-function mensajeSinOpciones(quedanPorAgregar: number, visibles: number, hayCliente: boolean): string | null {
-  if (quedanPorAgregar === 0) {
+function mensajeSinOpciones(
+  cantidadPorAgregar: number,
+  cantidadVisibles: number,
+  hayCliente: boolean,
+): string | null {
+  if (cantidadPorAgregar === 0) {
     return hayCliente
       ? "No hay lotes con disponible."
       : "No hay lotes con disponible. La semilla de clientes aparece al elegir el cliente.";
   }
-  return visibles === 0 ? "No hay lotes disponibles con esos filtros." : null;
+  return cantidadVisibles === 0 ? "No hay lotes disponibles con esos filtros." : null;
 }
+
+/** Id del detalle bajo el selector: lo anuncia el lector de pantalla al pasar por él (R2.2). */
+const ID_DETALLE = "nuevoRenglonDetalle";
 
 interface Props {
   /** Lotes × ubicación que la orden admite, con la regla de dueño y el máximo ya aplicados. */
@@ -55,8 +65,16 @@ interface Props {
  * ellos. Las opciones van agrupadas por producto y cada lote muestra su disponible (R2.1), para no
  * cargar, por ejemplo, semilla tratada cuando la pidieron sin tratar.
  */
-export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, onAgregar }: Props) {
-  const [filtros, setFiltros] = useState<FiltrosElegibles>(() => (loteInicial ? filtrosDeFila(loteInicial) : {}));
+export function AgregarRenglon({
+  elegibles,
+  renglones,
+  hayCliente,
+  loteInicial,
+  onAgregar,
+}: Props) {
+  const [filtros, setFiltros] = useState<FiltrosElegibles>(() =>
+    loteInicial ? filtrosDeFila(loteInicial) : {},
+  );
   // La cantidad no se precarga: la tipea el usuario.
   const [clave, setClave] = useState(() => (loteInicial ? claveDe(loteInicial) : ""));
   const [cantidadTexto, setCantidadTexto] = useState("");
@@ -108,7 +126,9 @@ export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, 
           <Select
             id="filtroVariedad"
             value={efectivos(filtros).variedadId ?? ""}
-            onChange={(e) => cambiarFiltros({ variedadId: e.target.value ? Number(e.target.value) : undefined })}
+            onChange={(e) =>
+              cambiarFiltros({ variedadId: e.target.value ? Number(e.target.value) : undefined })
+            }
           >
             <option value="">Todas</option>
             {variedades.map((v) => (
@@ -123,7 +143,9 @@ export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, 
             id="filtroTratamiento"
             value={filtros.tratada === undefined ? "" : String(filtros.tratada)}
             onChange={(e) =>
-              cambiarFiltros({ tratada: e.target.value === "" ? undefined : e.target.value === "true" })
+              cambiarFiltros({
+                tratada: e.target.value === "" ? undefined : e.target.value === "true",
+              })
             }
           >
             <option value="">Tratada y sin tratar</option>
@@ -135,7 +157,11 @@ export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, 
           <Select
             id="filtroEnvase"
             value={filtros.envase ?? ""}
-            onChange={(e) => cambiarFiltros({ envase: (e.target.value || undefined) as EnvaseSemillero | undefined })}
+            onChange={(e) =>
+              cambiarFiltros({
+                envase: (e.target.value || undefined) as EnvaseSemillero | undefined,
+              })
+            }
           >
             <option value="">Todos</option>
             {ENVASES.map((e) => (
@@ -150,7 +176,12 @@ export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, 
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-48 flex-1 space-y-1">
           <Label htmlFor="nuevoRenglon">Agregar renglón</Label>
-          <Select id="nuevoRenglon" value={elegido ? clave : ""} onChange={(e) => setClave(e.target.value)}>
+          <Select
+            id="nuevoRenglon"
+            aria-describedby={elegido || mensaje ? ID_DETALLE : undefined}
+            value={elegido ? clave : ""}
+            onChange={(e) => setClave(e.target.value)}
+          >
             <option value="">Elegí un lote y una ubicación…</option>
             {agruparElegibles(visibles).map((grupo) => (
               <optgroup key={grupo.clave} label={grupo.etiqueta}>
@@ -180,12 +211,18 @@ export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, 
       </div>
 
       {elegido ? (
-        <div className="text-xs text-ink-soft">
+        <div id={ID_DETALLE} className="text-xs text-ink-soft">
           <p>{`Disponible: ${unidades(elegido.maximo)} unidades · ${kgMaximo(elegido)}`}</p>
-          {elegido.observaciones && <p className="whitespace-pre-line text-ink">{elegido.observaciones}</p>}
+          {elegido.observaciones && (
+            <p className="whitespace-pre-line text-ink">{elegido.observaciones}</p>
+          )}
         </div>
       ) : (
-        mensaje && <p className="text-xs text-ink-soft">{mensaje}</p>
+        mensaje && (
+          <p id={ID_DETALLE} className="text-xs text-ink-soft">
+            {mensaje}
+          </p>
+        )
       )}
       {error && <p className="text-xs text-rojo">{error}</p>}
     </div>

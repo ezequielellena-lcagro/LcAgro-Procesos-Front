@@ -334,6 +334,7 @@ describe("SemilleroPage", () => {
     const dialogo = await screen.findByRole("dialog", { name: "Editar lote 26S-C01" });
     expect(within(dialogo).getByLabelText("Código de lote")).toHaveValue("26S-C01");
   });
+
   it('"Orden" en una fila propia de Stock abre una orden nueva con ese lote y sus filtros (R4.2/R4.4)', async () => {
     renderPagina();
     await screen.findByText("BigBags propios");
