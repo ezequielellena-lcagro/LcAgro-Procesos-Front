@@ -94,6 +94,21 @@ beforeEach(() => {
 });
 
 describe("Market Share", () => {
+  it("muestra textos y etiquetas de campaña en español sin escapes literales", () => {
+    render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    expect(screen.getByRole("combobox", { name: "Campaña" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Parámetros por cultivo" })).toBeInTheDocument();
+    expect(screen.getByText(/hectárea × precio USD\/tn ÷ 10\./)).toBeInTheDocument();
+    const resumen = screen.getByRole("region", { name: "Resumen de campaña" });
+    expect(within(resumen).getByRole("heading", { name: "Resumen de la campaña" }))
+      .toBeInTheDocument();
+    expect(within(resumen).getByText("Facturación LC")).toBeInTheDocument();
+    expect(within(resumen).getByRole("columnheader", { name: "Hectáreas" }))
+      .toBeInTheDocument();
+    expect(within(screen.getByTestId("market-form-row-otro")).getByText("—"))
+      .toBeInTheDocument();
+  });
+
   it("recalcula costo USD/ha al tipear y Otro queda deshabilitado", () => {
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
     const soja = screen.getByTestId("market-form-row-soja");

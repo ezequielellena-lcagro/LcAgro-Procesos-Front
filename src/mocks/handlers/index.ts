@@ -5,6 +5,7 @@ import { configHandlers } from "./config";
 import { cuentasHandlers } from "./cuentas";
 import { dashboardHandlers } from "./dashboard";
 import { devolucionHandlers } from "./devolucion";
+import { planificacionVentasHandlers } from "./planificacion-ventas";
 import { posicionHandlers } from "./posicion";
 import { prestamosHandlers } from "./prestamos";
 import { produccionPropiaHandlers } from "./produccionpropia";
@@ -20,6 +21,7 @@ export const handlers = [
   ...authHandlers,
   ...dashboardHandlers,
   ...posicionHandlers,
+  ...planificacionVentasHandlers,
   ...produccionPropiaHandlers,
   ...volumenAcopiadoHandlers,
   ...cuentasHandlers,

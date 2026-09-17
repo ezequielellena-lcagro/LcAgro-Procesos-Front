@@ -173,7 +173,7 @@ export function MarketShareForm({
   return (
     <div className="space-y-5">
       <FilterBar>
-        <FilterField label="Campa\u00f1a">
+        <FilterField label="Campaña">
           <CampaniaSelect
             value={campania}
             campanias={contexto.campanias.map((item) => item.codigo)}
@@ -191,13 +191,13 @@ export function MarketShareForm({
         <>
           {!editable && !requiereRecarga && (
             <div className="rounded-card border border-line bg-panel-soft px-4 py-3 text-sm text-ink-soft">
-              Esta campa\u00f1a es de solo lectura.
+              Esta campaña es de solo lectura.
             </div>
           )}
           {sinDatos && dataVigente.copiarDe && editable && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-panel-soft px-4 py-3">
               <p className="text-sm text-ink-soft">
-                Esta campa\u00f1a todav\u00eda no tiene par\u00e1metros cargados.
+                Esta campaña todavía no tiene parámetros cargados.
               </p>
               <Button
                 type="button"
@@ -236,10 +236,10 @@ export function MarketShareForm({
           <section className="rounded-card border border-line bg-panel shadow-card">
             <div className="border-b border-line px-5 py-4">
               <h2 className="font-display text-lg font-semibold text-ink">
-                Par\u00e1metros por cultivo
+                Parámetros por cultivo
               </h2>
               <p className="text-sm text-ink-soft">
-                El costo se calcula con qq de insumo por hect\u00e1rea \u00d7 precio USD/tn \u00f7
+                El costo se calcula con qq de insumo por hectárea × precio USD/tn ÷
                 10.
               </p>
             </div>
@@ -360,7 +360,7 @@ export function MarketShareForm({
                     <td className="px-3 py-2">
                       <Input disabled aria-label="Precio USD/tn de Otro" value="" />
                     </td>
-                    <td className="px-4 py-3 text-right">\u2014</td>
+                    <td className="px-4 py-3 text-right">—</td>
                     <td className="px-3 py-2">
                       <Input disabled aria-label="Rinde tn/ha de Otro" value="" />
                     </td>
@@ -370,13 +370,13 @@ export function MarketShareForm({
             </div>
           </section>
 
-          <section className="space-y-3" aria-label="Resumen de campa\u00f1a">
+          <section className="space-y-3" aria-label="Resumen de campaña">
             <div>
               <h2 className="font-display text-lg font-semibold text-ink">
-                Resumen de la campa\u00f1a
+                Resumen de la campaña
               </h2>
               <p className="text-sm text-ink-soft">
-                Valores guardados. Se actualizan despu\u00e9s de guardar.
+                Valores guardados. Se actualizan después de guardar.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -386,17 +386,17 @@ export function MarketShareForm({
                 hint="USD estimados"
               />
               <KpiCard
-                label="Facturaci\u00f3n LC"
+                label="Facturación LC"
                 value={usd(dataVigente.resumen.facturacionLcUsd)}
               />
               <KpiCard
-                label="Participaci\u00f3n LC"
+                label="Participación LC"
                 value={oDash(dataVigente.resumen.participacionLc, (valor) => pct(valor * 100))}
               />
               <KpiCard label="Potencial" value={oDash(dataVigente.resumen.potencialTn, tn)} />
-              <KpiCard label="Originaci\u00f3n" value={tn(dataVigente.resumen.originacionTn)} />
+              <KpiCard label="Originación" value={tn(dataVigente.resumen.originacionTn)} />
               <KpiCard
-                label="Participaci\u00f3n en originaci\u00f3n"
+                label="Participación en originación"
                 value={oDash(dataVigente.resumen.participacionOriginacion, (valor) =>
                   pct(valor * 100),
                 )}
@@ -410,7 +410,7 @@ export function MarketShareForm({
                       Cultivo
                     </th>
                     <th scope="col" className="px-4 py-2 text-right">
-                      Hect\u00e1reas
+                      Hectáreas
                     </th>
                     <th scope="col" className="px-4 py-2 text-right">
                       Costo USD/ha
