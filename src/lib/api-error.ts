@@ -7,6 +7,8 @@ export interface ProblemDetails {
   status?: number;
   detail?: string;
   errors?: Record<string, string[]>; // validación: campo → mensajes
+  fieldErrors?: Record<string, string[]>;
+  cuits?: string[];
   traceId?: string;
   /** Código estable del error de negocio (p. ej. "varios_vendedores"), para ramificar sin parsear el texto. */
   codigo?: string;
@@ -19,6 +21,7 @@ export interface AppError {
   message: string;
   /** Errores por campo, para mapear a react-hook-form. */
   fieldErrors?: Record<string, string[]>;
+  cuits?: string[];
   traceId?: string;
   /** Código estable del error de negocio, cuando la API lo informa. */
   codigo?: string;
@@ -43,7 +46,8 @@ export function toAppError(error: unknown): AppError {
     return {
       status,
       message: pd?.detail ?? pd?.title ?? mensajePorStatus(status),
-      fieldErrors: pd?.errors,
+      fieldErrors: pd?.errors ?? pd?.fieldErrors,
+      cuits: pd?.cuits,
       traceId: pd?.traceId,
       codigo: pd?.codigo,
     };

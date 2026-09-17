@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiClient, setTokenBridge } from "@/lib/api-client";
 import { tokenStorage } from "./token-storage";
 import type { AuthResponse, RolNombre, User } from "./types";
@@ -22,27 +23,41 @@ interface AuthState {
   hasAnyRole: (roles: RolNombre[]) => boolean;
 }
 
+function firmaAutorizacion(user: User): string {
+  return user.id + ":" + [...new Set(user.roles)].sort().join("|");
+}
+
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+  const identidadRef = useRef<string | null>(null);
   // Access token en memoria (ref): no re-renderiza ni se persiste.
   const accessRef = useRef<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>("loading");
 
-  const setSession = (data: AuthResponse) => {
-    accessRef.current = data.accessToken;
-    tokenStorage.setRefresh(data.refreshToken);
-    setUser(data.user);
-    setStatus("authenticated");
-  };
+  const setSession = useCallback(
+    (data: AuthResponse) => {
+      const firma = firmaAutorizacion(data.user);
+      if (identidadRef.current !== firma) queryClient.clear();
+      identidadRef.current = firma;
+      accessRef.current = data.accessToken;
+      tokenStorage.setRefresh(data.refreshToken);
+      setUser(data.user);
+      setStatus("authenticated");
+    },
+    [queryClient],
+  );
 
   const clearSession = useCallback(() => {
+    queryClient.clear();
+    identidadRef.current = null;
     accessRef.current = null;
     tokenStorage.clear();
     setUser(null);
     setStatus("anonymous");
-  }, []);
+  }, [queryClient]);
 
   // Devuelve el nuevo access token (o null). Lo usa el interceptor del apiClient.
   const refresh = useCallback(async (): Promise<string | null> => {
@@ -56,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearSession();
       return null;
     }
-  }, [clearSession]);
+  }, [clearSession, setSession]);
 
   // Cierra el ciclo apiClient <-> auth (sin import circular).
   useEffect(() => {

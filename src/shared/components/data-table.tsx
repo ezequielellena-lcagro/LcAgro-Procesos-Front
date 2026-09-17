@@ -8,6 +8,7 @@ export interface Column<T> {
   cell: (row: T) => ReactNode;
   align?: "left" | "right" | "center";
   className?: string;
+  headerClassName?: string;
   /**
    * Si se pasa, la columna se puede ordenar clickeando su encabezado. Devolvé el valor CRUDO
    * (número, fecha ISO, texto) y no lo ya formateado: "1.174.463,69" ordena mal como texto.
@@ -43,6 +44,8 @@ interface DataTableProps<T> {
    * cualquier otro, y al soltarlo queda el orden con el que vinieron los datos.
    */
   defaultSort?: { key: string; sentido?: Sentido };
+  stickyHeader?: boolean;
+  scrollClassName?: string;
 }
 
 type Sentido = "asc" | "desc";
@@ -78,6 +81,8 @@ export function DataTable<T>({
   rowClassName,
   groupBy,
   defaultSort,
+  stickyHeader = false,
+  scrollClassName,
 }: DataTableProps<T>) {
   const [orden, setOrden] = useState<{ key: string; sentido: Sentido } | null>(() =>
     defaultSort ? { key: defaultSort.key, sentido: defaultSort.sentido ?? "asc" } : null,
@@ -146,7 +151,12 @@ export function DataTable<T>({
   );
 
   return (
-    <div className="overflow-x-auto rounded-card border border-line bg-panel shadow-card">
+    <div
+      className={cn(
+        "overflow-x-auto rounded-card border border-line bg-panel shadow-card",
+        scrollClassName,
+      )}
+    >
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-line bg-panel-soft text-xs uppercase tracking-wide text-ink-soft">
@@ -164,7 +174,12 @@ export function DataTable<T>({
                           ? "ascending"
                           : "descending"
                   }
-                  className={cn("px-3 py-2 font-semibold", alignCls(c.align), c.className)}
+                  className={cn(
+                    "px-3 py-2 font-semibold",
+                    stickyHeader && "sticky top-0 z-20 bg-panel-soft",
+                    alignCls(c.align),
+                    c.headerClassName ?? c.className,
+                  )}
                 >
                   {c.sortBy ? (
                     <button
