@@ -150,3 +150,64 @@ export interface ConsolidadoResponse {
   ajusteRedondeo: { campaniaUsd: number; anteriorUsd: number };
   sinVendedor: boolean;
 }
+
+export const CULTIVOS_MARKET = ["soja", "maiz", "trigo"] as const;
+export type CultivoMarket = (typeof CULTIVOS_MARKET)[number];
+
+export interface MarketShareCultivoResponse {
+  cultivo: CultivoMarket;
+  qqInsumoHa: number | null;
+  precioUsdTn: number | null;
+  costoUsdHa: number | null;
+  rindeTnHa: number | null;
+  revision: number;
+  modificadoPor: string | null;
+  modificadoEl: string | null;
+}
+
+export interface MercadoCultivoResumen {
+  hectareas: number;
+  costoUsdHa: number | null;
+  mercadoUsd: number | null;
+  rindeTnHa: number | null;
+  potencialTn: number | null;
+}
+
+export interface MarketShareResumen {
+  soja: MercadoCultivoResumen;
+  maiz: MercadoCultivoResumen;
+  trigo: MercadoCultivoResumen;
+  hectareasOtro: number;
+  mercadoUsd: number | null;
+  potencialTn: number | null;
+  facturacionLcUsd: number;
+  participacionLc: number | null;
+  originacionTn: number;
+  participacionOriginacion: number | null;
+}
+
+export interface MarketShareResponse {
+  campania: string;
+  editable: boolean;
+  copiarDe: string | null;
+  datosMacroGestAl: string | null;
+  cultivos: MarketShareCultivoResponse[];
+  resumen: MarketShareResumen;
+  sinVendedor: boolean;
+}
+
+export interface GuardarMarketShareCultivoRequest {
+  cultivo: CultivoMarket;
+  qqInsumoHa: number;
+  precioUsdTn: number;
+  rindeTnHa: number;
+  revisionEsperada: number;
+}
+
+export interface GuardarMarketShareRequest {
+  cultivos: GuardarMarketShareCultivoRequest[];
+}
+
+export interface GuardarMarketShareResponse {
+  cultivos: { cultivo: CultivoMarket; revision: number }[];
+}

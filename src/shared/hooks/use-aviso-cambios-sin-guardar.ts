@@ -4,6 +4,10 @@ import { useBlocker } from "react-router-dom";
 const MENSAJE_SALIDA = "Tenés cambios sin guardar. ¿Querés descartarlos y salir?";
 const MENSAJE_CAMBIO = "Tenés cambios sin guardar. ¿Querés descartarlos y cambiar la selección?";
 
+export function confirmarCambioConBorrador(hayCambios: boolean): boolean {
+  return !hayCambios || window.confirm(MENSAJE_CAMBIO);
+}
+
 /** Protege navegación/recarga y expone una confirmación para cambiar filtros que reemplazan el borrador. */
 export function useAvisoCambiosSinGuardar(hayCambios: boolean) {
   const blocker = useBlocker(hayCambios);
@@ -24,10 +28,7 @@ export function useAvisoCambiosSinGuardar(hayCambios: boolean) {
     return () => window.removeEventListener("beforeunload", avisar);
   }, [hayCambios]);
 
-  const confirmarCambio = useCallback(
-    () => !hayCambios || window.confirm(MENSAJE_CAMBIO),
-    [hayCambios],
-  );
+  const confirmarCambio = useCallback(() => confirmarCambioConBorrador(hayCambios), [hayCambios]);
 
   return { confirmarCambio };
 }

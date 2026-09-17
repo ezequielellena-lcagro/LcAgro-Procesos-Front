@@ -15,7 +15,7 @@ vi.mock("../queries/use-guardar-plan", () => ({
   useActualizarDatosPlan: vi.fn(),
 }));
 vi.mock("@/shared/hooks/use-aviso-cambios-sin-guardar", () => ({
-  useAvisoCambiosSinGuardar: () => ({ confirmarCambio: () => true }),
+  confirmarCambioConBorrador: () => true,
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 

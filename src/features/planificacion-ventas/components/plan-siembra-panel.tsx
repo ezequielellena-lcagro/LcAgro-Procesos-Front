@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { KpiCard } from "@/shared/components/kpi-card";
-import { useAvisoCambiosSinGuardar } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
+import { confirmarCambioConBorrador } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
 import { numero, tn, usd } from "@/shared/format/format";
 import {
   CULTIVOS,
@@ -55,7 +55,13 @@ function horaMacroGest(fecha: string): string {
   });
 }
 
-export function PlanSiembraPanel({ contexto }: { contexto: ContextoPlanificacion }) {
+export function PlanSiembraPanel({
+  contexto,
+  onDirtyChange,
+}: {
+  contexto: ContextoPlanificacion;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
   const [campaniaElegida, setCampaniaElegida] = useState<string>();
   const campania = campaniaElegida ?? contexto.campaniaVigente;
   const [vendedorId, setVendedorId] = useState<number>();
@@ -93,7 +99,8 @@ export function PlanSiembraPanel({ contexto }: { contexto: ContextoPlanificacion
     return todos;
   }, [filas, borrador, erroresApi]);
   const hayErrores = Object.values(errores).some((celdas) => Object.keys(celdas).length > 0);
-  const { confirmarCambio } = useAvisoCambiosSinGuardar(cambios.length > 0);
+  useEffect(() => onDirtyChange?.(cambios.length > 0), [onDirtyChange, cambios.length]);
+  const confirmarCambio = () => confirmarCambioConBorrador(cambios.length > 0);
 
   const filtradas = useMemo(() => {
     const texto = buscar.trim().toLocaleLowerCase("es-AR");
