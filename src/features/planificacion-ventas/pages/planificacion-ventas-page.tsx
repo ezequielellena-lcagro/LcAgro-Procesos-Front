@@ -6,6 +6,7 @@ import { useAvisoCambiosSinGuardar } from "@/shared/hooks/use-aviso-cambios-sin-
 import { ConsolidadoPanel } from "../components/consolidado-panel";
 import { MarketShareForm } from "../components/market-share-form";
 import { PlanSiembraPanel } from "../components/plan-siembra-panel";
+import { VendedoresPanel } from "../components/vendedores-panel";
 import { useContextoPlanificacion } from "../queries/use-plan-siembra";
 
 type Solapa = "plan" | "consolidado" | "market-share" | "vendedores";
@@ -21,7 +22,8 @@ export function PlanificacionVentasPage() {
   const [solapa, setSolapa] = useState<Solapa>("plan");
   const [planDirty, setPlanDirty] = useState(false);
   const [marketDirty, setMarketDirty] = useState(false);
-  useAvisoCambiosSinGuardar(planDirty || marketDirty);
+  const [vendedoresDirty, setVendedoresDirty] = useState(false);
+  useAvisoCambiosSinGuardar(planDirty || marketDirty || vendedoresDirty);
   const solapaVisible =
     contexto.data &&
     !contexto.data.alcance.veTodo &&
@@ -91,11 +93,15 @@ export function PlanificacionVentasPage() {
               />
             </div>
           )}
-          {solapaVisible === "vendedores" && contexto.data.alcance.veTodo && (
-            <div id="panel-vendedores" role="tabpanel" aria-labelledby="solapa-vendedores">
-              <EmptyState mensaje="La administración de vendedores estará disponible en esta solapa." />
-            </div>
-          )}
+          {contexto.data.alcance.veTodo &&
+            (solapaVisible === "vendedores" || vendedoresDirty) && (
+              <div id="panel-vendedores" role="tabpanel" aria-labelledby="solapa-vendedores"
+                hidden={solapaVisible !== "vendedores"}>
+                <VendedoresPanel contexto={contexto.data}
+                  activo={solapaVisible === "vendedores"}
+                  onDirtyChange={setVendedoresDirty} />
+              </div>
+            )}
         </>
       ) : contexto.isError ? (
         <ErrorState error={contexto.error} onRetry={() => void contexto.refetch()} />

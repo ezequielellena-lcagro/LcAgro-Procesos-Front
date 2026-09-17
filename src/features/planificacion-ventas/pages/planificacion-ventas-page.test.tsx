@@ -45,6 +45,19 @@ vi.mock("../components/market-share-form", () => ({
   },
 }));
 
+vi.mock("../components/vendedores-panel", () => ({
+  VendedoresPanel: ({ onDirtyChange }: { onDirtyChange: (dirty: boolean) => void }) => {
+    const [valor, setValor] = useState("");
+    useEffect(() => onDirtyChange(valor !== ""), [valor, onDirtyChange]);
+    useEffect(() => () => onDirtyChange(false), [onDirtyChange]);
+    return (
+      <button type="button" onClick={() => setValor("borrador")}>
+        {valor ? "Borrador vendedor" : "Editar vendedor de prueba"}
+      </button>
+    );
+  },
+}));
+
 const origen = { anterior: 2, campania: 3, total: 5, sorgo: 0, girasol: 0 };
 const hectareas = { soja: 10, maiz: null, trigo: null, otro: null, total: 10 };
 const total = {
@@ -133,6 +146,24 @@ function preparar(contexto: ContextoPlanificacion, datos: ConsolidadoResponse = 
 }
 
 beforeEach(() => vi.clearAllMocks());
+
+describe("solapa Vendedores", () => {
+  it("es exclusiva de gestión y conserva su borrador al cambiar de solapa", () => {
+    preparar(seller);
+    const primera = render(<PlanificacionVentasPage />);
+    expect(screen.queryByRole("tab", { name: "Vendedores" })).not.toBeInTheDocument();
+    primera.unmount();
+
+    preparar({ ...seller, alcance: { veTodo: true, vendedor: null } });
+    render(<PlanificacionVentasPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Vendedores" }));
+    fireEvent.click(screen.getByRole("button", { name: "Editar vendedor de prueba" }));
+    expect(useAvisoCambiosSinGuardar).toHaveBeenLastCalledWith(true);
+    fireEvent.click(screen.getByRole("tab", { name: "Plan de siembra" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Vendedores" }));
+    expect(screen.getByRole("button", { name: "Borrador vendedor" })).toBeInTheDocument();
+  });
+});
 
 describe("solapa Consolidado", () => {
   it("el vendedor no ve selector de vendedor ni fuera de carteras aunque llegue en la respuesta", () => {

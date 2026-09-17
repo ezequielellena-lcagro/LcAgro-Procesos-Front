@@ -211,3 +211,43 @@ export interface GuardarMarketShareRequest {
 export interface GuardarMarketShareResponse {
   cultivos: { cultivo: CultivoMarket; revision: number }[];
 }
+
+
+export interface SucursalComercial {
+  id: number;
+  nombre: string;
+  activa: boolean;
+}
+
+export interface ViajanteAsignable {
+  codigo: number;
+  nombre: string;
+  vendedorId: number | null;
+  vendedorNombre: string | null;
+}
+
+export interface UsuarioAsignable {
+  id: number;
+  nombre: string;
+  email: string;
+}
+
+export interface VendedorRequest {
+  nombre: string;
+  sucursalId: number;
+  viajantes: number[];
+  usuarioId: number | null;
+  activo: boolean;
+}
+
+export interface ControlPadron {
+  campania: string;
+  datosMacroGestAl: string;
+  codigosSinVendedorConMovimiento: { codigo: number; cuentas: number }[];
+  cuitsAmbiguos: number;
+  productoresPorVendedor: { vendedorId: number; productores: number }[];
+  cuentasSinCuitValidoPorVendedor: { vendedorId: number; cuentas: number }[];
+  cuentasSinClienteConMovimiento: number;
+  facturacionSinCuitUsd: { cuentas: number; total: number };
+  originacionSinCuitTn: { cuentas: number; total: number };
+}
