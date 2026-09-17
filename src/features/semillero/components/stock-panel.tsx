@@ -8,16 +8,15 @@ import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { kg, unidades } from "../format";
 import { duenioEtiqueta, envaseEtiqueta, tratamientoEtiqueta } from "../lib/etiquetas-lote";
 import {
-  ENVASES,
   ESPECIES,
   type DuenioLote,
-  type EnvaseSemillero,
   type EspecieSemillero,
   type StockFilaDto,
   type StockFiltros,
   type StockSemilleroDto,
   type VariedadDto,
 } from "../types";
+import { EnvaseSelect, TratamientoSelect } from "./filtros-lote";
 
 export type OperacionStock = "ingreso" | "ajuste" | "reubicacion";
 
@@ -195,29 +194,18 @@ export function StockPanel({
           </Select>
         </FilterField>
         <FilterField label="Envase">
-          <Select
+          <EnvaseSelect
             aria-label="Envase"
-            value={filtros.envase ?? ""}
-            onChange={(e) => onFiltros({ ...filtros, envase: (e.target.value || undefined) as EnvaseSemillero | undefined })}
-          >
-            <option value="">Todos</option>
-            {ENVASES.map((e) => (
-              <option key={e.valor} value={e.valor}>
-                {e.etiqueta}
-              </option>
-            ))}
-          </Select>
+            value={filtros.envase}
+            onChange={(envase) => onFiltros({ ...filtros, envase })}
+          />
         </FilterField>
         <FilterField label="Tratamiento">
-          <Select
+          <TratamientoSelect
             aria-label="Tratamiento"
-            value={filtros.tratada === undefined ? "" : String(filtros.tratada)}
-            onChange={(e) => onFiltros({ ...filtros, tratada: e.target.value === "" ? undefined : e.target.value === "true" })}
-          >
-            <option value="">Tratada y sin tratar</option>
-            <option value="true">Tratada</option>
-            <option value="false">Sin tratar</option>
-          </Select>
+            value={filtros.tratada}
+            onChange={(tratada) => onFiltros({ ...filtros, tratada })}
+          />
         </FilterField>
         <FilterField label="Campaña">
           <CampaniaSelect

@@ -188,6 +188,22 @@ describe("StockPanel", () => {
     expect(props.onFiltros).toHaveBeenCalledWith({ campania: undefined });
   });
 
+  it("filtra por envase y por tratamiento", () => {
+    const props = renderPanel({ filtros: { envase: "Bolsa", tratada: false } });
+    expect(screen.getByLabelText("Envase")).toHaveValue("Bolsa");
+    expect(screen.getByLabelText("Tratamiento")).toHaveValue("false");
+
+    fireEvent.change(screen.getByLabelText("Envase"), { target: { value: "BigBag" } });
+    expect(props.onFiltros).toHaveBeenLastCalledWith({ envase: "BigBag", tratada: false });
+    fireEvent.change(screen.getByLabelText("Envase"), { target: { value: "" } });
+    expect(props.onFiltros).toHaveBeenLastCalledWith({ envase: undefined, tratada: false });
+
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "true" } });
+    expect(props.onFiltros).toHaveBeenLastCalledWith({ envase: "Bolsa", tratada: true });
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "" } });
+    expect(props.onFiltros).toHaveBeenLastCalledWith({ envase: "Bolsa", tratada: undefined });
+  });
+
   it("filtra por dueño entre Todos, Propio y Clientes", () => {
     const props = renderPanel({ filtros: { duenio: "Propio" } });
     expect(screen.getByLabelText("Dueño")).toHaveValue("Propio");

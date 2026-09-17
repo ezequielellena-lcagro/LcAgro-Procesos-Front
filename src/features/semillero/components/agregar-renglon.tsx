@@ -15,7 +15,8 @@ import {
   type LoteElegible,
   type RenglonEditable,
 } from "../lib/orden";
-import { ENVASES, type EnvaseSemillero, type StockFilaDto } from "../types";
+import type { StockFilaDto } from "../types";
+import { EnvaseSelect, TratamientoSelect } from "./filtros-lote";
 
 /** Largo de las observaciones dentro de una opción: el texto completo se ve al elegirla (R2.2). */
 const LARGO_OBSERVACIONES_EN_OPCION = 40;
@@ -160,37 +161,18 @@ export function AgregarRenglon({
             </Select>
           </Filtro>
           <Filtro id="filtroTratamiento" label="Tratamiento">
-            <Select
+            <TratamientoSelect
               id="filtroTratamiento"
-              value={filtros.tratada === undefined ? "" : String(filtros.tratada)}
-              onChange={(e) =>
-                cambiarFiltros({
-                  tratada: e.target.value === "" ? undefined : e.target.value === "true",
-                })
-              }
-            >
-              <option value="">Tratada y sin tratar</option>
-              <option value="true">Tratada</option>
-              <option value="false">Sin tratar</option>
-            </Select>
+              value={filtros.tratada}
+              onChange={(tratada) => cambiarFiltros({ tratada })}
+            />
           </Filtro>
           <Filtro id="filtroEnvase" label="Envase">
-            <Select
+            <EnvaseSelect
               id="filtroEnvase"
-              value={filtros.envase ?? ""}
-              onChange={(e) =>
-                cambiarFiltros({
-                  envase: (e.target.value || undefined) as EnvaseSemillero | undefined,
-                })
-              }
-            >
-              <option value="">Todos</option>
-              {ENVASES.map((e) => (
-                <option key={e.valor} value={e.valor}>
-                  {e.etiqueta}
-                </option>
-              ))}
-            </Select>
+              value={filtros.envase}
+              onChange={(envase) => cambiarFiltros({ envase })}
+            />
           </Filtro>
         </div>
       </div>
