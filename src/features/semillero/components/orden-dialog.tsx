@@ -13,13 +13,14 @@ import { kg, unidades } from "../format";
 import { normalizarComprobante } from "../lib/comprobante";
 import { duenioEtiqueta, productoEtiqueta } from "../lib/etiquetas-lote";
 import {
-  clienteActivoDeLote,
   excedidos,
   lotesElegibles,
   mismaClave,
+  problemaClienteDelLote,
   renglonesDeOtroCliente,
   totalesOrden,
   type LoteElegible,
+  type ProblemaClienteDelLote,
   type RenglonEditable,
 } from "../lib/orden";
 import type {
@@ -42,6 +43,13 @@ const campos = z.object({
   observaciones: z.string().max(500, "Las observaciones no pueden superar 500 caracteres."),
 });
 type Values = z.infer<typeof campos>;
+
+const AVISO_CLIENTE_DEL_LOTE: Record<ProblemaClienteDelLote, string> = {
+  inactivo:
+    "El lote es de un cliente que no está activo en la copia de MacroGest: no se puede cargar en una orden.",
+  sinCopia:
+    "Sin la copia de clientes de MacroGest no se sabe si el dueño del lote está activo: actualizá los clientes y elegilo.",
+};
 
 /**
  * Cliente y destino son obligatorios (R6.1); el pedido de venta es opcional pero, si se completa,
@@ -66,9 +74,9 @@ function esquema() {
   });
 }
 
-function aValues(orden: OrdenCargaDto | null, clienteDeAlta: number | null): Values {
+function aValues(orden: OrdenCargaDto | null, clienteInicial: number | null): Values {
   if (!orden) {
-    return { clienteNumero: clienteDeAlta, destinoId: null, numeroPedidoVenta: "", observaciones: "" };
+    return { clienteNumero: clienteInicial, destinoId: null, numeroPedidoVenta: "", observaciones: "" };
   }
   return {
     clienteNumero: orden.clienteNumero,
@@ -98,10 +106,15 @@ interface Props {
    */
   filas: StockFilaDto[];
   /**
-   * Fila de Stock desde la que se pidió la orden (botón "Orden", R4): prefija los filtros, el lote y,
-   * si es de un cliente activo, el cliente. Sólo cuenta para un alta.
+   * Fila de Stock desde la que se pidió la orden (botón "Orden", R4): prefija los filtros y el lote,
+   * y avisa si su dueño no se puede usar. Sólo cuenta para un alta.
    */
   filaOrigen?: StockFilaDto | null;
+  /**
+   * Cliente con el que arranca un alta: lo fija la página una sola vez, al abrir (el dueño de
+   * `filaOrigen` si está activo, R4.3), y lo sigue usando para los destinos. Se lee sólo al montar.
+   */
+  clienteInicial?: number | null;
   /** Destinos del cliente elegido en el formulario (R1.3); el padre los mantiene al día con `onClienteChange`. */
   destinos: DestinoDto[];
   onClienteChange?: (clienteNumero: number | null) => void;
@@ -143,6 +156,7 @@ function OrdenForm({
   onActualizarClientes,
   filas,
   filaOrigen = null,
+  clienteInicial = null,
   destinos,
   onClienteChange,
   onAgregarDestino,
@@ -160,14 +174,12 @@ function OrdenForm({
   const [reservaOriginal] = useState<RenglonEditable[]>(() => aRenglones(orden));
 
   const loteInicial = esAlta ? filaOrigen : null;
-  // Foto fija, como `reservaOriginal`: el formulario arranca una sola vez con este cliente, y el aviso
-  // de cliente inactivo tiene que describir ESE arranque aunque la copia de clientes se refresque.
-  const [clienteDeAlta] = useState(() => clienteActivoDeLote(loteInicial, clientes));
-  const loteDeClienteInactivo = loteInicial?.duenio === "Cliente" && clienteDeAlta === null;
+  // Contra la copia ACTUAL: si se refresca con el diálogo abierto, el aviso aparece o se va con ella.
+  const problemaCliente = problemaClienteDelLote(loteInicial, clientes, copiaClientes.sinCopia);
 
   const form = useForm<Values>({
     resolver: zodResolver(esquema()),
-    defaultValues: aValues(orden, clienteDeAlta),
+    defaultValues: aValues(orden, clienteInicial),
   });
   const { errors, isSubmitting } = form.formState;
 
@@ -235,9 +247,9 @@ function OrdenForm({
         onActualizar={onActualizarClientes}
         actualizando={actualizandoClientes}
       />
-      {loteDeClienteInactivo && (
+      {problemaCliente && (
         <p className="rounded-card border border-rojo/30 bg-rojo-bg px-3 py-2 text-sm text-rojo">
-          El lote es de un cliente que no está activo en la copia de MacroGest: no se puede cargar en una orden.
+          {AVISO_CLIENTE_DEL_LOTE[problemaCliente]}
         </p>
       )}
 

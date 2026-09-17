@@ -121,6 +121,8 @@ interface RenderOpts {
   destinos?: DestinoDto[];
   clientes?: ClienteCopiaDto[];
   filaOrigen?: StockFilaDto | null;
+  clienteInicial?: number | null;
+  copiaClientes?: EstadoCopiaClientesDto;
 }
 
 function renderDialog(opts: RenderOpts = {}) {
@@ -130,25 +132,36 @@ function renderDialog(opts: RenderOpts = {}) {
   const onActualizarClientes = vi.fn();
   const onAgregarDestino = vi.fn();
   const onClienteChange = vi.fn();
-  render(
+  const dialogo = (o: RenderOpts) => (
     <OrdenDialog
       open
-      orden={opts.orden ?? null}
-      clientes={opts.clientes ?? CLIENTES}
-      copiaClientes={COPIA_OK}
+      orden={o.orden ?? null}
+      clientes={o.clientes ?? CLIENTES}
+      copiaClientes={o.copiaClientes ?? COPIA_OK}
       actualizandoClientes={false}
       onActualizarClientes={onActualizarClientes}
-      filas={opts.filas ?? [PROPIO, CLIENTE_500]}
-      filaOrigen={opts.filaOrigen ?? null}
-      destinos={opts.destinos ?? DESTINOS_500}
+      filas={o.filas ?? [PROPIO, CLIENTE_500]}
+      filaOrigen={o.filaOrigen ?? null}
+      clienteInicial={o.clienteInicial ?? null}
+      destinos={o.destinos ?? DESTINOS_500}
       onClienteChange={onClienteChange}
       onAgregarDestino={onAgregarDestino}
       onCrear={onCrear}
       onActualizar={onActualizar}
       onClose={onClose}
-    />,
+    />
   );
-  return { onCrear, onActualizar, onClose, onActualizarClientes, onAgregarDestino, onClienteChange };
+  const { rerender } = render(dialogo(opts));
+  return {
+    onCrear,
+    onActualizar,
+    onClose,
+    onActualizarClientes,
+    onAgregarDestino,
+    onClienteChange,
+    /** Vuelve a renderizar con otras props (p. ej. la copia de clientes refrescada), sin remontar. */
+    actualizar: (cambios: RenderOpts) => rerender(dialogo({ ...opts, ...cambios })),
+  };
 }
 
 function elegirCliente(etiqueta: string) {
@@ -542,7 +555,8 @@ describe("OrdenDialog", () => {
   });
 
   it("desde una fila de un cliente activo arranca con ese cliente y su lote elegidos (R4.3)", async () => {
-    const { onCrear } = renderDialog({ filaOrigen: CLIENTE_500 });
+    // El cliente con el que arranca lo fija la página (una sola vez, al abrir).
+    const { onCrear } = renderDialog({ filaOrigen: CLIENTE_500, clienteInicial: 500 });
 
     expect(screen.getByLabelText("Cliente")).toHaveValue("500 · Cliente Uno");
     expect(screen.getByLabelText("Agregar renglón")).toHaveValue("2:2");
@@ -586,6 +600,33 @@ describe("OrdenDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     expect(await screen.findByText("Elegí el cliente.")).toBeInTheDocument();
     expect(onCrear).not.toHaveBeenCalled();
+  });
+
+  /** Hallazgo de la revisión (ronda 1): el aviso quedaba fijo aunque la copia refrescada trajera al cliente. */
+  it("el aviso del cliente del lote sigue a la copia de clientes actual (R4.3)", () => {
+    const { actualizar } = renderDialog({ filaOrigen: CLIENTE_500, clientes: [] });
+    const avisoInactivo = /El lote es de un cliente que no está activo en la copia de MacroGest/;
+    expect(screen.getByText(avisoInactivo)).toBeInTheDocument();
+
+    actualizar({ clientes: CLIENTES });
+
+    expect(screen.queryByText(avisoInactivo)).not.toBeInTheDocument();
+    // El formulario no se completa solo: el cliente ya se puede elegir a mano.
+    expect(screen.getByLabelText("Cliente")).toHaveValue("");
+    elegirCliente("Uno");
+    expect(screen.getByLabelText("Cliente")).toHaveValue("500 · Cliente Uno");
+  });
+
+  it("sin copia de clientes no afirma que el dueño del lote esté de baja (R4.3)", () => {
+    renderDialog({ filaOrigen: CLIENTE_500, clientes: [], copiaClientes: { ...COPIA_OK, sinCopia: true, cantidad: 0 } });
+
+    expect(screen.queryByText(/no está activo en la copia de MacroGest/)).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Sin la copia de clientes de MacroGest no se sabe si el dueño del lote está activo: actualizá los clientes y elegilo.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Cliente")).toHaveValue("");
   });
 
   it("al editar una orden no se usa la fila de origen (R4.4)", () => {

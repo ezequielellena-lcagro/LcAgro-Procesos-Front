@@ -118,6 +118,22 @@ export function clienteActivoDeLote(fila: StockFilaDto | null, clientes: Cliente
   return clientes.some((c) => c.numero === fila.clienteNumero) ? fila.clienteNumero : null;
 }
 
+export type ProblemaClienteDelLote = "inactivo" | "sinCopia";
+
+/**
+ * Por qué el dueño de un lote de Cliente no se puede usar en la orden (R4.3), o `null` si se puede
+ * (o si el lote no es de un cliente). Sin copia de clientes no hay contra qué comparar: no se puede
+ * afirmar que el cliente esté dado de baja.
+ */
+export function problemaClienteDelLote(
+  fila: StockFilaDto | null,
+  clientes: ClienteCopiaDto[],
+  sinCopia: boolean,
+): ProblemaClienteDelLote | null {
+  if (fila?.duenio !== "Cliente" || clienteActivoDeLote(fila, clientes) !== null) return null;
+  return sinCopia ? "sinCopia" : "inactivo";
+}
+
 // Una sola instancia: se usa en cada comparación al ordenar.
 const colador = new Intl.Collator("es-AR", { numeric: true, sensitivity: "base" });
 

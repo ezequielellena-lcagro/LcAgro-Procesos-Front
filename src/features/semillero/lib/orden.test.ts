@@ -7,6 +7,7 @@ import {
   filtrarElegibles,
   filtrosDeFila,
   lotesElegibles,
+  problemaClienteDelLote,
   renglonesDeOtroCliente,
   totalesOrden,
   variedadesDeElegibles,
@@ -161,6 +162,25 @@ describe("armar una orden desde una fila de Stock (R4)", () => {
   it("un lote de un cliente que no está en la copia de activos no preselecciona nada", () => {
     const deClienteDeBaja = fila({ duenio: "Cliente", clienteNumero: 900, clienteDenominacion: "De baja" });
     expect(clienteActivoDeLote(deClienteDeBaja, clientesActivos)).toBeNull();
+  });
+
+  describe("problemaClienteDelLote", () => {
+    const deClienteA = fila({ duenio: "Cliente", clienteNumero: 500, clienteDenominacion: "Cliente A" });
+
+    it("sin problema si el lote es propio, no hay fila o su cliente está activo", () => {
+      expect(problemaClienteDelLote(fila(), clientesActivos, false)).toBeNull();
+      expect(problemaClienteDelLote(null, clientesActivos, false)).toBeNull();
+      expect(problemaClienteDelLote(deClienteA, clientesActivos, false)).toBeNull();
+    });
+
+    it("un cliente que no está en la copia de activos está inactivo", () => {
+      expect(problemaClienteDelLote(deClienteA, [], false)).toBe("inactivo");
+    });
+
+    it("sin copia de clientes no se puede afirmar que esté de baja", () => {
+      expect(problemaClienteDelLote(deClienteA, [], true)).toBe("sinCopia");
+      expect(problemaClienteDelLote(fila(), [], true)).toBeNull();
+    });
   });
 });
 

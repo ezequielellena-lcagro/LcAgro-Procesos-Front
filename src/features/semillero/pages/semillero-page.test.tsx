@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { env } from "@/lib/env";
 import { semilleroHandlers } from "@/mocks/handlers/semillero";
 import { semilleroKeys } from "../queries/keys";
-import type { StockFilaDto, StockSemilleroDto } from "../types";
+import type { ClientesCopiaDto, StockFilaDto, StockSemilleroDto } from "../types";
 import { SemilleroPage } from "./semillero-page";
 
 /**
@@ -372,6 +372,66 @@ describe("SemilleroPage", () => {
     expect(within(dialogo).getByLabelText("Agregar renglón")).toHaveValue("3:3");
     expect(within(dialogo).queryByText(/no está activo en la copia de MacroGest/)).not.toBeInTheDocument();
     expect(await within(dialogo).findByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
+  });
+
+  /**
+   * Hallazgo de la revisión (ronda 1): la página recalculaba en vivo el cliente inicial y el
+   * formulario lo fijaba al montarse. Si la copia se refrescaba sin ese cliente, la página pasaba al
+   * "cliente 0" (destinos vacíos, alta rápida contra /clientes/0) mientras el formulario lo conservaba.
+   */
+  it("si la copia de clientes se refresca con la orden abierta y el cliente sale, página y formulario siguen de acuerdo (R4.3)", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(await within(dialogo).findByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
+
+    // El 900001 se dio de baja en MacroGest y la copia se refresca con el diálogo abierto.
+    server.use(
+      http.get(`${env.apiUrl}/semillero/clientes`, () =>
+        HttpResponse.json({
+          clientes: [],
+          copia: {
+            ultimaSincronizacion: new Date().toISOString(),
+            ultimoIntentoFallido: null,
+            ultimoError: null,
+            desactualizada: false,
+            sinCopia: false,
+            cantidad: 0,
+          },
+        } satisfies ClientesCopiaDto),
+      ),
+    );
+    let clienteDelAltaDeDestino: string | undefined;
+    server.use(
+      http.post(`${env.apiUrl}/semillero/clientes/:numero/destinos`, ({ params }) => {
+        clienteDelAltaDeDestino = String(params.numero);
+        return HttpResponse.json({ id: 999, clienteNumero: 900001, nombre: "Campo X", activo: true, enUso: 0 });
+      }),
+    );
+    await queryClient.invalidateQueries({ queryKey: semilleroKeys.clientes() });
+
+    expect(await within(dialogo).findByText(/no está activo en la copia de MacroGest/)).toBeInTheDocument();
+    // Los destinos siguen siendo los del cliente que tiene el formulario, y el alta rápida también.
+    expect(within(dialogo).getByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
+    fireEvent.change(within(dialogo).getByLabelText("Nuevo destino"), { target: { value: "Campo X" } });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Agregar destino" }));
+    await waitFor(() => expect(clienteDelAltaDeDestino).toBe("900001"));
+  });
+
+  it('"Orden" en una fila de cliente sin copia de clientes no culpa al cliente (R4.3)', async () => {
+    server.use(
+      http.get(`${env.apiUrl}/semillero/clientes`, () => HttpResponse.json(null, { status: 503 })),
+    );
+    renderPagina();
+    await screen.findByText("BigBags propios");
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).queryByText(/no está activo en la copia de MacroGest/)).not.toBeInTheDocument();
+    expect(within(dialogo).getByText(/^Sin la copia de clientes de MacroGest/)).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText("Cliente")).toHaveValue("");
   });
 
   it('"Orden" en una fila de un cliente dado de baja avisa y no pide sus destinos (R4.3)', async () => {

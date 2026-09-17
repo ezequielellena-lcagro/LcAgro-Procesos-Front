@@ -66,6 +66,15 @@ interface PedidoOrden {
   pedidoEn: number;
 }
 
+/**
+ * Cliente de una orden al pedirla: el suyo al editar; ninguno en un alta, salvo desde un lote de
+ * Cliente, cuyo dueño se decide recién con la copia de clientes (`undefined`, R4.3).
+ */
+function clienteAlPedirOrden(orden: OrdenCargaDto | null, filaOrigen: StockFilaDto | null) {
+  if (orden) return orden.clienteNumero;
+  return filaOrigen?.duenio === "Cliente" ? undefined : null;
+}
+
 /** Mientras la copia de clientes todavía no se pidió (o sigue en camino), se asume lo más cauto. */
 const COPIA_CLIENTES_CARGANDO: EstadoCopiaClientesDto = {
   ultimaSincronizacion: null,
@@ -97,8 +106,9 @@ export function SemilleroPage() {
   const [loteEditandoId, setLoteEditandoId] = useState<number | null>(null);
   const [movimiento, setMovimiento] = useState<{ operacion: OperacionStock; fila: StockFilaDto } | null>(null);
   const [pedidoOrden, setPedidoOrden] = useState<PedidoOrden | null>(null);
-  // `undefined` = el formulario todavía no cambió el cliente: vale el inicial de la orden.
-  const [clienteFormularioOrden, setClienteFormularioOrden] = useState<number | null | undefined>(undefined);
+  // Cliente de la orden en armado, el mismo que tiene el formulario: de él salen los destinos y su
+  // alta rápida. `undefined` mientras un lote de Cliente espera la copia de clientes (ver abajo).
+  const [clienteOrden, setClienteOrden] = useState<number | null | undefined>(null);
   const [ordenImprimiendo, setOrdenImprimiendo] = useState<OrdenCargaDto | null>(null);
   const [clienteCatalogoElegido, setClienteCatalogoElegido] = useState<number | null>(null);
 
@@ -119,12 +129,6 @@ export function SemilleroPage() {
   const catalogos = useCatalogosSemillero();
   const clientes = useClientesSemillero(clientesHabilitado);
   const listaClientes = clientes.data?.clientes ?? [];
-  // Al editar, el cliente de la orden; desde una fila de Stock, su dueño sólo si está activo (R4.3):
-  // de un cliente dado de baja no se piden ni sus destinos.
-  const clienteInicialOrden = ordenEditando
-    ? ordenEditando.clienteNumero
-    : clienteActivoDeLote(filaOrigenOrden, listaClientes);
-  const clienteOrden = clienteFormularioOrden === undefined ? clienteInicialOrden : clienteFormularioOrden;
   // Todos los atributos del lote, incluidos duenioEditable/envaseYPesoEditables (ausentes en las
   // filas de stock): sólo hace falta al editar uno existente.
   const lotes = useLotesSemillero(loteDialogAbierto && loteEditandoId !== null);
@@ -169,7 +173,7 @@ export function SemilleroPage() {
 
   const abrirOrden = (orden: OrdenCargaDto | null, filaOrigen: StockFilaDto | null) => {
     setPedidoOrden({ orden, filaOrigen, pedidoEn: Date.now() });
-    setClienteFormularioOrden(undefined);
+    setClienteOrden(clienteAlPedirOrden(orden, filaOrigen));
     // Con el diálogo cerrado nadie vuelve a pedir el stock completo (una escritura sólo lo marca
     // como vencido): la copia en caché puede ser vieja, así que se pide siempre al abrir (R1.2).
     void stockOrden.refetch();
@@ -182,7 +186,7 @@ export function SemilleroPage() {
   };
   const cerrarOrdenDialog = () => {
     setPedidoOrden(null);
-    setClienteFormularioOrden(undefined);
+    setClienteOrden(null);
   };
 
   const loteParaEditar =
@@ -202,6 +206,12 @@ export function SemilleroPage() {
   // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla.
   const esperandoClientes = filaOrigenOrden?.duenio === "Cliente" && clientes.isPending;
   const ordenDialogListoParaAbrir = stockOrdenAlDia && !esperandoClientes;
+  // Ese dueño se fija UNA sola vez, al quedar listo el diálogo, y sólo si está activo: de un cliente
+  // dado de baja no se piden ni sus destinos. Si después la copia se refresca sin él, la página y el
+  // formulario siguen hablando del mismo cliente (antes la página pasaba al "cliente 0").
+  if (ordenDialogListoParaAbrir && clienteOrden === undefined) {
+    setClienteOrden(clienteActivoDeLote(filaOrigenOrden, listaClientes));
+  }
 
   const copiaClientes = clientes.data?.copia ?? COPIA_CLIENTES_CARGANDO;
 
@@ -358,8 +368,9 @@ export function SemilleroPage() {
         onActualizarClientes={() => sincronizarClientes.mutate()}
         filas={stockOrden.data?.filas ?? []}
         filaOrigen={filaOrigenOrden}
+        clienteInicial={clienteOrden ?? null}
         destinos={destinosOrden.data ?? []}
-        onClienteChange={setClienteFormularioOrden}
+        onClienteChange={setClienteOrden}
         onAgregarDestino={(nombre) => crearDestinoOrden.mutateAsync({ nombre })}
         onCrear={(input) => crearOrden.mutateAsync(input)}
         onActualizar={(id, input) => actualizarOrden.mutateAsync({ id, ...input })}
