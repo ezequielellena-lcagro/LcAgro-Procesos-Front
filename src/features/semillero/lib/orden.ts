@@ -1,4 +1,5 @@
-import type { StockFilaDto } from "../types";
+import type { EnvaseSemillero, StockFilaDto } from "../types";
+import { envaseEtiqueta, productoEtiqueta, tratamientoEtiqueta } from "./etiquetas-lote";
 
 export interface RenglonEditable {
   loteId: number;
@@ -8,7 +9,12 @@ export interface RenglonEditable {
 
 export type LoteElegible = StockFilaDto & { maximo: number };
 
-const mismaClave = (a: { loteId: number; ubicacionId: number }, b: { loteId: number; ubicacionId: number }) =>
+interface LoteEnUbicacion {
+  loteId: number;
+  ubicacionId: number;
+}
+
+export const mismaClave = (a: LoteEnUbicacion, b: LoteEnUbicacion) =>
   a.loteId === b.loteId && a.ubicacionId === b.ubicacionId;
 
 /**
@@ -77,4 +83,71 @@ export function totalesOrden(renglones: RenglonEditable[], filas: StockFilaDto[]
 /** Renglones que piden más de lo que el elegible correspondiente admite como máximo. */
 export function excedidos(renglones: RenglonEditable[], elegibles: LoteElegible[]): RenglonEditable[] {
   return renglones.filter((r) => r.cantidad > (elegibles.find((e) => mismaClave(e, r))?.maximo ?? 0));
+}
+
+/** Filtros propios del armado de la orden (R3): sólo acotan lo que se ofrece para agregar. */
+export interface FiltrosElegibles {
+  variedadId?: number;
+  tratada?: boolean;
+  envase?: EnvaseSemillero;
+}
+
+export function filtrarElegibles(elegibles: LoteElegible[], filtros: FiltrosElegibles): LoteElegible[] {
+  return elegibles.filter(
+    (e) =>
+      (filtros.variedadId === undefined || e.variedadId === filtros.variedadId) &&
+      (filtros.tratada === undefined || e.tratada === filtros.tratada) &&
+      (filtros.envase === undefined || e.envase === filtros.envase),
+  );
+}
+
+// Una sola instancia: se usa en cada comparación al ordenar.
+const colador = new Intl.Collator("es-AR", { numeric: true, sensitivity: "base" });
+
+/** Las variedades que tienen algo para cargar, sin repetir: las opciones del filtro Variedad. */
+export function variedadesDeElegibles(elegibles: LoteElegible[]): { id: number; nombre: string }[] {
+  const nombrePorId = new Map(elegibles.map((e) => [e.variedadId, e.variedad]));
+  return [...nombrePorId]
+    .map(([id, nombre]) => ({ id, nombre }))
+    .sort((a, b) => colador.compare(a.nombre, b.nombre));
+}
+
+export interface GrupoElegibles {
+  clave: string;
+  /** "{variedad} · {tratamiento} · {envase} · {campaña}". */
+  etiqueta: string;
+  lotes: LoteElegible[];
+}
+
+/** Orden estable de las opciones: primero el producto, después el lote y la ubicación. */
+const CRITERIOS_ORDEN: ((e: LoteElegible) => string)[] = [
+  (e) => e.variedad,
+  (e) => tratamientoEtiqueta(e.tratada),
+  (e) => envaseEtiqueta(e.envase),
+  (e) => e.campania,
+  (e) => e.loteCodigo,
+  (e) => e.ubicacion,
+];
+
+function compararElegibles(a: LoteElegible, b: LoteElegible): number {
+  for (const criterio of CRITERIOS_ORDEN) {
+    const resultado = colador.compare(criterio(a), criterio(b));
+    if (resultado !== 0) return resultado;
+  }
+  return 0;
+}
+
+/**
+ * Agrupa los elegibles por producto para el selector de renglones (un `<optgroup>` por grupo), como
+ * se arma la orden en SeedStock: primero el producto pedido y, dentro, cada lote con su disponible.
+ */
+export function agruparElegibles(elegibles: LoteElegible[]): GrupoElegibles[] {
+  const grupos = new Map<string, GrupoElegibles>();
+  for (const e of elegibles.toSorted(compararElegibles)) {
+    const clave = `${e.variedadId}|${e.tratada}|${e.envase}|${e.campania}`;
+    const grupo = grupos.get(clave);
+    if (grupo) grupo.lotes.push(e);
+    else grupos.set(clave, { clave, etiqueta: `${productoEtiqueta(e)} · ${e.campania}`, lotes: [e] });
+  }
+  return [...grupos.values()];
 }

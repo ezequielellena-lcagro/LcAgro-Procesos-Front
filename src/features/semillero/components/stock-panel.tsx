@@ -6,6 +6,7 @@ import { CampaniaSelect } from "@/shared/components/campania-select";
 import { DataTable, type Column } from "@/shared/components/data-table";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { kg, unidades } from "../format";
+import { duenioEtiqueta, envaseEtiqueta, tratamientoEtiqueta } from "../lib/etiquetas-lote";
 import {
   ENVASES,
   ESPECIES,
@@ -41,10 +42,6 @@ const DUENIO_BADGE_CLS: Record<DuenioLote, string> = {
   Propio: "bg-verde-bg text-verde",
   Cliente: "bg-panel-soft text-ink-soft",
 };
-
-function duenioEtiqueta(f: StockFilaDto): string {
-  return f.duenio === "Propio" ? "Propio" : `Cliente · ${f.clienteDenominacion}`;
-}
 
 export function StockPanel({
   datos,
@@ -87,8 +84,8 @@ export function StockPanel({
       ),
     },
     { key: "ubicacion", header: "Ubicación", sortBy: (f) => f.ubicacion, cell: (f) => f.ubicacion },
-    { key: "envase", header: "Envase", cell: (f) => (f.envase === "BigBag" ? "BigBag" : "Bolsa") },
-    { key: "tratada", header: "Tratamiento", cell: (f) => (f.tratada ? "Tratada" : "Sin tratar") },
+    { key: "envase", header: "Envase", cell: (f) => envaseEtiqueta(f.envase) },
+    { key: "tratada", header: "Tratamiento", cell: (f) => tratamientoEtiqueta(f.tratada) },
     { key: "pg", header: "PG", align: "right", cell: (f) => oDash(f.pg, " %") },
     { key: "pmil", header: "PMIL", align: "right", cell: (f) => oDash(f.pmil, " g") },
     { key: "fisico", header: "Físico", align: "right", sortBy: (f) => f.fisico, cell: (f) => unidades(f.fisico) },

@@ -6,15 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
 import { cn } from "@/lib/utils";
 import { kg, unidades } from "../format";
 import { normalizarComprobante } from "../lib/comprobante";
+import { duenioEtiqueta, productoEtiqueta } from "../lib/etiquetas-lote";
 import {
   excedidos,
   lotesElegibles,
+  mismaClave,
   renglonesDeOtroCliente,
   totalesOrden,
   type LoteElegible,
@@ -23,12 +24,12 @@ import {
 import type {
   ClienteCopiaDto,
   DestinoDto,
-  DuenioLote,
   EstadoCopiaClientesDto,
   OrdenCargaDto,
   OrdenCargaInput,
   StockFilaDto,
 } from "../types";
+import { AgregarRenglon } from "./agregar-renglon";
 import { ClienteSelect } from "./cliente-select";
 import { CopiaClientesAviso } from "./copia-clientes-aviso";
 import { DestinoSelect } from "./destino-select";
@@ -82,13 +83,6 @@ function aRenglones(orden: OrdenCargaDto | null): RenglonEditable[] {
     : orden.items.map((it) => ({ loteId: it.loteId, ubicacionId: it.ubicacionId, cantidad: it.cantidad }));
 }
 
-const mismaClave = (a: { loteId: number; ubicacionId: number }, b: { loteId: number; ubicacionId: number }) =>
-  a.loteId === b.loteId && a.ubicacionId === b.ubicacionId;
-
-function duenioEtiqueta(f: { duenio: DuenioLote; clienteDenominacion: string | null }): string {
-  return f.duenio === "Propio" ? "Propio" : `Cliente · ${f.clienteDenominacion}`;
-}
-
 interface Props {
   open: boolean;
   /** `null` = alta. */
@@ -97,6 +91,10 @@ interface Props {
   copiaClientes: EstadoCopiaClientesDto;
   actualizandoClientes: boolean;
   onActualizarClientes: () => void;
+  /**
+   * Stock completo, sin los filtros de la pestaña Stock: al editar, los lotes de la orden tienen que
+   * estar siempre (si no, el renglón queda sin datos y su máximo en 0).
+   */
   filas: StockFilaDto[];
   /** Destinos del cliente elegido en el formulario (R1.3); el padre los mantiene al día con `onClienteChange`. */
   destinos: DestinoDto[];
@@ -153,9 +151,6 @@ function OrdenForm({
   // se le pasara el estado vivo `renglones`, el máximo de cada renglón ya cargado se autoinflaría con
   // la propia cantidad recién tipeada y el chequeo de "excede lo disponible" quedaría tautológico.
   const [reservaOriginal] = useState<RenglonEditable[]>(() => aRenglones(orden));
-  const [nuevaClave, setNuevaClave] = useState("");
-  const [nuevaCantidad, setNuevaCantidad] = useState("");
-  const [errorNuevoRenglon, setErrorNuevoRenglon] = useState<string | null>(null);
 
   const form = useForm<Values>({ resolver: zodResolver(esquema()), defaultValues: aValues(orden) });
   const { errors, isSubmitting } = form.formState;
@@ -170,38 +165,12 @@ function OrdenForm({
   const cantidadesInvalidas = renglones.filter((r) => !(r.cantidad > 0));
   const totales = totalesOrden(renglones, filas);
 
-  const yaAgregado = (loteId: number, ubicacionId: number) =>
-    renglones.some((r) => mismaClave(r, { loteId, ubicacionId }));
-  const opcionesAgregar = elegibles.filter((e) => !yaAgregado(e.loteId, e.ubicacionId));
-
   const filaDe = (r: RenglonEditable) => filas.find((f) => mismaClave(f, r));
   const esInvalido = (r: RenglonEditable) => invalidos.some((i) => mismaClave(i, r));
   const excede = (r: RenglonEditable) => excedidosActuales.some((e) => mismaClave(e, r));
   const esCantidadInvalida = (r: RenglonEditable) => cantidadesInvalidas.some((c) => mismaClave(c, r));
 
-  const agregarRenglon = () => {
-    setErrorNuevoRenglon(null);
-    const [loteIdTxt, ubicacionIdTxt] = nuevaClave.split(":");
-    const elegible = opcionesAgregar.find(
-      (e) => e.loteId === Number(loteIdTxt) && e.ubicacionId === Number(ubicacionIdTxt),
-    );
-    if (!elegible) {
-      setErrorNuevoRenglon("Elegí un lote y una ubicación.");
-      return;
-    }
-    const cantidad = Number(nuevaCantidad);
-    if (nuevaCantidad.trim() === "" || Number.isNaN(cantidad) || cantidad <= 0) {
-      setErrorNuevoRenglon("La cantidad tiene que ser mayor a 0.");
-      return;
-    }
-    if (cantidad > elegible.maximo) {
-      setErrorNuevoRenglon(`Hay ${unidades(elegible.maximo)} disponibles para ese lote y ubicación.`);
-      return;
-    }
-    setRenglones((r) => [...r, { loteId: elegible.loteId, ubicacionId: elegible.ubicacionId, cantidad }]);
-    setNuevaClave("");
-    setNuevaCantidad("");
-  };
+  const agregarRenglon = (renglon: RenglonEditable) => setRenglones((r) => [...r, renglon]);
 
   const quitarRenglon = (loteId: number, ubicacionId: number) =>
     setRenglones((r) => r.filter((x) => !mismaClave(x, { loteId, ubicacionId })));
@@ -328,10 +297,7 @@ function OrdenForm({
                   )}
                 >
                   <div className="min-w-40 flex-1">
-                    <p className="font-medium text-ink">
-                      {filaRenglon?.loteCodigo} · {filaRenglon?.ubicacion}
-                    </p>
-                    <p className="text-xs text-ink-soft">{filaRenglon ? duenioEtiqueta(filaRenglon) : ""}</p>
+                    {filaRenglon && <DescripcionLote fila={filaRenglon} />}
                     {invalido && <p className="text-xs font-medium text-rojo">Ya no corresponde al cliente elegido.</p>}
                     {!invalido && excedido && <p className="text-xs font-medium text-rojo">Supera lo disponible.</p>}
                     {!invalido && !excedido && cantidadInvalida && (
@@ -366,34 +332,12 @@ function OrdenForm({
           </ul>
         )}
 
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="min-w-48 flex-1 space-y-1">
-            <Label htmlFor="nuevoRenglon">Agregar renglón</Label>
-            <Select id="nuevoRenglon" value={nuevaClave} onChange={(e) => setNuevaClave(e.target.value)}>
-              <option value="">Elegí un lote y una ubicación…</option>
-              {opcionesAgregar.map((e) => (
-                <option key={`${e.loteId}-${e.ubicacionId}`} value={`${e.loteId}:${e.ubicacionId}`}>
-                  {e.loteCodigo} · {e.ubicacion} · {duenioEtiqueta(e)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div className="w-28 space-y-1">
-            <Label htmlFor="nuevaCantidad">Cantidad</Label>
-            <Input
-              id="nuevaCantidad"
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={nuevaCantidad}
-              onChange={(e) => setNuevaCantidad(e.target.value)}
-            />
-          </div>
-          <Button type="button" variant="outline" onClick={agregarRenglon}>
-            Agregar
-          </Button>
-        </div>
-        {errorNuevoRenglon && <p className="text-xs text-rojo">{errorNuevoRenglon}</p>}
+        <AgregarRenglon
+          elegibles={elegibles}
+          renglones={renglones}
+          hayCliente={clienteNumero !== null}
+          onAgregar={agregarRenglon}
+        />
 
         <p data-testid="totales-orden" className="text-sm text-ink-soft">
           {unidades(totales.unidades)} unidades · {kg(totales.kgPropio)} propios · {kg(totales.kgCliente)} del cliente
@@ -418,6 +362,21 @@ function OrdenForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/** Qué se carga en el renglón: el producto primero, después de dónde sale y de quién es (R2.3). */
+function DescripcionLote({ fila }: { fila: StockFilaDto }) {
+  return (
+    <>
+      <p className="font-medium text-ink">{productoEtiqueta(fila)}</p>
+      <p className="text-xs text-ink-soft">{`Lote ${fila.loteCodigo} · ${fila.ubicacion} · ${duenioEtiqueta(fila)}`}</p>
+      {fila.observaciones && (
+        <p className="truncate text-xs text-ink-soft" title={fila.observaciones}>
+          {fila.observaciones}
+        </p>
+      )}
+    </>
   );
 }
 

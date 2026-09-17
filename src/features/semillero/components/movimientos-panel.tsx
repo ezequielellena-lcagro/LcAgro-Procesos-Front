@@ -7,6 +7,7 @@ import { DataTable, type Column } from "@/shared/components/data-table";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { fechaHora, kg, unidades } from "../format";
+import { duenioEtiqueta } from "../lib/etiquetas-lote";
 import {
   MOTIVOS_AJUSTE,
   TIPOS_MOVIMIENTO,
@@ -25,10 +26,6 @@ interface Props {
   onFiltros: (filtros: MovimientoFiltros) => void;
   onExcel: () => void;
   descargando: boolean;
-}
-
-function duenioEtiqueta(m: MovimientoDto): string {
-  return m.duenio === "Propio" ? "Propio" : `Cliente · ${m.clienteDenominacion}`;
 }
 
 function motivoEtiqueta(m: MovimientoDto): string {

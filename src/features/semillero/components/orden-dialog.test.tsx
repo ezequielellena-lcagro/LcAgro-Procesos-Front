@@ -162,6 +162,36 @@ function agregarRenglon(clave: string, cantidad: string) {
   fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
 }
 
+/** Códigos de lote que el selector "Agregar renglón" ofrece hoy, en el orden en que aparecen. */
+function lotesOfrecidos(): string[] {
+  return within(screen.getByLabelText("Agregar renglón"))
+    .getAllByRole("option")
+    .filter((o) => o.getAttribute("value") !== "")
+    .map((o) => /Lote (\S+)/.exec(o.textContent ?? "")?.[1] ?? "");
+}
+
+const OBS_LARGA = "Línea Profesional, curado con fungicida e insecticida de amplio espectro";
+
+const PROPIO_TRATADO = fila({
+  loteId: 3,
+  loteCodigo: "26S-003",
+  ubicacionId: 3,
+  ubicacion: "G1-3",
+  tratada: true,
+  observaciones: OBS_LARGA,
+});
+
+const PROPIO_OTRA_VARIEDAD = fila({
+  loteId: 4,
+  loteCodigo: "26S-004",
+  ubicacionId: 4,
+  ubicacion: "G1-4",
+  variedadId: 2,
+  variedad: "NS 4309",
+  envase: "Bolsa",
+  pesoUnitarioKg: 40,
+});
+
 function errorServidor(detail: string) {
   return new AxiosError("Request failed", "409", undefined, null, {
     status: 409,
@@ -387,6 +417,114 @@ describe("OrdenDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agregar destino" }));
 
     await waitFor(() => expect(onAgregarDestino).toHaveBeenCalledWith("Silo Nuevo"));
+  });
+
+  it("agrupa las opciones por producto y cada lote muestra su disponible y observaciones (R2.1)", () => {
+    renderDialog({ filas: [PROPIO, PROPIO_TRATADO] });
+    const select = screen.getByLabelText("Agregar renglón");
+
+    const sinTratar = select.querySelector('optgroup[label="DM 46E25 · Sin tratar · BigBag · 2026-2027"]');
+    const tratada = select.querySelector('optgroup[label="DM 46E25 · Tratada · BigBag · 2026-2027"]');
+    expect(sinTratar).not.toBeNull();
+    expect(tratada).not.toBeNull();
+    expect(within(sinTratar as HTMLElement).getByRole("option").textContent).toBe(
+      "Lote 26S-001 · G1-1 · Propio · disp. 10 (8.000 kg)",
+    );
+    expect(within(tratada as HTMLElement).getByRole("option").textContent).toBe(
+      "Lote 26S-003 · G1-3 · Propio · disp. 10 (8.000 kg) · Línea Profesional, curado con fungicida…",
+    );
+  });
+
+  it("al elegir un lote muestra su disponible y sus observaciones completas (R2.2)", () => {
+    renderDialog({ filas: [PROPIO, PROPIO_TRATADO] });
+    expect(screen.queryByText(/^Disponible:/)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Agregar renglón"), { target: { value: "3:3" } });
+
+    expect(screen.getByText("Disponible: 10 unidades · 8.000 kg")).toBeInTheDocument();
+    expect(screen.getByText(OBS_LARGA)).toBeInTheDocument();
+  });
+
+  it("cada renglón muestra el producto, el lote con ubicación y dueño, y las observaciones (R2.3)", () => {
+    renderDialog({ filas: [PROPIO, PROPIO_TRATADO] });
+    agregarRenglon("3:3", "2");
+
+    const renglon = screen.getByRole("button", { name: "Quitar 26S-003 en G1-3" }).closest("li") as HTMLElement;
+    expect(within(renglon).getByText("DM 46E25 · Tratada · BigBag")).toBeInTheDocument();
+    expect(within(renglon).getByText("Lote 26S-003 · G1-3 · Propio")).toBeInTheDocument();
+    expect(within(renglon).getByText(OBS_LARGA)).toHaveAttribute("title", OBS_LARGA);
+    expect(within(renglon).getByLabelText("Cantidad de 26S-003 en G1-3")).toHaveValue(2);
+  });
+
+  it("sin nada para agregar lo dice, y sin cliente aclara que la semilla de clientes aparece al elegirlo (R2.4)", () => {
+    renderDialog({ filas: [CLIENTE_500] });
+    expect(
+      screen.getByText("No hay lotes con disponible. La semilla de clientes aparece al elegir el cliente."),
+    ).toBeInTheDocument();
+
+    elegirCliente("Uno");
+    expect(screen.queryByText(/No hay lotes con disponible/)).not.toBeInTheDocument();
+    expect(lotesOfrecidos()).toEqual(["26S-C01"]);
+  });
+
+  it("con el cliente elegido y nada disponible, no habla de la semilla de clientes (R2.4)", () => {
+    renderDialog({ filas: [fila({ fisico: 0 })] });
+    elegirCliente("Uno");
+    expect(screen.getByText("No hay lotes con disponible.")).toBeInTheDocument();
+  });
+
+  it("si los filtros del diálogo no dejan ningún lote, lo dice (R2.4)", () => {
+    renderDialog({ filas: [PROPIO] });
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "true" } });
+    expect(screen.getByText("No hay lotes disponibles con esos filtros.")).toBeInTheDocument();
+    expect(lotesOfrecidos()).toEqual([]);
+  });
+
+  it("los filtros acotan sólo lo que se ofrece para agregar: nunca los renglones cargados ni los totales (R3.1)", () => {
+    renderDialog({ filas: [PROPIO, PROPIO_TRATADO, PROPIO_OTRA_VARIEDAD] });
+    agregarRenglon("3:3", "2");
+    expect(lotesOfrecidos()).toEqual(["26S-001", "26S-004"]);
+
+    const variedades = within(screen.getByLabelText("Variedad"))
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(variedades).toEqual(["Todas", "DM 46E25", "NS 4309"]);
+
+    fireEvent.change(screen.getByLabelText("Variedad"), { target: { value: "2" } });
+    expect(lotesOfrecidos()).toEqual(["26S-004"]);
+
+    fireEvent.change(screen.getByLabelText("Variedad"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Envase"), { target: { value: "BigBag" } });
+    expect(lotesOfrecidos()).toEqual(["26S-001"]);
+
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "false" } });
+    expect(lotesOfrecidos()).toEqual(["26S-001"]);
+
+    // El renglón tratado sigue cargado y cuenta en los totales, aunque los filtros lo excluyan.
+    expect(screen.getByRole("button", { name: "Quitar 26S-003 en G1-3" })).toBeInTheDocument();
+    expect(screen.getByTestId("totales-orden")).toHaveTextContent("2 unidades · 1.600 kg propios");
+  });
+
+  it("si un filtro deja afuera el lote elegido, el selector se limpia y Agregar no lo carga (R3.3)", () => {
+    renderDialog({ filas: [PROPIO, PROPIO_TRATADO] });
+    const selector = screen.getByLabelText("Agregar renglón");
+
+    fireEvent.change(selector, { target: { value: "1:1" } });
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "false" } });
+    expect(selector).toHaveValue("1:1"); // sigue visible: no se pierde la elección
+
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "true" } });
+    expect(selector).toHaveValue("");
+    expect(screen.queryByText(/^Disponible:/)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    expect(screen.getByText("Elegí un lote y una ubicación.")).toBeInTheDocument();
+    expect(screen.getByText("Todavía no agregaste ningún lote.")).toBeInTheDocument();
+
+    // Volver a ampliar el filtro no resucita la elección que se había limpiado.
+    fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "" } });
+    expect(selector).toHaveValue("");
   });
 
   it("muestra el error del servidor dentro del diálogo", async () => {

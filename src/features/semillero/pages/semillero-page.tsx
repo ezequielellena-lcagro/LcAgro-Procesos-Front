@@ -47,6 +47,13 @@ import type {
 
 type Pestania = "stock" | "ordenes" | "movimientos" | "catalogos";
 
+/**
+ * El armado de la orden usa el stock SIN los filtros de la pestaña Stock: con un filtro activo, la
+ * orden ofrecería sólo esos lotes y, al editar una pendiente cuyo lote quedó afuera, el renglón
+ * quedaría sin datos y con máximo 0. El backend igual oculta lo que no tiene físico ni reservas.
+ */
+const STOCK_COMPLETO: StockFiltros = {};
+
 /** Mientras la copia de clientes todavía no se pidió (o sigue en camino), se asume lo más cauto. */
 const COPIA_CLIENTES_CARGANDO: EstadoCopiaClientesDto = {
   ultimaSincronizacion: null,
@@ -90,6 +97,7 @@ export function SemilleroPage() {
     loteDialogAbierto || ordenDialogAbierto || pestania === "ordenes" || pestania === "catalogos";
 
   const stock = useStockSemillero(stockFiltros);
+  const stockOrden = useStockSemillero(STOCK_COMPLETO, ordenDialogAbierto);
   const ordenes = useOrdenesCarga(ordenesFiltros);
   const movimientos = useMovimientosSemillero(movimientosFiltros, pestania === "movimientos");
   const catalogos = useCatalogosSemillero();
@@ -120,7 +128,10 @@ export function SemilleroPage() {
   const exportarOrdenes = useExportarOrdenes();
   const exportarMovimientos = useExportarMovimientos();
 
-  const error = stock.error ?? ordenes.error ?? catalogos.error;
+  // El stock de la orden sólo cuenta mientras el diálogo está pedido: sin él, el diálogo no abre y
+  // hay que ofrecer reintentar en vez de no hacer nada.
+  const errorStockOrden = ordenDialogAbierto ? stockOrden.error : null;
+  const error = stock.error ?? ordenes.error ?? catalogos.error ?? errorStockOrden;
   const listoParaMostrar = stock.data && ordenes.data && catalogos.data;
 
   const abrirNuevoLote = () => {
@@ -158,6 +169,11 @@ export function SemilleroPage() {
   // envaseYPesoEditables no viajan en las filas de stock): evita un parpadeo mostrando "Nuevo lote".
   const loteDialogListoParaAbrir = loteDialogAbierto && (loteEditandoId === null || loteParaEditar !== null);
 
+  // Mismo criterio para la orden: sin el stock completo, un renglón se vería vacío y con un
+  // "Supera lo disponible" que no es real (R1.2).
+  const filasOrden = stockOrden.data?.filas;
+  const ordenDialogListoParaAbrir = ordenDialogAbierto && filasOrden !== undefined;
+
   const copiaClientes = clientes.data?.copia ?? COPIA_CLIENTES_CARGANDO;
   const listaClientes = clientes.data?.clientes ?? [];
 
@@ -184,6 +200,7 @@ export function SemilleroPage() {
             void stock.refetch();
             void ordenes.refetch();
             void catalogos.refetch();
+            if (errorStockOrden) void stockOrden.refetch();
           }}
         />
       ) : !listoParaMostrar ? (
@@ -296,13 +313,13 @@ export function SemilleroPage() {
       />
 
       <OrdenDialog
-        open={ordenDialogAbierto}
+        open={ordenDialogListoParaAbrir}
         orden={ordenEditando}
         clientes={listaClientes}
         copiaClientes={copiaClientes}
         actualizandoClientes={sincronizarClientes.isPending}
         onActualizarClientes={() => sincronizarClientes.mutate()}
-        filas={stock.data?.filas ?? []}
+        filas={filasOrden ?? []}
         destinos={destinosOrden.data ?? []}
         onClienteChange={setClienteFormularioOrden}
         onAgregarDestino={(nombre) => crearDestinoOrden.mutateAsync({ nombre })}

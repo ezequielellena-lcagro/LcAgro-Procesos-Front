@@ -96,6 +96,75 @@ describe("SemilleroPage", () => {
     await waitFor(() => expect(queryClient.getQueryData(semilleroKeys.clientes())).toBeDefined());
   });
 
+  /** Deja afuera de la pestaña Stock el lote 26S-C01, el de la orden Pendiente N° 1 de la fixture. */
+  async function filtrarStockSoloPropio() {
+    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "Propio" } });
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: "Editar lote 26S-C01" })).not.toBeInTheDocument(),
+    );
+  }
+
+  /**
+   * Regresión (ajuste 1.1, R1.3): el diálogo de orden recibía el stock YA FILTRADO de la pestaña
+   * Stock. Con un filtro que dejaba afuera el lote de una orden pendiente, al editarla el renglón
+   * quedaba sin datos, con máximo 0 ("Supera lo disponible"), y la orden no se podía guardar.
+   * Estos tests van antes del que despacha la orden N° 1: la fixture de MSW es compartida.
+   */
+  it("editar una orden cuyo lote quedó fuera del filtro de Stock muestra el renglón y se puede guardar (R1.3)", async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+    await filtrarStockSoloPropio();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Editar orden N° 1" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
+    expect(
+      within(dialogo).getByText("Lote 26S-C01 · PLANTA · Cliente · VIVERO DEMO SANTA ROSA SA"),
+    ).toBeInTheDocument();
+    expect(within(dialogo).queryByText("Supera lo disponible.")).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // La pestaña Stock conserva su filtro: la orden no lo toca (R1.4).
+    fireEvent.click(screen.getByRole("tab", { name: "Stock" }));
+    expect(screen.getByLabelText("Dueño")).toHaveValue("Propio");
+    expect(screen.queryByRole("button", { name: "Editar lote 26S-C01" })).not.toBeInTheDocument();
+  });
+
+  it("el diálogo de orden no se abre hasta tener el stock completo (R1.2)", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    await filtrarStockSoloPropio();
+
+    // Sin el stock completo en caché y con la respuesta demorada, el diálogo tiene que esperar.
+    // `resetQueries` (no `removeQueries`): deja el query sin datos, sin que `keepPreviousData`
+    // recupere los que el observer ya había visto.
+    await queryClient.resetQueries({ queryKey: semilleroKeys.stock({}), exact: true });
+    let liberarStock = () => {};
+    const stockDemorado = new Promise<void>((resolver) => (liberarStock = resolver));
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, async ({ request }) => {
+        if (new URL(request.url).search === "") await stockDemorado;
+        // Sin respuesta propia: sigue al handler de la fixture.
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Editar orden N° 1" }));
+
+    await waitFor(() =>
+      expect(queryClient.getQueryState(semilleroKeys.stock({}))?.fetchStatus).toBe("fetching"),
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    liberarStock();
+    const dialogo = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
+    expect(within(dialogo).getByText(/^Lote 26S-C01 · PLANTA/)).toBeInTheDocument();
+  });
+
   /**
    * La pestaña "Órdenes de carga (N)" tiene que contar sólo las Pendientes, el mismo dato que el KPI
    * "Órdenes pendientes" — nunca el total de órdenes (que se queda alto aunque no quede ninguna

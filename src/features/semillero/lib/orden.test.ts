@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { StockFilaDto } from "../types";
-import { excedidos, lotesElegibles, renglonesDeOtroCliente, totalesOrden } from "./orden";
+import {
+  agruparElegibles,
+  excedidos,
+  filtrarElegibles,
+  lotesElegibles,
+  renglonesDeOtroCliente,
+  totalesOrden,
+  variedadesDeElegibles,
+} from "./orden";
 
 function fila(over: Partial<StockFilaDto> = {}): StockFilaDto {
   const base: StockFilaDto = {
@@ -56,6 +64,77 @@ describe("lotesElegibles", () => {
     const elegibles = lotesElegibles([agotadoPorEstaOrden], [{ loteId: 1, ubicacionId: 1, cantidad: 4 }]);
     expect(elegibles).toHaveLength(1);
     expect(elegibles[0].maximo).toBe(4);
+  });
+});
+
+describe("filtrarElegibles", () => {
+  const elegibles = lotesElegibles([
+    fila({ loteId: 1, variedadId: 1, variedad: "DM 46E25", tratada: true }),
+    fila({ loteId: 2, variedadId: 2, variedad: "NS 4309", tratada: false }),
+    fila({ loteId: 3, variedadId: 1, variedad: "DM 46E25", envase: "Bolsa", pesoUnitarioKg: 40, fisico: 100 }),
+  ]);
+  const ids = (filtradas: { loteId: number }[]) => filtradas.map((e) => e.loteId);
+
+  it("sin filtros devuelve todos los elegibles", () => {
+    expect(ids(filtrarElegibles(elegibles, {}))).toEqual([1, 2, 3]);
+  });
+
+  it("filtra por variedad, tratamiento y envase, y los filtros se combinan", () => {
+    expect(ids(filtrarElegibles(elegibles, { variedadId: 1 }))).toEqual([1, 3]);
+    expect(ids(filtrarElegibles(elegibles, { tratada: false }))).toEqual([2, 3]);
+    expect(ids(filtrarElegibles(elegibles, { envase: "Bolsa" }))).toEqual([3]);
+    expect(ids(filtrarElegibles(elegibles, { variedadId: 1, tratada: false, envase: "BigBag" }))).toEqual([]);
+  });
+});
+
+describe("variedadesDeElegibles", () => {
+  it("devuelve cada variedad presente una sola vez, ordenada por nombre", () => {
+    const elegibles = lotesElegibles([
+      fila({ loteId: 1, variedadId: 2, variedad: "NS 4309" }),
+      fila({ loteId: 2, variedadId: 1, variedad: "DM 46E25" }),
+      fila({ loteId: 3, variedadId: 2, variedad: "NS 4309" }),
+    ]);
+    expect(variedadesDeElegibles(elegibles)).toEqual([
+      { id: 1, nombre: "DM 46E25" },
+      { id: 2, nombre: "NS 4309" },
+    ]);
+  });
+});
+
+describe("agruparElegibles", () => {
+  it("agrupa por producto (variedad · tratamiento · envase · campaña) en un orden estable", () => {
+    const grupos = agruparElegibles(
+      lotesElegibles([
+        fila({ loteId: 1, loteCodigo: "26S-010", variedadId: 2, variedad: "NS 4309" }),
+        fila({ loteId: 2, loteCodigo: "26S-020", tratada: true }),
+        fila({ loteId: 3, loteCodigo: "26S-030", envase: "Bolsa", pesoUnitarioKg: 40 }),
+        fila({ loteId: 4, loteCodigo: "25S-040", campania: "2025-2026" }),
+        fila({ loteId: 5, loteCodigo: "26S-050" }),
+      ]),
+    );
+    expect(grupos.map((g) => g.etiqueta)).toEqual([
+      "DM 46E25 · Sin tratar · BigBag · 2025-2026",
+      "DM 46E25 · Sin tratar · BigBag · 2026-2027",
+      "DM 46E25 · Sin tratar · Bolsa · 2026-2027",
+      "DM 46E25 · Tratada · BigBag · 2026-2027",
+      "NS 4309 · Sin tratar · BigBag · 2026-2027",
+    ]);
+    expect(grupos.map((g) => g.lotes.map((l) => l.loteId))).toEqual([[4], [5], [3], [2], [1]]);
+  });
+
+  it("dentro de cada grupo ordena por código de lote y después por ubicación", () => {
+    const [grupo] = agruparElegibles(
+      lotesElegibles([
+        fila({ loteId: 2, loteCodigo: "26S-002", ubicacionId: 1, ubicacion: "G1-1" }),
+        fila({ loteId: 1, loteCodigo: "26S-001", ubicacionId: 3, ubicacion: "PLANTA" }),
+        fila({ loteId: 1, loteCodigo: "26S-001", ubicacionId: 2, ubicacion: "G1-2" }),
+      ]),
+    );
+    expect(grupo.lotes.map((l) => `${l.loteCodigo} ${l.ubicacion}`)).toEqual([
+      "26S-001 G1-2",
+      "26S-001 PLANTA",
+      "26S-002 G1-1",
+    ]);
   });
 });
 

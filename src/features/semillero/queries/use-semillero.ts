@@ -12,11 +12,15 @@ import type {
 } from "../types";
 import { semilleroKeys } from "./keys";
 
-/** Stock por lote × ubicación, con KPIs partidos Propio/Cliente (R4.2/R4.3). */
-export function useStockSemillero(filtros: StockFiltros) {
+/**
+ * Stock por lote × ubicación, con KPIs partidos Propio/Cliente (R4.2/R4.3). `habilitado` evita
+ * pedirlo mientras nadie lo necesita (p. ej. el stock completo del diálogo de orden, cerrado).
+ */
+export function useStockSemillero(filtros: StockFiltros, habilitado = true) {
   return useQuery({
     queryKey: semilleroKeys.stock(filtros),
     queryFn: async () => (await apiClient.get<StockSemilleroDto>("/semillero/stock", { params: filtros })).data,
+    enabled: habilitado,
     placeholderData: keepPreviousData,
   });
 }
