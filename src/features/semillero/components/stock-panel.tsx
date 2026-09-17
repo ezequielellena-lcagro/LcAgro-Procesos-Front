@@ -42,7 +42,8 @@ const oDash = (n: number | null, sufijo = "") => (n === null ? "—" : `${unidad
 /** Una orden sólo puede cargar lo que está disponible (R4.1). */
 const sePuedeOrdenar = (f: StockFilaDto) => f.disponible > 0;
 /** Por qué "Orden" está deshabilitado: sin este texto el botón gris no se explica. */
-const MOTIVO_SIN_DISPONIBLE = "Sin disponible para cargar en una orden.";
+const motivoSinOrden = (f: StockFilaDto) =>
+  sePuedeOrdenar(f) ? undefined : "Sin disponible para cargar en una orden.";
 
 /** ADR-13: la semilla de cliente se distingue visualmente, nunca se confunde con la propia. */
 const DUENIO_BADGE_CLS: Record<DuenioLote, string> = {
@@ -128,16 +129,21 @@ export function StockPanel({
       align: "right",
       cell: (f) => (
         <div className="flex justify-end gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={`Orden con ${f.loteCodigo} en ${f.ubicacion}`}
-            disabled={!sePuedeOrdenar(f)}
-            title={sePuedeOrdenar(f) ? undefined : MOTIVO_SIN_DISPONIBLE}
-            onClick={() => onOrden(f)}
-          >
-            Orden
-          </Button>
+          {/* Deshabilitado, el botón no recibe el mouse (`pointer-events-none`): el motivo va
+              también en el contenedor para que se vea el tooltip; en el botón queda como
+              descripción accesible. */}
+          <span className="inline-flex" title={motivoSinOrden(f)}>
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label={`Orden con ${f.loteCodigo} en ${f.ubicacion}`}
+              disabled={!sePuedeOrdenar(f)}
+              title={motivoSinOrden(f)}
+              onClick={() => onOrden(f)}
+            >
+              Orden
+            </Button>
+          </span>
           <Button variant="ghost" size="sm" aria-label={`Ingreso ${f.loteCodigo} en ${f.ubicacion}`} onClick={() => onMovimiento("ingreso", f)}>
             Ingreso
           </Button>

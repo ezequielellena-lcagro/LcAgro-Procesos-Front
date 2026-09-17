@@ -147,11 +147,15 @@ describe("StockPanel", () => {
     const sinDisponible = screen.getByRole("button", { name: "Orden con 26S-001 en G1-6" });
     expect(sinDisponible).toBeDisabled();
     expect(sinDisponible).toHaveAccessibleDescription("Sin disponible para cargar en una orden.");
+    // Hallazgo de la revisión (ronda 2): un botón deshabilitado no recibe el mouse
+    // (`pointer-events-none`), así que el tooltip tiene que salir de su contenedor.
+    expect(sinDisponible.parentElement).toHaveAttribute("title", "Sin disponible para cargar en una orden.");
     expect(screen.getByRole("button", { name: "Orden con 26S-002 en G1-6" })).toBeDisabled();
 
     const conDisponible = screen.getByRole("button", { name: "Orden con 26S-003 en G1-6" });
     expect(conDisponible).toBeEnabled();
     expect(conDisponible).not.toHaveAttribute("title");
+    expect(conDisponible.parentElement).not.toHaveAttribute("title");
   });
 
   it("al cambiar de especie se limpia la variedad elegida", () => {
