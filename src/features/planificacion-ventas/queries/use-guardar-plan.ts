@@ -14,9 +14,16 @@ export function useGuardarPlan() {
         )
       ).data,
     onSuccess: async () => {
-      const key = [...planificacionKeys.all, "plan-siembra"];
-      await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
-      queryClient.removeQueries({ queryKey: key, type: "inactive" });
+      for (const recurso of ["plan-siembra", "consolidado"]) {
+        const key = [...planificacionKeys.all, recurso];
+        if (recurso === "consolidado") {
+          // QueryCache.onError avisa si el GET falla; el PUT ya está confirmado.
+          void queryClient.invalidateQueries({ queryKey: key, refetchType: "active" });
+        } else {
+          await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+        }
+        queryClient.removeQueries({ queryKey: key, type: "inactive" });
+      }
     },
   });
 }

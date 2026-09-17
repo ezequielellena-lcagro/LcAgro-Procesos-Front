@@ -1,5 +1,5 @@
 import type { jsPDF as JsPdf } from "jspdf";
-import { numero, pct, usd } from "@/shared/format/format";
+import { numero, numero3, pct, usd } from "@/shared/format/format";
 import { calcularTotales, esNumerica, type ExportColumn, type ExportKpi, type ExportSpec } from "./export-types";
 
 // Dibuja las tarjetas de KPI (como en pantalla) en filas. Devuelve la Y debajo de las tarjetas.
@@ -70,6 +70,8 @@ function comoTexto<T>(col: ExportColumn<T>, v: string | number | null): string {
   switch (col.format) {
     case "number":
       return numero(Number(v));
+    case "number3":
+      return numero3(Number(v));
     case "usd":
       return usd(Number(v));
     case "percent":

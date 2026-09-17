@@ -1,5 +1,5 @@
 /** Formato de cada columna para los exportadores (Excel y PDF comparten la misma definición). */
-export type ExportFormat = "text" | "number" | "usd" | "percent";
+export type ExportFormat = "text" | "number" | "number3" | "usd" | "percent";
 
 export interface ExportColumn<T> {
   header: string;

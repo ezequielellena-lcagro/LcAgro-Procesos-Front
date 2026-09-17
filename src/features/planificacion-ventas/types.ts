@@ -85,3 +85,68 @@ export interface GuardarPlanRequest {
 export interface GuardarPlanResponse {
   guardados: { cuit: string; revision: number }[];
 }
+
+export interface HectareasConsolidado {
+  soja: number | null;
+  maiz: number | null;
+  trigo: number | null;
+  otro: number | null;
+  total: number;
+}
+
+export interface OriginacionConsolidado {
+  anterior: number;
+  campania: number;
+  total: number;
+  sorgo: number;
+  girasol: number;
+}
+
+export interface TotalesConsolidado {
+  hectareas: HectareasConsolidado;
+  mercadoUsd: number | null;
+  facturacionLcUsd: number;
+  facturacionLcAnteriorUsd: number;
+  variacionLc: number | null;
+  participacionLc: number | null;
+  originacionTn: OriginacionConsolidado;
+  potencialTn: number | null;
+}
+
+export interface FilaConsolidado extends Omit<TotalesConsolidado, "hectareas"> {
+  cuit: string;
+  razonSocial: string;
+  vendedorId: number | null;
+  vendedor: string | null;
+  sucursalId: number | null;
+  sucursal: string | null;
+  hectareas: HectareasConsolidado | null;
+  compraInsumos: "si" | "no" | "sin_originacion";
+}
+
+export interface SubtotalConsolidado {
+  id: number;
+  nombre: string;
+  totales: TotalesConsolidado;
+}
+
+export interface FueraDeCarteras {
+  facturacionLcUsd: number;
+  facturacionLcAnteriorUsd: number;
+  originacionTn: OriginacionConsolidado;
+  cuits: number;
+  cuentasSinCuit: number;
+}
+
+export interface ConsolidadoResponse {
+  campania: string;
+  datosMacroGestAl: string | null;
+  filas: FilaConsolidado[];
+  subtotalesSucursales: SubtotalConsolidado[];
+  subtotalesVendedores: SubtotalConsolidado[];
+  total: TotalesConsolidado;
+  totalGeneral: TotalesConsolidado;
+  fueraDeCarteras: FueraDeCarteras | null;
+  ajusteRedondeo: { campaniaUsd: number; anteriorUsd: number };
+  sinVendedor: boolean;
+}

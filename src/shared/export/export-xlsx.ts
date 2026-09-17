@@ -3,6 +3,7 @@ import { calcularTotales, esNumerica, type ExportColumn, type ExportKpi, type Ex
 // Formatos de número de Excel (se muestran con los separadores locales del Excel del usuario).
 const NUM_FMT: Record<Exclude<ExportColumn<unknown>["format"], "text" | undefined>, string> = {
   number: "#,##0.00",
+  number3: "#,##0.000",
   usd: '"US$" #,##0.00',
   percent: '#,##0.00"%"',
 };
