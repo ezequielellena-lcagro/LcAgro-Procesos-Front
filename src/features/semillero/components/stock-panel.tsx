@@ -91,6 +91,20 @@ export function StockPanel({
     { key: "tratada", header: "Tratamiento", cell: (f) => tratamientoEtiqueta(f.tratada) },
     { key: "pg", header: "PG", align: "right", cell: (f) => oDash(f.pg, " %") },
     { key: "pmil", header: "PMIL", align: "right", cell: (f) => oDash(f.pmil, " g") },
+    // En la campaña de trigo ahí se anotaban la línea comercial y el curado, que distinguen lotes
+    // por lo demás iguales: se ve en una línea y el texto completo queda en el title.
+    {
+      key: "observaciones",
+      header: "Obs.",
+      cell: (f) =>
+        f.observaciones ? (
+          <span className="block max-w-48 truncate" title={f.observaciones}>
+            {f.observaciones}
+          </span>
+        ) : (
+          "—"
+        ),
+    },
     { key: "fisico", header: "Físico", align: "right", sortBy: (f) => f.fisico, cell: (f) => unidades(f.fisico) },
     { key: "comprometido", header: "Reservado", align: "right", sortBy: (f) => f.comprometido, cell: (f) => unidades(f.comprometido) },
     {

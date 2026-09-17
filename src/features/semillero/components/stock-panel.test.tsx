@@ -94,6 +94,28 @@ describe("StockPanel", () => {
     expect(props.onEditarLote).toHaveBeenCalledWith(1);
   });
 
+  it("la columna Obs. muestra las observaciones en una línea, con el texto completo en el title (R5.1)", () => {
+    const observaciones = "Línea Premium. Curado con fungicida e insecticida, separado para el mismo cliente.";
+    renderPanel({
+      datos: datos([
+        fila({ loteId: 1, loteCodigo: "26S-001", observaciones }),
+        fila({ loteId: 2, loteCodigo: "26S-002", observaciones: null }),
+      ]),
+    });
+
+    const encabezados = screen.getAllByRole("columnheader").map((th) => th.textContent);
+    const columnaObs = encabezados.indexOf("Obs.");
+    expect(columnaObs).toBeGreaterThan(-1);
+    expect(columnaObs).toBeLessThan(encabezados.indexOf("Físico"));
+
+    const texto = screen.getByText(observaciones);
+    expect(texto).toHaveAttribute("title", observaciones);
+    expect(texto).toHaveClass("truncate");
+
+    const filaSinObs = screen.getByText("26S-002").closest("tr") as HTMLElement;
+    expect(within(filaSinObs).getAllByRole("cell")[columnaObs]).toHaveTextContent(/^—$/);
+  });
+
   it('"Orden" arma una orden con el lote y la ubicación de la fila (R4.1)', () => {
     const propio = fila({ loteId: 1, loteCodigo: "26S-001" });
     const deCliente = fila({
