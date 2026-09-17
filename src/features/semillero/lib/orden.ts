@@ -1,4 +1,4 @@
-import type { EnvaseSemillero, StockFilaDto } from "../types";
+import type { ClienteCopiaDto, EnvaseSemillero, StockFilaDto } from "../types";
 import { envaseEtiqueta, productoEtiqueta, tratamientoEtiqueta } from "./etiquetas-lote";
 
 export interface RenglonEditable {
@@ -99,6 +99,23 @@ export function filtrarElegibles(elegibles: LoteElegible[], filtros: FiltrosEleg
       (filtros.tratada === undefined || e.tratada === filtros.tratada) &&
       (filtros.envase === undefined || e.envase === filtros.envase),
   );
+}
+
+/** Los filtros del diálogo que dejan a la vista el producto de una fila de Stock (botón "Orden", R4.2). */
+export const filtrosDeFila = (f: StockFilaDto): FiltrosElegibles => ({
+  variedadId: f.variedadId,
+  tratada: f.tratada,
+  envase: f.envase,
+});
+
+/**
+ * Cliente con el que arranca una orden armada desde una fila de Stock (R4.3): el dueño del lote,
+ * sólo si está en la copia de clientes activos. Un cliente dado de baja nunca se usa, así que en ese
+ * caso (o si el lote es propio) no hay cliente para precargar.
+ */
+export function clienteActivoDeLote(fila: StockFilaDto | null, clientes: ClienteCopiaDto[]): number | null {
+  if (fila?.duenio !== "Cliente") return null;
+  return clientes.some((c) => c.numero === fila.clienteNumero) ? fila.clienteNumero : null;
 }
 
 // Una sola instancia: se usa en cada comparación al ordenar.

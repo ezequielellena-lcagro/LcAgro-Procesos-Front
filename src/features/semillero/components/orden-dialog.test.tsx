@@ -120,6 +120,7 @@ interface RenderOpts {
   filas?: StockFilaDto[];
   destinos?: DestinoDto[];
   clientes?: ClienteCopiaDto[];
+  filaOrigen?: StockFilaDto | null;
 }
 
 function renderDialog(opts: RenderOpts = {}) {
@@ -138,6 +139,7 @@ function renderDialog(opts: RenderOpts = {}) {
       actualizandoClientes={false}
       onActualizarClientes={onActualizarClientes}
       filas={opts.filas ?? [PROPIO, CLIENTE_500]}
+      filaOrigen={opts.filaOrigen ?? null}
       destinos={opts.destinos ?? DESTINOS_500}
       onClienteChange={onClienteChange}
       onAgregarDestino={onAgregarDestino}
@@ -525,6 +527,75 @@ describe("OrdenDialog", () => {
     // Volver a ampliar el filtro no resucita la elección que se había limpiado.
     fireEvent.change(screen.getByLabelText("Tratamiento"), { target: { value: "" } });
     expect(selector).toHaveValue("");
+  });
+
+  it("desde una fila propia de Stock arranca con sus filtros y ese lote elegido, sin cliente (R4.2)", () => {
+    renderDialog({ filas: [PROPIO, PROPIO_TRATADO, PROPIO_OTRA_VARIEDAD], filaOrigen: PROPIO });
+
+    expect(screen.getByLabelText("Variedad")).toHaveValue("1");
+    expect(screen.getByLabelText("Tratamiento")).toHaveValue("false");
+    expect(screen.getByLabelText("Envase")).toHaveValue("BigBag");
+    expect(lotesOfrecidos()).toEqual(["26S-001"]);
+    expect(screen.getByLabelText("Agregar renglón")).toHaveValue("1:1");
+    expect(screen.getByLabelText("Cantidad")).toHaveValue(null); // la cantidad la tipea el usuario
+    expect(screen.getByLabelText("Cliente")).toHaveValue("");
+  });
+
+  it("desde una fila de un cliente activo arranca con ese cliente y su lote elegidos (R4.3)", async () => {
+    const { onCrear } = renderDialog({ filaOrigen: CLIENTE_500 });
+
+    expect(screen.getByLabelText("Cliente")).toHaveValue("500 · Cliente Uno");
+    expect(screen.getByLabelText("Agregar renglón")).toHaveValue("2:2");
+    expect(screen.getByLabelText("Destino")).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText("Destino"), { target: { value: "10" } });
+    fireEvent.change(screen.getByLabelText("Cantidad"), { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() =>
+      expect(onCrear).toHaveBeenCalledWith(
+        expect.objectContaining({ clienteNumero: 500, items: [{ loteId: 2, ubicacionId: 2, cantidad: 3 }] }),
+      ),
+    );
+  });
+
+  it("desde una fila de un cliente que no está activo no preselecciona nada y avisa por qué (R4.3)", async () => {
+    const deClienteDeBaja = fila({
+      loteId: 5,
+      loteCodigo: "26S-C09",
+      ubicacionId: 5,
+      ubicacion: "G1-5",
+      duenio: "Cliente",
+      clienteNumero: 700,
+      clienteDenominacion: "Cliente Dado de Baja",
+    });
+    const { onCrear } = renderDialog({ filas: [PROPIO, deClienteDeBaja], filaOrigen: deClienteDeBaja });
+
+    expect(
+      screen.getByText(
+        "El lote es de un cliente que no está activo en la copia de MacroGest: no se puede cargar en una orden.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Cliente")).toHaveValue("");
+    expect(screen.getByLabelText("Destino")).toBeDisabled();
+    expect(screen.getByLabelText("Agregar renglón")).toHaveValue("");
+    expect(lotesOfrecidos()).not.toContain("26S-C09");
+
+    // El formulario tampoco tiene un cliente escondido: guardar pide elegirlo.
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    expect(await screen.findByText("Elegí el cliente.")).toBeInTheDocument();
+    expect(onCrear).not.toHaveBeenCalled();
+  });
+
+  it("al editar una orden no se usa la fila de origen (R4.4)", () => {
+    renderDialog({ orden: ORDEN_EDITABLE, filaOrigen: PROPIO });
+
+    expect(screen.getByLabelText("Variedad")).toHaveValue("");
+    expect(screen.getByLabelText("Tratamiento")).toHaveValue("");
+    expect(screen.getByLabelText("Envase")).toHaveValue("");
+    expect(screen.getByLabelText("Agregar renglón")).toHaveValue("");
+    expect(screen.getByLabelText("Cliente")).toHaveValue("500 · Cliente Uno");
   });
 
   it("muestra el error del servidor dentro del diálogo", async () => {

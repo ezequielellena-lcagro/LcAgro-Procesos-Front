@@ -13,6 +13,7 @@ import { OrdenesPanel } from "../components/ordenes-panel";
 import { SemilleroKpis } from "../components/semillero-kpis";
 import type { OperacionStock } from "../components/stock-panel";
 import { StockPanel } from "../components/stock-panel";
+import { clienteActivoDeLote } from "../lib/orden";
 import { useDestinos, useCrearDestino, useGuardarDestino } from "../queries/use-destinos";
 import { useClientesSemillero, useSincronizarClientes } from "../queries/use-clientes-semillero";
 import { useExportarMovimientos, useExportarOrdenes, useExportarStock } from "../queries/use-semillero-excel";
@@ -86,7 +87,9 @@ export function SemilleroPage() {
   const [movimiento, setMovimiento] = useState<{ operacion: OperacionStock; fila: StockFilaDto } | null>(null);
   const [ordenDialogAbierto, setOrdenDialogAbierto] = useState(false);
   const [ordenEditando, setOrdenEditando] = useState<OrdenCargaDto | null>(null);
-  const [clienteFormularioOrden, setClienteFormularioOrden] = useState<number | null>(null);
+  const [filaOrigenOrden, setFilaOrigenOrden] = useState<StockFilaDto | null>(null);
+  // `undefined` = el formulario todavía no cambió el cliente: vale el inicial de la orden.
+  const [clienteFormularioOrden, setClienteFormularioOrden] = useState<number | null | undefined>(undefined);
   const [ordenImprimiendo, setOrdenImprimiendo] = useState<OrdenCargaDto | null>(null);
   const [clienteCatalogoElegido, setClienteCatalogoElegido] = useState<number | null>(null);
 
@@ -102,10 +105,17 @@ export function SemilleroPage() {
   const movimientos = useMovimientosSemillero(movimientosFiltros, pestania === "movimientos");
   const catalogos = useCatalogosSemillero();
   const clientes = useClientesSemillero(clientesHabilitado);
+  const listaClientes = clientes.data?.clientes ?? [];
+  // Al editar, el cliente de la orden; desde una fila de Stock, su dueño sólo si está activo (R4.3):
+  // de un cliente dado de baja no se piden ni sus destinos.
+  const clienteInicialOrden = ordenEditando
+    ? ordenEditando.clienteNumero
+    : clienteActivoDeLote(filaOrigenOrden, listaClientes);
+  const clienteOrden = clienteFormularioOrden === undefined ? clienteInicialOrden : clienteFormularioOrden;
   // Todos los atributos del lote, incluidos duenioEditable/envaseYPesoEditables (ausentes en las
   // filas de stock): sólo hace falta al editar uno existente.
   const lotes = useLotesSemillero(loteDialogAbierto && loteEditandoId !== null);
-  const destinosOrden = useDestinos(clienteFormularioOrden ?? undefined);
+  const destinosOrden = useDestinos(clienteOrden ?? undefined);
   const destinosCatalogo = useDestinos(clienteCatalogoElegido ?? undefined, true);
 
   const sincronizarClientes = useSincronizarClientes();
@@ -120,7 +130,7 @@ export function SemilleroPage() {
   const anularOrden = useAnularOrden();
   const guardarVariedad = useGuardarVariedad();
   const guardarUbicacion = useGuardarUbicacion();
-  const crearDestinoOrden = useCrearDestino(clienteFormularioOrden ?? 0);
+  const crearDestinoOrden = useCrearDestino(clienteOrden ?? 0);
   const crearDestinoCatalogo = useCrearDestino(clienteCatalogoElegido ?? 0);
   const guardarDestinoCatalogo = useGuardarDestino(clienteCatalogoElegido ?? 0);
 
@@ -147,20 +157,20 @@ export function SemilleroPage() {
     setLoteEditandoId(null);
   };
 
-  const abrirNuevaOrden = () => {
-    setOrdenEditando(null);
-    setClienteFormularioOrden(null);
-    setOrdenDialogAbierto(true);
-  };
-  const abrirEditarOrden = (orden: OrdenCargaDto) => {
+  const abrirOrden = (orden: OrdenCargaDto | null, filaOrigen: StockFilaDto | null) => {
     setOrdenEditando(orden);
-    setClienteFormularioOrden(orden.clienteNumero);
+    setFilaOrigenOrden(filaOrigen);
+    setClienteFormularioOrden(undefined);
     setOrdenDialogAbierto(true);
   };
+  const abrirNuevaOrden = () => abrirOrden(null, null);
+  const abrirEditarOrden = (orden: OrdenCargaDto) => abrirOrden(orden, null);
+  const abrirOrdenDesdeStock = (fila: StockFilaDto) => abrirOrden(null, fila);
   const cerrarOrdenDialog = () => {
     setOrdenDialogAbierto(false);
     setOrdenEditando(null);
-    setClienteFormularioOrden(null);
+    setFilaOrigenOrden(null);
+    setClienteFormularioOrden(undefined);
   };
 
   const loteParaEditar =
@@ -172,10 +182,12 @@ export function SemilleroPage() {
   // Mismo criterio para la orden: sin el stock completo, un renglón se vería vacío y con un
   // "Supera lo disponible" que no es real (R1.2).
   const filasOrden = stockOrden.data?.filas;
-  const ordenDialogListoParaAbrir = ordenDialogAbierto && filasOrden !== undefined;
+  // Desde una fila de un Cliente, además, hay que saber si ese cliente está activo antes de armar el
+  // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla.
+  const esperandoClientes = filaOrigenOrden?.duenio === "Cliente" && clientes.isPending;
+  const ordenDialogListoParaAbrir = ordenDialogAbierto && filasOrden !== undefined && !esperandoClientes;
 
   const copiaClientes = clientes.data?.copia ?? COPIA_CLIENTES_CARGANDO;
-  const listaClientes = clientes.data?.clientes ?? [];
 
   return (
     <>
@@ -232,6 +244,7 @@ export function SemilleroPage() {
                 onNuevoLote={abrirNuevoLote}
                 onEditarLote={abrirEditarLote}
                 onMovimiento={(operacion, fila) => setMovimiento({ operacion, fila })}
+                onOrden={abrirOrdenDesdeStock}
                 onExcel={() => exportarStock.mutate(stockFiltros)}
                 descargando={exportarStock.isPending}
               />
@@ -320,6 +333,7 @@ export function SemilleroPage() {
         actualizandoClientes={sincronizarClientes.isPending}
         onActualizarClientes={() => sincronizarClientes.mutate()}
         filas={filasOrden ?? []}
+        filaOrigen={filaOrigenOrden}
         destinos={destinosOrden.data ?? []}
         onClienteChange={setClienteFormularioOrden}
         onAgregarDestino={(nombre) => crearDestinoOrden.mutateAsync({ nombre })}

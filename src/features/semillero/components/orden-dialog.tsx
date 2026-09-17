@@ -13,6 +13,7 @@ import { kg, unidades } from "../format";
 import { normalizarComprobante } from "../lib/comprobante";
 import { duenioEtiqueta, productoEtiqueta } from "../lib/etiquetas-lote";
 import {
+  clienteActivoDeLote,
   excedidos,
   lotesElegibles,
   mismaClave,
@@ -65,9 +66,9 @@ function esquema() {
   });
 }
 
-function aValues(orden: OrdenCargaDto | null): Values {
+function aValues(orden: OrdenCargaDto | null, clienteDeAlta: number | null): Values {
   if (!orden) {
-    return { clienteNumero: null, destinoId: null, numeroPedidoVenta: "", observaciones: "" };
+    return { clienteNumero: clienteDeAlta, destinoId: null, numeroPedidoVenta: "", observaciones: "" };
   }
   return {
     clienteNumero: orden.clienteNumero,
@@ -96,6 +97,11 @@ interface Props {
    * estar siempre (si no, el renglón queda sin datos y su máximo en 0).
    */
   filas: StockFilaDto[];
+  /**
+   * Fila de Stock desde la que se pidió la orden (botón "Orden", R4): prefija los filtros, el lote y,
+   * si es de un cliente activo, el cliente. Sólo cuenta para un alta.
+   */
+  filaOrigen?: StockFilaDto | null;
   /** Destinos del cliente elegido en el formulario (R1.3); el padre los mantiene al día con `onClienteChange`. */
   destinos: DestinoDto[];
   onClienteChange?: (clienteNumero: number | null) => void;
@@ -136,6 +142,7 @@ function OrdenForm({
   actualizandoClientes,
   onActualizarClientes,
   filas,
+  filaOrigen = null,
   destinos,
   onClienteChange,
   onAgregarDestino,
@@ -152,7 +159,16 @@ function OrdenForm({
   // la propia cantidad recién tipeada y el chequeo de "excede lo disponible" quedaría tautológico.
   const [reservaOriginal] = useState<RenglonEditable[]>(() => aRenglones(orden));
 
-  const form = useForm<Values>({ resolver: zodResolver(esquema()), defaultValues: aValues(orden) });
+  const loteInicial = esAlta ? filaOrigen : null;
+  // Foto fija, como `reservaOriginal`: el formulario arranca una sola vez con este cliente, y el aviso
+  // de cliente inactivo tiene que describir ESE arranque aunque la copia de clientes se refresque.
+  const [clienteDeAlta] = useState(() => clienteActivoDeLote(loteInicial, clientes));
+  const loteDeClienteInactivo = loteInicial?.duenio === "Cliente" && clienteDeAlta === null;
+
+  const form = useForm<Values>({
+    resolver: zodResolver(esquema()),
+    defaultValues: aValues(orden, clienteDeAlta),
+  });
   const { errors, isSubmitting } = form.formState;
 
   // `useWatch`, no `form.watch()`: el compilador de React no puede memoizar `watch`, y acá hace falta
@@ -219,6 +235,11 @@ function OrdenForm({
         onActualizar={onActualizarClientes}
         actualizando={actualizandoClientes}
       />
+      {loteDeClienteInactivo && (
+        <p className="rounded-card border border-rojo/30 bg-rojo-bg px-3 py-2 text-sm text-rojo">
+          El lote es de un cliente que no está activo en la copia de MacroGest: no se puede cargar en una orden.
+        </p>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Campo id="clienteNumero" label="Cliente" error={errors.clienteNumero?.message}>
@@ -336,6 +357,7 @@ function OrdenForm({
           elegibles={elegibles}
           renglones={renglones}
           hayCliente={clienteNumero !== null}
+          loteInicial={loteInicial}
           onAgregar={agregarRenglon}
         />
 

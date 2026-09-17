@@ -8,13 +8,14 @@ import { duenioEtiqueta, recortar } from "../lib/etiquetas-lote";
 import {
   agruparElegibles,
   filtrarElegibles,
+  filtrosDeFila,
   mismaClave,
   variedadesDeElegibles,
   type FiltrosElegibles,
   type LoteElegible,
   type RenglonEditable,
 } from "../lib/orden";
-import { ENVASES, type EnvaseSemillero } from "../types";
+import { ENVASES, type EnvaseSemillero, type StockFilaDto } from "../types";
 
 /** Largo de las observaciones dentro de una opción: el texto completo se ve al elegirla (R2.2). */
 const LARGO_OBSERVACIONES_EN_OPCION = 40;
@@ -43,6 +44,8 @@ interface Props {
   /** Lo ya cargado en la orden: no se vuelve a ofrecer. */
   renglones: RenglonEditable[];
   hayCliente: boolean;
+  /** Fila de Stock con la que arranca: sus filtros y ese lote × ubicación ya elegido (R4.2). */
+  loteInicial?: StockFilaDto | null;
   onAgregar: (renglon: RenglonEditable) => void;
 }
 
@@ -52,9 +55,10 @@ interface Props {
  * ellos. Las opciones van agrupadas por producto y cada lote muestra su disponible (R2.1), para no
  * cargar, por ejemplo, semilla tratada cuando la pidieron sin tratar.
  */
-export function AgregarRenglon({ elegibles, renglones, hayCliente, onAgregar }: Props) {
-  const [filtros, setFiltros] = useState<FiltrosElegibles>({});
-  const [clave, setClave] = useState("");
+export function AgregarRenglon({ elegibles, renglones, hayCliente, loteInicial, onAgregar }: Props) {
+  const [filtros, setFiltros] = useState<FiltrosElegibles>(() => (loteInicial ? filtrosDeFila(loteInicial) : {}));
+  // La cantidad no se precarga: la tipea el usuario.
+  const [clave, setClave] = useState(() => (loteInicial ? claveDe(loteInicial) : ""));
   const [cantidadTexto, setCantidadTexto] = useState("");
   const [error, setError] = useState<string | null>(null);
 

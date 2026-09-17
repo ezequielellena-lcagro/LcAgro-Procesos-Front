@@ -55,6 +55,7 @@ function renderPanel(over: Partial<Parameters<typeof StockPanel>[0]> = {}) {
     onNuevoLote: vi.fn(),
     onEditarLote: vi.fn(),
     onMovimiento: vi.fn(),
+    onOrden: vi.fn(),
     onExcel: vi.fn(),
     descargando: false,
     ...over,
@@ -91,6 +92,37 @@ describe("StockPanel", () => {
     expect(props.onMovimiento).toHaveBeenNthCalledWith(2, "ajuste", expect.objectContaining({ loteId: 1 }));
     expect(props.onMovimiento).toHaveBeenNthCalledWith(3, "reubicacion", expect.objectContaining({ loteId: 1 }));
     expect(props.onEditarLote).toHaveBeenCalledWith(1);
+  });
+
+  it('"Orden" arma una orden con el lote y la ubicación de la fila (R4.1)', () => {
+    const propio = fila({ loteId: 1, loteCodigo: "26S-001" });
+    const deCliente = fila({
+      loteId: 2,
+      loteCodigo: "26S-C01",
+      ubicacionId: 3,
+      ubicacion: "PLANTA",
+      duenio: "Cliente",
+      clienteNumero: 1234,
+      clienteDenominacion: "Juan Pérez",
+    });
+    const props = renderPanel({ datos: datos([propio, deCliente]) });
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-6" }));
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+
+    expect(props.onOrden).toHaveBeenNthCalledWith(1, propio);
+    expect(props.onOrden).toHaveBeenNthCalledWith(2, deCliente);
+  });
+
+  it('"Orden" queda deshabilitado si la fila no tiene disponible (R4.1)', () => {
+    renderPanel({
+      datos: datos([
+        fila({ loteId: 1, loteCodigo: "26S-001", fisico: 3, comprometido: 3, disponible: 0, kgDisponibles: 0 }),
+        fila({ loteId: 2, loteCodigo: "26S-002", fisico: 1, comprometido: 3, disponible: -2, kgDisponibles: -1600 }),
+      ]),
+    });
+    expect(screen.getByRole("button", { name: "Orden con 26S-001 en G1-6" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Orden con 26S-002 en G1-6" })).toBeDisabled();
   });
 
   it("al cambiar de especie se limpia la variedad elegida", () => {

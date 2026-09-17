@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { env } from "@/lib/env";
 import { semilleroHandlers } from "@/mocks/handlers/semillero";
 import { semilleroKeys } from "../queries/keys";
+import type { StockFilaDto, StockSemilleroDto } from "../types";
 import { SemilleroPage } from "./semillero-page";
 
 /**
@@ -234,5 +235,89 @@ describe("SemilleroPage", () => {
 
     const dialogo = await screen.findByRole("dialog", { name: "Editar lote 26S-C01" });
     expect(within(dialogo).getByLabelText("Código de lote")).toHaveValue("26S-C01");
+  });
+  it('"Orden" en una fila propia de Stock abre una orden nueva con ese lote y sus filtros (R4.2/R4.4)', async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).getByLabelText("Agregar renglón")).toHaveValue("1:1");
+    expect(within(dialogo).getByLabelText("Variedad")).toHaveValue("1");
+    expect(within(dialogo).getByLabelText("Tratamiento")).toHaveValue("true");
+    expect(within(dialogo).getByLabelText("Envase")).toHaveValue("BigBag");
+    expect(within(dialogo).getByLabelText("Cliente")).toHaveValue("");
+
+    // "Nueva orden" desde la pestaña Órdenes sigue arrancando sin filtros ni lote elegido.
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cancelar" }));
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Nueva orden" }));
+
+    const nueva = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(nueva).getByLabelText("Agregar renglón")).toHaveValue("");
+    expect(within(nueva).getByLabelText("Variedad")).toHaveValue("");
+    expect(within(nueva).getByLabelText("Tratamiento")).toHaveValue("");
+    expect(within(nueva).getByLabelText("Envase")).toHaveValue("");
+  });
+
+  it('"Orden" en una fila de un cliente activo espera la copia de clientes, lo preselecciona y pide sus destinos (R4.3)', async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+
+    // La pestaña Stock no pide la copia de clientes: el diálogo tiene que esperarla para saber si
+    // el dueño del lote está activo.
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).getByLabelText("Cliente")).toHaveValue("900001 · VIVERO DEMO SANTA ROSA SA");
+    expect(within(dialogo).getByLabelText("Agregar renglón")).toHaveValue("3:3");
+    expect(within(dialogo).queryByText(/no está activo en la copia de MacroGest/)).not.toBeInTheDocument();
+    expect(await within(dialogo).findByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
+  });
+
+  it('"Orden" en una fila de un cliente dado de baja avisa y no pide sus destinos (R4.3)', async () => {
+    // El 900004 de la fixture está inactivo: nunca viene en la copia de clientes.
+    const deClienteDeBaja: StockFilaDto = {
+      loteId: 90,
+      loteCodigo: "26S-B01",
+      campania: "2026-2027",
+      especie: "Soja",
+      variedadId: 1,
+      variedad: "DM 53i54",
+      envase: "BigBag",
+      pesoUnitarioKg: 800,
+      tratada: false,
+      pg: null,
+      pmil: null,
+      observaciones: null,
+      duenio: "Cliente",
+      clienteNumero: 900004,
+      clienteDenominacion: "ESTANCIA DEMO LA BAJADA (BAJA)",
+      ubicacionId: 2,
+      ubicacion: "G1-2",
+      fisico: 5,
+      comprometido: 0,
+      disponible: 5,
+      kgDisponibles: 4000,
+    };
+    const sinTotales = { bigBagsDisponibles: 0, bolsasDisponibles: 0, kgDisponibles: 0 };
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, () =>
+        HttpResponse.json({
+          filas: [deClienteDeBaja],
+          totales: { propio: sinTotales, clientes: sinTotales, kgComprometidos: 0, ordenesPendientes: 0 },
+        } satisfies StockSemilleroDto),
+      ),
+    );
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-B01 en G1-2" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).getByText(/no está activo en la copia de MacroGest/)).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText("Cliente")).toHaveValue("");
+    expect(queryClient.getQueryState(semilleroKeys.destinos(900004, false))).toBeUndefined();
   });
 });

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { StockFilaDto } from "../types";
+import type { ClienteCopiaDto, StockFilaDto } from "../types";
 import {
   agruparElegibles,
+  clienteActivoDeLote,
   excedidos,
   filtrarElegibles,
+  filtrosDeFila,
   lotesElegibles,
   renglonesDeOtroCliente,
   totalesOrden,
@@ -135,6 +137,30 @@ describe("agruparElegibles", () => {
       "26S-001 PLANTA",
       "26S-002 G1-1",
     ]);
+  });
+});
+
+describe("armar una orden desde una fila de Stock (R4)", () => {
+  const clientesActivos: ClienteCopiaDto[] = [{ numero: 500, denominacion: "Cliente A", cuit: null }];
+
+  it("los filtros del diálogo quedan en la variedad, el tratamiento y el envase de la fila", () => {
+    const origen = fila({ variedadId: 7, tratada: true, envase: "Bolsa" });
+    expect(filtrosDeFila(origen)).toEqual({ variedadId: 7, tratada: true, envase: "Bolsa" });
+  });
+
+  it("un lote propio no preselecciona cliente", () => {
+    expect(clienteActivoDeLote(fila(), clientesActivos)).toBeNull();
+    expect(clienteActivoDeLote(null, clientesActivos)).toBeNull();
+  });
+
+  it("un lote de un cliente activo preselecciona ese cliente", () => {
+    const deClienteA = fila({ duenio: "Cliente", clienteNumero: 500, clienteDenominacion: "Cliente A" });
+    expect(clienteActivoDeLote(deClienteA, clientesActivos)).toBe(500);
+  });
+
+  it("un lote de un cliente que no está en la copia de activos no preselecciona nada", () => {
+    const deClienteDeBaja = fila({ duenio: "Cliente", clienteNumero: 900, clienteDenominacion: "De baja" });
+    expect(clienteActivoDeLote(deClienteDeBaja, clientesActivos)).toBeNull();
   });
 });
 

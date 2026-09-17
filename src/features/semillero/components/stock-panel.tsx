@@ -31,6 +31,8 @@ interface Props {
   onNuevoLote: () => void;
   onEditarLote: (loteId: number) => void;
   onMovimiento: (operacion: OperacionStock, fila: StockFilaDto) => void;
+  /** Arma una orden nueva a partir de la fila, como en SeedStock (R4). */
+  onOrden: (fila: StockFilaDto) => void;
   onExcel: () => void;
   descargando: boolean;
 }
@@ -53,6 +55,7 @@ export function StockPanel({
   onNuevoLote,
   onEditarLote,
   onMovimiento,
+  onOrden,
   onExcel,
   descargando,
 }: Props) {
@@ -106,6 +109,15 @@ export function StockPanel({
       align: "right",
       cell: (f) => (
         <div className="flex justify-end gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={`Orden con ${f.loteCodigo} en ${f.ubicacion}`}
+            disabled={f.disponible <= 0}
+            onClick={() => onOrden(f)}
+          >
+            Orden
+          </Button>
           <Button variant="ghost" size="sm" aria-label={`Ingreso ${f.loteCodigo} en ${f.ubicacion}`} onClick={() => onMovimiento("ingreso", f)}>
             Ingreso
           </Button>
