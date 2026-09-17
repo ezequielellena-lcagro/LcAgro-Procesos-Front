@@ -21,9 +21,10 @@ beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers(...semilleroHandlers));
 afterAll(() => server.close());
 
-function renderPagina() {
+/** `staleTime`: el de la app (`lib/query-client.ts`) cuando el test depende de si la caché está al día. */
+function renderPagina({ staleTime = 0 }: { staleTime?: number } = {}) {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: { queries: { retry: false, staleTime }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
@@ -105,6 +106,22 @@ describe("SemilleroPage", () => {
     );
   }
 
+  /** Demora la respuesta del stock completo (sin filtros) hasta llamar a la función que devuelve. */
+  function demorarStockCompleto() {
+    let liberar = () => {};
+    const demora = new Promise<void>((resolver) => (liberar = resolver));
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, async ({ request }) => {
+        if (new URL(request.url).search === "") await demora;
+        // Sin respuesta propia: sigue al handler de la fixture.
+      }),
+    );
+    return liberar;
+  }
+
+  const estadoStockCompleto = (queryClient: QueryClient) =>
+    queryClient.getQueryState(semilleroKeys.stock({}))?.fetchStatus;
+
   /**
    * Regresión (ajuste 1.1, R1.3): el diálogo de orden recibía el stock YA FILTRADO de la pestaña
    * Stock. Con un filtro que dejaba afuera el lote de una orden pendiente, al editarla el renglón
@@ -144,26 +161,107 @@ describe("SemilleroPage", () => {
     // `resetQueries` (no `removeQueries`): deja el query sin datos, sin que `keepPreviousData`
     // recupere los que el observer ya había visto.
     await queryClient.resetQueries({ queryKey: semilleroKeys.stock({}), exact: true });
-    let liberarStock = () => {};
-    const stockDemorado = new Promise<void>((resolver) => (liberarStock = resolver));
-    server.use(
-      http.get(`${env.apiUrl}/semillero/stock`, async ({ request }) => {
-        if (new URL(request.url).search === "") await stockDemorado;
-        // Sin respuesta propia: sigue al handler de la fixture.
-      }),
-    );
+    const liberarStock = demorarStockCompleto();
 
     fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Editar orden N° 1" }));
 
-    await waitFor(() =>
-      expect(queryClient.getQueryState(semilleroKeys.stock({}))?.fetchStatus).toBe("fetching"),
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("fetching"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Preparando la orden…")).toBeInTheDocument();
+
+    liberarStock();
+    const dialogo = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
+    expect(within(dialogo).getByText(/^Lote 26S-C01 · PLANTA/)).toBeInTheDocument();
+    expect(screen.queryByText("Preparando la orden…")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Hallazgo de la revisión (ronda 1): la caché del stock completo casi nunca está vacía (la pestaña
+   * Stock arranca sin filtros y la llena), pero con el diálogo cerrado nadie la vuelve a pedir. Abrir
+   * con esa copia mostraba el renglón de un lote nuevo vacío y con "Supera lo disponible".
+   */
+  it("aunque haya una copia del stock completo en caché, el diálogo espera la que pide al abrir (R1.2)", async () => {
+    const { queryClient } = renderPagina({ staleTime: 60_000 });
+    await screen.findByText("BigBags propios");
+    await filtrarStockSoloPropio();
+
+    // Copia de hace un segundo (todavía "fresca" para la caché) sin el lote de la orden N° 1: por
+    // ejemplo, otro usuario cargó ese lote y la orden después.
+    queryClient.setQueryData<StockSemilleroDto>(
+      semilleroKeys.stock({}),
+      (d) => d && { ...d, filas: d.filas.filter((f) => f.loteCodigo !== "26S-C01") },
+      { updatedAt: Date.now() - 1000 },
     );
+    const liberarStock = demorarStockCompleto();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Editar orden N° 1" }));
+
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("fetching"));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
     liberarStock();
     const dialogo = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
     expect(within(dialogo).getByText(/^Lote 26S-C01 · PLANTA/)).toBeInTheDocument();
+    expect(within(dialogo).queryByText("Supera lo disponible.")).not.toBeInTheDocument();
+  });
+
+  it("volver a pedir el stock completo con el diálogo abierto no lo cierra ni pierde lo cargado (R1.2)", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Nueva orden" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    fireEvent.change(within(dialogo).getByLabelText("Observaciones"), {
+      target: { value: "Llevar lona." },
+    });
+
+    // Lo mismo que hace cualquier escritura del módulo.
+    const liberarStock = demorarStockCompleto();
+    void queryClient.invalidateQueries({ queryKey: semilleroKeys.all });
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("fetching"));
+    expect(screen.getByRole("dialog", { name: "Nueva orden de carga" })).toBeInTheDocument();
+
+    liberarStock();
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("idle"));
+    const sigueAbierto = screen.getByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(sigueAbierto).getByLabelText("Observaciones")).toHaveValue("Llevar lona.");
+  });
+
+  it("si falla el stock completo al pedir la orden, avisa sin tapar la página y deja reintentar o cancelar (R1.2)", async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+    await filtrarStockSoloPropio();
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, ({ request }) =>
+        new URL(request.url).search === ""
+          ? HttpResponse.json({ detail: "Stock no disponible." }, { status: 400 })
+          : undefined,
+      ),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+
+    const aviso = await screen.findByRole("alert");
+    expect(aviso).toHaveTextContent("No se pudo traer el stock para armar la orden: Stock no disponible.");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    // La página sigue ahí: pestañas y tabla filtrada.
+    expect(screen.getByRole("tab", { name: "Stock" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar lote 26S-001" })).toBeInTheDocument();
+
+    fireEvent.click(within(aviso).getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    // Con el backend repuesto, "Reintentar" abre la orden que se había pedido.
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
+    const otroAviso = await screen.findByRole("alert");
+    server.resetHandlers(...semilleroHandlers);
+    fireEvent.click(within(otroAviso).getByRole("button", { name: "Reintentar" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).getByLabelText("Agregar renglón")).toHaveValue("1:1");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   /**

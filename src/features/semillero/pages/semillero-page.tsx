@@ -10,6 +10,7 @@ import { MovimientosPanel } from "../components/movimientos-panel";
 import { OrdenDialog } from "../components/orden-dialog";
 import { OrdenImprimible } from "../components/orden-imprimible";
 import { OrdenesPanel } from "../components/ordenes-panel";
+import { PedidoOrdenAviso } from "../components/pedido-orden-aviso";
 import { SemilleroKpis } from "../components/semillero-kpis";
 import type { OperacionStock } from "../components/stock-panel";
 import { StockPanel } from "../components/stock-panel";
@@ -55,6 +56,16 @@ type Pestania = "stock" | "ordenes" | "movimientos" | "catalogos";
  */
 const STOCK_COMPLETO: StockFiltros = {};
 
+/**
+ * Pedido de abrir el diálogo de orden (alta, edición o desde una fila de Stock). `pedidoEn` marca
+ * desde cuándo vale el stock completo: el diálogo abre recién con datos recibidos después (R1.2).
+ */
+interface PedidoOrden {
+  orden: OrdenCargaDto | null;
+  filaOrigen: StockFilaDto | null;
+  pedidoEn: number;
+}
+
 /** Mientras la copia de clientes todavía no se pidió (o sigue en camino), se asume lo más cauto. */
 const COPIA_CLIENTES_CARGANDO: EstadoCopiaClientesDto = {
   ultimaSincronizacion: null,
@@ -85,13 +96,15 @@ export function SemilleroPage() {
   const [loteDialogAbierto, setLoteDialogAbierto] = useState(false);
   const [loteEditandoId, setLoteEditandoId] = useState<number | null>(null);
   const [movimiento, setMovimiento] = useState<{ operacion: OperacionStock; fila: StockFilaDto } | null>(null);
-  const [ordenDialogAbierto, setOrdenDialogAbierto] = useState(false);
-  const [ordenEditando, setOrdenEditando] = useState<OrdenCargaDto | null>(null);
-  const [filaOrigenOrden, setFilaOrigenOrden] = useState<StockFilaDto | null>(null);
+  const [pedidoOrden, setPedidoOrden] = useState<PedidoOrden | null>(null);
   // `undefined` = el formulario todavía no cambió el cliente: vale el inicial de la orden.
   const [clienteFormularioOrden, setClienteFormularioOrden] = useState<number | null | undefined>(undefined);
   const [ordenImprimiendo, setOrdenImprimiendo] = useState<OrdenCargaDto | null>(null);
   const [clienteCatalogoElegido, setClienteCatalogoElegido] = useState<number | null>(null);
+
+  const ordenDialogAbierto = pedidoOrden !== null;
+  const ordenEditando = pedidoOrden?.orden ?? null;
+  const filaOrigenOrden = pedidoOrden?.filaOrigen ?? null;
 
   // La copia de clientes (R2.2/R2.3) se pide sólo cuando algo de lo montado la necesita: un diálogo
   // de lote/orden abierto, o las pestañas que tienen su propio selector de cliente (filtro de Órdenes,
@@ -138,10 +151,7 @@ export function SemilleroPage() {
   const exportarOrdenes = useExportarOrdenes();
   const exportarMovimientos = useExportarMovimientos();
 
-  // El stock de la orden sólo cuenta mientras el diálogo está pedido: sin él, el diálogo no abre y
-  // hay que ofrecer reintentar en vez de no hacer nada.
-  const errorStockOrden = ordenDialogAbierto ? stockOrden.error : null;
-  const error = stock.error ?? ordenes.error ?? catalogos.error ?? errorStockOrden;
+  const error = stock.error ?? ordenes.error ?? catalogos.error;
   const listoParaMostrar = stock.data && ordenes.data && catalogos.data;
 
   const abrirNuevoLote = () => {
@@ -158,18 +168,20 @@ export function SemilleroPage() {
   };
 
   const abrirOrden = (orden: OrdenCargaDto | null, filaOrigen: StockFilaDto | null) => {
-    setOrdenEditando(orden);
-    setFilaOrigenOrden(filaOrigen);
+    setPedidoOrden({ orden, filaOrigen, pedidoEn: Date.now() });
     setClienteFormularioOrden(undefined);
-    setOrdenDialogAbierto(true);
+    // Con el diálogo cerrado nadie vuelve a pedir el stock completo (una escritura sólo lo marca
+    // como vencido): la copia en caché puede ser vieja, así que se pide siempre al abrir (R1.2).
+    void stockOrden.refetch();
   };
   const abrirNuevaOrden = () => abrirOrden(null, null);
   const abrirEditarOrden = (orden: OrdenCargaDto) => abrirOrden(orden, null);
   const abrirOrdenDesdeStock = (fila: StockFilaDto) => abrirOrden(null, fila);
+  const reintentarOrden = () => {
+    if (pedidoOrden) abrirOrden(pedidoOrden.orden, pedidoOrden.filaOrigen);
+  };
   const cerrarOrdenDialog = () => {
-    setOrdenDialogAbierto(false);
-    setOrdenEditando(null);
-    setFilaOrigenOrden(null);
+    setPedidoOrden(null);
     setClienteFormularioOrden(undefined);
   };
 
@@ -179,13 +191,17 @@ export function SemilleroPage() {
   // envaseYPesoEditables no viajan en las filas de stock): evita un parpadeo mostrando "Nuevo lote".
   const loteDialogListoParaAbrir = loteDialogAbierto && (loteEditandoId === null || loteParaEditar !== null);
 
-  // Mismo criterio para la orden: sin el stock completo, un renglón se vería vacío y con un
-  // "Supera lo disponible" que no es real (R1.2).
-  const filasOrden = stockOrden.data?.filas;
+  // Mismo criterio para la orden, con una exigencia más: el stock completo tiene que haber llegado
+  // DESPUÉS del pedido. Con una copia vieja, el renglón de un lote nuevo se vería vacío y con un
+  // "Supera lo disponible" que no es real (R1.2). Ya abierto, volver a pedirlo no lo cierra:
+  // `dataUpdatedAt` sólo avanza.
+  const pedidoEn = pedidoOrden?.pedidoEn;
+  const stockOrdenAlDia = pedidoEn !== undefined && stockOrden.dataUpdatedAt >= pedidoEn;
+  const falloStockOrden = pedidoEn !== undefined && !stockOrdenAlDia && stockOrden.errorUpdatedAt >= pedidoEn;
   // Desde una fila de un Cliente, además, hay que saber si ese cliente está activo antes de armar el
   // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla.
   const esperandoClientes = filaOrigenOrden?.duenio === "Cliente" && clientes.isPending;
-  const ordenDialogListoParaAbrir = ordenDialogAbierto && filasOrden !== undefined && !esperandoClientes;
+  const ordenDialogListoParaAbrir = stockOrdenAlDia && !esperandoClientes;
 
   const copiaClientes = clientes.data?.copia ?? COPIA_CLIENTES_CARGANDO;
 
@@ -205,6 +221,15 @@ export function SemilleroPage() {
         </p>
       )}
 
+      {/* Fuera del bloque de error: aunque la página no se pueda mostrar, el pedido se puede cancelar. */}
+      {ordenDialogAbierto && !ordenDialogListoParaAbrir && (
+        <PedidoOrdenAviso
+          error={falloStockOrden ? stockOrden.error : null}
+          onReintentar={reintentarOrden}
+          onCancelar={cerrarOrdenDialog}
+        />
+      )}
+
       {error ? (
         <ErrorState
           error={error}
@@ -212,7 +237,6 @@ export function SemilleroPage() {
             void stock.refetch();
             void ordenes.refetch();
             void catalogos.refetch();
-            if (errorStockOrden) void stockOrden.refetch();
           }}
         />
       ) : !listoParaMostrar ? (
@@ -332,7 +356,7 @@ export function SemilleroPage() {
         copiaClientes={copiaClientes}
         actualizandoClientes={sincronizarClientes.isPending}
         onActualizarClientes={() => sincronizarClientes.mutate()}
-        filas={filasOrden ?? []}
+        filas={stockOrden.data?.filas ?? []}
         filaOrigen={filaOrigenOrden}
         destinos={destinosOrden.data ?? []}
         onClienteChange={setClienteFormularioOrden}
