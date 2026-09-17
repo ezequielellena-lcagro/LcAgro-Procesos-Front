@@ -561,6 +561,19 @@ describe("OrdenDialog", () => {
     expect(screen.getByTestId("totales-orden")).toHaveTextContent("2 unidades · 1.600 kg propios");
   });
 
+  /**
+   * Hallazgo de la revisión (ronda 2): sin nada que los agrupara, un lector de pantalla anunciaba
+   * "Variedad", "Tratamiento" y "Envase" como si fueran datos de la orden.
+   */
+  it("los filtros del diálogo forman un grupo que dice que filtran los lotes para agregar (R3.1)", () => {
+    renderDialog();
+    const grupo = screen.getByRole("group", { name: "Filtrar los lotes para agregar" });
+    expect(within(grupo).getByLabelText("Variedad")).toBeInTheDocument();
+    expect(within(grupo).getByLabelText("Tratamiento")).toBeInTheDocument();
+    expect(within(grupo).getByLabelText("Envase")).toBeInTheDocument();
+    expect(within(grupo).queryByLabelText("Agregar renglón")).not.toBeInTheDocument();
+  });
+
   it("si un filtro deja afuera el lote elegido, el selector se limpia y Agregar no lo carga (R3.3)", () => {
     renderDialog({ filas: [PROPIO, PROPIO_TRATADO] });
     const selector = screen.getByLabelText("Agregar renglón");

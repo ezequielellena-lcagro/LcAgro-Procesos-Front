@@ -55,6 +55,8 @@ function mensajeSinOpciones(
 
 /** Id del detalle bajo el selector: lo anuncia el lector de pantalla al pasar por él (R2.2). */
 const ID_DETALLE = "nuevoRenglonDetalle";
+/** Id del título de los filtros: los agrupa para que no se lean como datos de la orden (R3.1). */
+const ID_TITULO_FILTROS = "filtrosRenglonTitulo";
 
 interface Props {
   /** Lotes × ubicación que la orden admite, con la regla de dueño y el máximo ya aplicados. */
@@ -136,56 +138,61 @@ export function AgregarRenglon({
 
   return (
     <div className="space-y-2">
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Filtro id="filtroVariedad" label="Variedad">
-          <Select
-            id="filtroVariedad"
-            value={efectivos(filtros).variedadId ?? ""}
-            onChange={(e) =>
-              cambiarFiltros({ variedadId: e.target.value ? Number(e.target.value) : undefined })
-            }
-          >
-            <option value="">Todas</option>
-            {variedades.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.nombre}
-              </option>
-            ))}
-          </Select>
-        </Filtro>
-        <Filtro id="filtroTratamiento" label="Tratamiento">
-          <Select
-            id="filtroTratamiento"
-            value={filtros.tratada === undefined ? "" : String(filtros.tratada)}
-            onChange={(e) =>
-              cambiarFiltros({
-                tratada: e.target.value === "" ? undefined : e.target.value === "true",
-              })
-            }
-          >
-            <option value="">Tratada y sin tratar</option>
-            <option value="true">Tratada</option>
-            <option value="false">Sin tratar</option>
-          </Select>
-        </Filtro>
-        <Filtro id="filtroEnvase" label="Envase">
-          <Select
-            id="filtroEnvase"
-            value={filtros.envase ?? ""}
-            onChange={(e) =>
-              cambiarFiltros({
-                envase: (e.target.value || undefined) as EnvaseSemillero | undefined,
-              })
-            }
-          >
-            <option value="">Todos</option>
-            {ENVASES.map((e) => (
-              <option key={e.valor} value={e.valor}>
-                {e.etiqueta}
-              </option>
-            ))}
-          </Select>
-        </Filtro>
+      <div role="group" aria-labelledby={ID_TITULO_FILTROS} className="space-y-1">
+        <p id={ID_TITULO_FILTROS} className="text-xs font-medium text-ink-soft">
+          Filtrar los lotes para agregar
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <Filtro id="filtroVariedad" label="Variedad">
+            <Select
+              id="filtroVariedad"
+              value={efectivos(filtros).variedadId ?? ""}
+              onChange={(e) =>
+                cambiarFiltros({ variedadId: e.target.value ? Number(e.target.value) : undefined })
+              }
+            >
+              <option value="">Todas</option>
+              {variedades.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nombre}
+                </option>
+              ))}
+            </Select>
+          </Filtro>
+          <Filtro id="filtroTratamiento" label="Tratamiento">
+            <Select
+              id="filtroTratamiento"
+              value={filtros.tratada === undefined ? "" : String(filtros.tratada)}
+              onChange={(e) =>
+                cambiarFiltros({
+                  tratada: e.target.value === "" ? undefined : e.target.value === "true",
+                })
+              }
+            >
+              <option value="">Tratada y sin tratar</option>
+              <option value="true">Tratada</option>
+              <option value="false">Sin tratar</option>
+            </Select>
+          </Filtro>
+          <Filtro id="filtroEnvase" label="Envase">
+            <Select
+              id="filtroEnvase"
+              value={filtros.envase ?? ""}
+              onChange={(e) =>
+                cambiarFiltros({
+                  envase: (e.target.value || undefined) as EnvaseSemillero | undefined,
+                })
+              }
+            >
+              <option value="">Todos</option>
+              {ENVASES.map((e) => (
+                <option key={e.valor} value={e.valor}>
+                  {e.etiqueta}
+                </option>
+              ))}
+            </Select>
+          </Filtro>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-2">
