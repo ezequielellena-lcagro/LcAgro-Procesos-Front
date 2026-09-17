@@ -203,8 +203,11 @@ export function SemilleroPage() {
   const stockOrdenAlDia = pedidoEn !== undefined && stockOrden.dataUpdatedAt >= pedidoEn;
   const falloStockOrden = pedidoEn !== undefined && !stockOrdenAlDia && stockOrden.errorUpdatedAt >= pedidoEn;
   // Desde una fila de un Cliente, además, hay que saber si ese cliente está activo antes de armar el
-  // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla.
-  const esperandoClientes = filaOrigenOrden?.duenio === "Cliente" && clientes.isPending;
+  // formulario (R4.3): nunca puede quedar un cliente cargado con el selector vacío en pantalla. Se
+  // espera también la copia que se está pidiendo aunque haya una vieja en caché (vencida, se pide al
+  // abrir): con la vieja, un cliente dado de baja quedaría precargado. Ya fijado el cliente, un
+  // pedido posterior no cierra el diálogo.
+  const esperandoClientes = clienteOrden === undefined && (clientes.isPending || clientes.isFetching);
   const ordenDialogListoParaAbrir = stockOrdenAlDia && !esperandoClientes;
   // Ese dueño se fija UNA sola vez, al quedar listo el diálogo, y sólo si está activo: de un cliente
   // dado de baja no se piden ni sus destinos. Si después la copia se refresca sin él, la página y el

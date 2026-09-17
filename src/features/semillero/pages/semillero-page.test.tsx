@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { env } from "@/lib/env";
 import { semilleroHandlers } from "@/mocks/handlers/semillero";
 import { semilleroKeys } from "../queries/keys";
-import type { ClientesCopiaDto, StockFilaDto, StockSemilleroDto } from "../types";
+import type { ClienteCopiaDto, ClientesCopiaDto, StockFilaDto, StockSemilleroDto } from "../types";
 import { SemilleroPage } from "./semillero-page";
 
 /**
@@ -375,6 +375,97 @@ describe("SemilleroPage", () => {
     expect(await within(dialogo).findByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
   });
 
+  const VIVERO: ClienteCopiaDto = { numero: 900001, denominacion: "VIVERO DEMO SANTA ROSA SA", cuit: "30712345678" };
+  const CEIBO: ClienteCopiaDto = { numero: 900002, denominacion: "SEMILLERO DEMO EL CEIBO SRL", cuit: null };
+
+  function copiaDeClientes(clientes: ClienteCopiaDto[]): ClientesCopiaDto {
+    return {
+      clientes,
+      copia: {
+        ultimaSincronizacion: new Date().toISOString(),
+        ultimoIntentoFallido: null,
+        ultimoError: null,
+        desactualizada: false,
+        sinCopia: false,
+        cantidad: clientes.length,
+      },
+    };
+  }
+
+  /** Copia de clientes de hace dos horas en caché: vencida, así que abrir la orden la vuelve a pedir. */
+  function copiaDeClientesVencida(queryClient: QueryClient, clientes: ClienteCopiaDto[]) {
+    queryClient.setQueryData(semilleroKeys.clientes(), copiaDeClientes(clientes), {
+      updatedAt: Date.now() - 2 * 60 * 60 * 1000,
+    });
+  }
+
+  /**
+   * Demora la copia de clientes hasta llamar a la función que devuelve. Sin `respuesta`, sigue al
+   * handler de la fixture.
+   */
+  function demorarClientes(respuesta?: ClientesCopiaDto) {
+    let liberar = () => {};
+    const demora = new Promise<void>((resolver) => (liberar = resolver));
+    server.use(
+      http.get(`${env.apiUrl}/semillero/clientes`, async () => {
+        await demora;
+        return respuesta && HttpResponse.json(respuesta);
+      }),
+    );
+    return liberar;
+  }
+
+  const estadoClientes = (queryClient: QueryClient) =>
+    queryClient.getQueryState(semilleroKeys.clientes())?.fetchStatus;
+
+  /**
+   * Hallazgo de la revisión (ronda 2): la espera sólo miraba si NO había copia de clientes. Con una
+   * copia vieja en caché, el diálogo abría sin esperar la nueva y fijaba el cliente con la vieja:
+   * un cliente dado de baja quedaba cargado en el formulario con el selector vacío.
+   */
+  it('"Orden" en una fila de cliente espera la copia de clientes que se está pidiendo, aunque haya una vieja (R4.3)', async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    // La copia vieja todavía lo trae, pero el 900001 se dio de baja: la nueva ya no.
+    copiaDeClientesVencida(queryClient, [VIVERO, CEIBO]);
+    const liberarClientes = demorarClientes(copiaDeClientes([CEIBO]));
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+
+    await waitFor(() => expect(estadoClientes(queryClient)).toBe("fetching"));
+    await waitFor(() => expect(estadoStockCompleto(queryClient)).toBe("idle"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Preparando la orden…")).toBeInTheDocument();
+
+    liberarClientes();
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).getByText(/no está activo en la copia de MacroGest/)).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText("Cliente")).toHaveValue("");
+    // El formulario tampoco tiene un cliente escondido.
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar" }));
+    expect(await within(dialogo).findByText("Elegí el cliente.")).toBeInTheDocument();
+    expect(queryClient.getQueryState(semilleroKeys.destinos(900001, false))).toBeUndefined();
+  });
+
+  it('"Orden" en una fila de un cliente que falta en la copia vieja lo preselecciona con la nueva (R4.3)', async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    // Otro usuario sincronizó la copia (ya trae al 900001) y cargó el lote después.
+    copiaDeClientesVencida(queryClient, [CEIBO]);
+    const liberarClientes = demorarClientes();
+
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+
+    await waitFor(() => expect(estadoClientes(queryClient)).toBe("fetching"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    liberarClientes();
+    const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    expect(within(dialogo).getByLabelText("Cliente")).toHaveValue("900001 · VIVERO DEMO SANTA ROSA SA");
+    expect(within(dialogo).getByLabelText("Agregar renglón")).toHaveValue("3:3");
+    expect(within(dialogo).queryByText(/no está activo en la copia de MacroGest/)).not.toBeInTheDocument();
+  });
+
   /**
    * Hallazgo de la revisión (ronda 1): la página recalculaba en vivo el cliente inicial y el
    * formulario lo fijaba al montarse. Si la copia se refrescaba sin ese cliente, la página pasaba al
@@ -387,22 +478,12 @@ describe("SemilleroPage", () => {
     const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
     expect(await within(dialogo).findByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
 
+    fireEvent.change(within(dialogo).getByLabelText("Observaciones"), {
+      target: { value: "Llevar lona." },
+    });
+
     // El 900001 se dio de baja en MacroGest y la copia se refresca con el diálogo abierto.
-    server.use(
-      http.get(`${env.apiUrl}/semillero/clientes`, () =>
-        HttpResponse.json({
-          clientes: [],
-          copia: {
-            ultimaSincronizacion: new Date().toISOString(),
-            ultimoIntentoFallido: null,
-            ultimoError: null,
-            desactualizada: false,
-            sinCopia: false,
-            cantidad: 0,
-          },
-        } satisfies ClientesCopiaDto),
-      ),
-    );
+    const liberarClientes = demorarClientes(copiaDeClientes([]));
     let clienteDelAltaDeDestino: string | undefined;
     server.use(
       http.post(`${env.apiUrl}/semillero/clientes/:numero/destinos`, ({ params }) => {
@@ -410,9 +491,15 @@ describe("SemilleroPage", () => {
         return HttpResponse.json({ id: 999, clienteNumero: 900001, nombre: "Campo X", activo: true, enUso: 0 });
       }),
     );
-    await queryClient.invalidateQueries({ queryKey: semilleroKeys.clientes() });
+    void queryClient.invalidateQueries({ queryKey: semilleroKeys.clientes() });
+
+    // Mientras se pide, el diálogo ya armado no se cierra (el cliente ya se había fijado).
+    await waitFor(() => expect(estadoClientes(queryClient)).toBe("fetching"));
+    expect(screen.getByRole("dialog", { name: "Nueva orden de carga" })).toBe(dialogo);
+    liberarClientes();
 
     expect(await within(dialogo).findByText(/no está activo en la copia de MacroGest/)).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText("Observaciones")).toHaveValue("Llevar lona.");
     // Los destinos siguen siendo los del cliente que tiene el formulario, y el alta rápida también.
     expect(within(dialogo).getByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
     fireEvent.change(within(dialogo).getByLabelText("Nuevo destino"), { target: { value: "Campo X" } });
