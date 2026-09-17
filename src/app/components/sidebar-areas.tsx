@@ -60,23 +60,44 @@ export function SidebarAreas({
             (p) => p.kind === "activo" && p.roles.some((r) => roles.includes(r)),
           );
           const active = a.id === areaActivaId;
-          const to = navegable?.kind === "activo" ? navegable.to : "/";
+          const className = cn(
+            "mb-0.5 flex items-center gap-3 whitespace-nowrap rounded-[11px] px-3 py-2.5 text-[13.5px] font-medium transition-colors",
+            collapsed && "md:justify-center md:px-0",
+          );
+          const contenido = (
+            <>
+              <Icon className="size-5 flex-none opacity-90" />
+              <span className={cn("truncate", collapsed && "md:hidden")}>{a.label}</span>
+            </>
+          );
+
+          if (navegable?.kind !== "activo") {
+            return (
+              <div
+                key={a.id}
+                title={a.label}
+                aria-disabled="true"
+                className={cn(className, "cursor-not-allowed text-white/35")}
+              >
+                {contenido}
+              </div>
+            );
+          }
+
           return (
             <NavLink
               key={a.id}
-              to={to}
+              to={navegable.to}
               title={a.label}
               onClick={onNavigate}
               className={cn(
-                "mb-0.5 flex items-center gap-3 whitespace-nowrap rounded-[11px] px-3 py-2.5 text-[13.5px] font-medium transition-colors",
-                collapsed && "md:justify-center md:px-0",
+                className,
                 active
                   ? "bg-gradient-to-r from-clementina to-clementina-deep font-semibold text-slate-brand"
                   : "text-[#cdd9e0] hover:bg-white/10 hover:text-white",
               )}
             >
-              <Icon className="size-5 flex-none opacity-90" />
-              <span className={cn("truncate", collapsed && "md:hidden")}>{a.label}</span>
+              {contenido}
             </NavLink>
           );
         })}

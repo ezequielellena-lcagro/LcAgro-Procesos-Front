@@ -9,7 +9,15 @@ const USUARIOS: Record<string, User> = {
   "admin@lcagro.local": {
     id: 1, nombre: "Admin Demo", email: "admin@lcagro.local",
     // Todas las pantallas de Pantallas.cs: es el usuario con el que se recorre el demo entero.
-    roles: ["dashboard", "posicion", "cuentas", "semilla", "stock", "stockfisico", "produccionpropia", "volumenacopiado", "comisiones", "proveedores", "prestamos", "semillero", "usuarios", "config", "auditoria"],
+    roles: ["dashboard", "posicion", "cuentas", "semilla", "stock", "stockfisico", "produccionpropia", "volumenacopiado", "comisiones", "proveedores", "prestamos", "semillero", "planificacionventas", "planificacionventasgestion", "usuarios", "config", "auditoria"],
+  },
+  "vendedor@lcagro.local": {
+    id: 5, nombre: "Vendedor Demo", email: "vendedor@lcagro.local",
+    roles: ["planificacionventas"],
+  },
+  "gestion@lcagro.local": {
+    id: 6, nombre: "Gestión Demo", email: "gestion@lcagro.local",
+    roles: ["planificacionventasgestion"],
   },
   "operador@lcagro.local": {
     id: 2, nombre: "Operador Acopio", email: "operador@lcagro.local",

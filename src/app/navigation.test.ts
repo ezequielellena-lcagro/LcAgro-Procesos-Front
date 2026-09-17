@@ -30,3 +30,21 @@ describe("menú Semillero", () => {
     expect(tituloProcesoPorPath(semillero()!, "/semillero")).toBe("Stock y Órdenes de Carga");
   });
 });
+
+describe("menú Planificación de Ventas", () => {
+  const comercial = () => NAV.find((a) => a.id === "comercial")!;
+
+  it("navega con cualquiera de las dos pantallas y se oculta sin ellas", () => {
+    const proceso = comercial().procesos.find((p) => p.label === "Planificación de Ventas");
+    expect(proceso).toMatchObject({
+      kind: "activo",
+      to: "/planificacion-ventas",
+      roles: ["planificacionventas", "planificacionventasgestion"],
+    });
+    expect(procesosVisibles(comercial(), ["planificacionventas"])).toContain(proceso);
+    expect(procesosVisibles(comercial(), ["planificacionventasgestion"])).toContain(proceso);
+    expect(procesosVisibles(comercial(), ["comisiones"])).not.toContain(proceso);
+    expect(areaActivaPorPath("/planificacion-ventas")?.id).toBe("comercial");
+    expect(tituloProcesoPorPath(comercial(), "/planificacion-ventas")).toBe("Planificación de Ventas");
+  });
+});

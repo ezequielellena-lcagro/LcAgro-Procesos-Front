@@ -4,6 +4,7 @@ import { createBrowserRouter } from "react-router-dom";
 import { NotFoundPage } from "@/shared/components/not-found-page";
 import { PageLoader } from "@/shared/components/page-loader";
 import { AppLayout } from "./app-layout";
+import { InicioPage } from "./inicio-page";
 import { ProtectedRoute } from "./protected-route";
 
 // Code-splitting: cada página se carga en su propio chunk, bajo demanda.
@@ -21,6 +22,7 @@ const VolumenAcopiadoPage = lazy(() => import("@/features/volumenacopiado/pages/
 const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
 const PrestamosPage = lazy(() => import("@/features/prestamos/pages/prestamos-page").then((m) => ({ default: m.PrestamosPage })));
 const SemilleroPage = lazy(() => import("@/features/semillero/pages/semillero-page").then((m) => ({ default: m.SemilleroPage })));
+const PlanificacionVentasPage = lazy(() => import("@/features/planificacion-ventas/pages/planificacion-ventas-page").then((m) => ({ default: m.PlanificacionVentasPage })));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })));
 const ConfigPage = lazy(() => import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })));
 const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/auditoria-page").then((m) => ({ default: m.AuditoriaPage })));
@@ -52,7 +54,7 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <DashboardPage /> },
+          { index: true, element: <InicioPage dashboard={<DashboardPage />} /> },
           {
             element: <ProtectedRoute roles={["posicion"]} />,
             children: [{ path: "posicion", element: <PosicionPage /> }],
@@ -96,6 +98,10 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={["comisiones"]} />,
             children: [{ path: "comisiones", element: <ComisionesPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["planificacionventas", "planificacionventasgestion"]} />,
+            children: [{ path: "planificacion-ventas", element: <PlanificacionVentasPage /> }],
           },
           {
             element: <ProtectedRoute roles={["usuarios"]} />,
