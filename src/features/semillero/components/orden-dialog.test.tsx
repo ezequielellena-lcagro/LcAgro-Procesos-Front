@@ -475,6 +475,20 @@ describe("OrdenDialog", () => {
     expect(within(renglon).getByLabelText("Cantidad de 26S-003 en G1-3")).toHaveValue(2);
   });
 
+  /**
+   * Hallazgo de la revisión (ronda 2): con `truncate` solo, el texto en una línea fijaba el ancho
+   * mínimo del renglón y, a través de él, el del Modal. En un celular (375 px) el diálogo se iba de
+   * la pantalla y Guardar quedaba fuera de alcance. `contain-inline-size` hace que el ancho lo decida
+   * el renglón y no el texto (medido en navegador: jsdom no calcula layout, así que se fija la clase).
+   */
+  it("las observaciones del renglón se recortan sin ensanchar el diálogo en pantallas angostas (R2.3)", () => {
+    renderDialog({ filas: [PROPIO_TRATADO] });
+    agregarRenglon("3:3", "2");
+
+    const renglon = screen.getByRole("button", { name: "Quitar 26S-003 en G1-3" }).closest("li") as HTMLElement;
+    expect(within(renglon).getByText(OBS_LARGA)).toHaveClass("truncate", "contain-inline-size");
+  });
+
   it("sin nada para agregar lo dice, y sin cliente aclara que la semilla de clientes aparece al elegirlo (R2.4)", () => {
     renderDialog({ filas: [CLIENTE_500] });
     expect(

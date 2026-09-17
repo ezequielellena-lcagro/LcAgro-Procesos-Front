@@ -410,8 +410,10 @@ function DescripcionLote({ fila }: { fila: StockFilaDto }) {
     <>
       <p className="font-medium text-ink">{productoEtiqueta(fila)}</p>
       <p className="text-xs text-ink-soft">{`Lote ${fila.loteCodigo} · ${fila.ubicacion} · ${duenioEtiqueta(fila)}`}</p>
+      {/* `contain-inline-size`: el texto en una línea no fija el ancho mínimo del renglón; sin eso,
+          en un celular ensanchaba el diálogo y Guardar quedaba fuera de la pantalla. */}
       {fila.observaciones && (
-        <p className="truncate text-xs text-ink-soft" title={fila.observaciones}>
+        <p className="truncate text-xs text-ink-soft contain-inline-size" title={fila.observaciones}>
           {fila.observaciones}
         </p>
       )}
