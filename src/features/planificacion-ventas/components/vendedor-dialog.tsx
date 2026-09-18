@@ -10,11 +10,12 @@ import type {
   SucursalComercial, UsuarioAsignable, VendedorComercial, VendedorRequest, ViajanteAsignable,
 } from "../types";
 
-function inicial(vendedor: VendedorComercial | null): VendedorRequest {
+function inicial(vendedor: VendedorComercial | null, viajanteInicial: ViajanteAsignable | null): VendedorRequest {
   return {
-    nombre: vendedor?.nombre ?? "",
+    nombre: vendedor?.nombre ?? viajanteInicial?.nombre ?? "",
     sucursalId: vendedor?.sucursalId ?? 0,
-    viajantes: [...(vendedor?.viajantes ?? [])].sort((a, b) => a - b),
+    viajantes: [...(vendedor?.viajantes ?? (viajanteInicial ? [viajanteInicial.codigo] : []))]
+      .sort((a, b) => a - b),
     usuarioId: vendedor?.usuarioId ?? null,
     activo: vendedor?.activo ?? true,
   };
@@ -25,10 +26,11 @@ function normalizar(texto: string): string {
 }
 
 export function VendedorDialog({
-  vendedor, sucursales, viajantes, usuarios, vendedores, guardando, onClose, onGuardar,
+  vendedor, viajanteInicial, sucursales, viajantes, usuarios, vendedores, guardando, onClose, onGuardar,
   onDirtyChange,
 }: {
   vendedor: VendedorComercial | null;
+  viajanteInicial: ViajanteAsignable | null;
   sucursales: SucursalComercial[];
   viajantes: ViajanteAsignable[];
   usuarios: UsuarioAsignable[];
@@ -38,7 +40,7 @@ export function VendedorDialog({
   onGuardar: (request: VendedorRequest) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [base] = useState(() => inicial(vendedor));
+  const [base] = useState(() => inicial(vendedor, viajanteInicial));
   const [form, setForm] = useState(base);
   const [busqueda, setBusqueda] = useState("");
   const [errores, setErrores] = useState<string[]>([]);
@@ -63,6 +65,7 @@ export function VendedorDialog({
 
   function alternarCodigo(codigo: number) {
     if (ocupado) return;
+    if (codigo === viajanteInicial?.codigo) return;
     const opcion = viajantes.find((item) => item.codigo === codigo);
     if (!opcion || (!form.viajantes.includes(codigo) &&
       opcion.vendedorId !== null && opcion.vendedorId !== vendedor?.id)) return;
@@ -110,13 +113,15 @@ export function VendedorDialog({
     !usuarios.some((item) => item.id === form.usuarioId);
 
   return (
-    <Modal open onClose={cerrar} title={vendedor ? "Editar vendedor" : "Nuevo vendedor"}>
+    <Modal open onClose={cerrar} title={vendedor ? "Editar vendedor" : "Configurar vendedor"}>
       <form onSubmit={(evento) => void enviar(evento)} className="space-y-5" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="vendedor-nombre">Nombre del vendedor</Label>
             <Input id="vendedor-nombre" value={form.nombre} disabled={ocupado}
+              readOnly={!vendedor}
               onChange={(evento) => cambiar({ nombre: evento.target.value })} maxLength={120} />
+            {!vendedor && <p className="text-xs text-ink-soft">Nombre tomado de MacroGest.</p>}
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="vendedor-sucursal">Sucursal</Label>
@@ -163,7 +168,7 @@ export function VendedorDialog({
                         <input type="checkbox" className="size-4 accent-primary"
                           aria-label={item.codigo + " " + item.nombre}
                           checked={seleccionado}
-                          disabled={ocupado || (ajeno && !seleccionado)}
+                          disabled={ocupado || item.codigo === viajanteInicial?.codigo || (ajeno && !seleccionado)}
                           onChange={() => alternarCodigo(item.codigo)} />
                         <span className={ajeno ? "text-ink-soft" : "text-ink"}>
                           <span className="font-semibold tabular">{item.codigo}</span> {item.nombre}
@@ -221,7 +226,7 @@ export function VendedorDialog({
         <div className="flex justify-end gap-2 border-t border-line pt-4">
           <Button type="button" variant="outline" onClick={cerrar} disabled={ocupado}>Cancelar</Button>
           <Button type="submit" disabled={ocupado}>
-            {ocupado ? "Guardando…" : "Guardar vendedor"}
+            {ocupado ? "Guardando…" : vendedor ? "Guardar vendedor" : "Guardar configuración"}
           </Button>
         </div>
       </form>

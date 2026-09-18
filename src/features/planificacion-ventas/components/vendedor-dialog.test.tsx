@@ -16,7 +16,7 @@ const usuarios: UsuarioAsignable[] = [{ id: 7, nombre: "Usuario Prueba", email: 
 describe("diálogo de vendedor", () => {
   it("busca por nombre o código y no permite elegir viajantes de otro vendedor", () => {
     render(
-      <VendedorDialog vendedor={null} sucursales={sucursales} viajantes={viajantes}
+      <VendedorDialog vendedor={null} viajanteInicial={viajantes[2]} sucursales={sucursales} viajantes={viajantes}
         usuarios={usuarios} vendedores={[]} guardando={false}
         onClose={vi.fn()} onGuardar={vi.fn()} onDirtyChange={vi.fn()} />,
     );
@@ -43,7 +43,7 @@ describe("diálogo de vendedor", () => {
       usuarioId: 7, usuarioNombre: "Usuario Prueba",
     };
     render(
-      <VendedorDialog vendedor={propio} sucursales={sucursales} viajantes={viajantes}
+      <VendedorDialog vendedor={propio} viajanteInicial={null} sucursales={sucursales} viajantes={viajantes}
         usuarios={usuarios} vendedores={[propio, otro]} guardando={false}
         onClose={vi.fn()} onGuardar={vi.fn()} onDirtyChange={vi.fn()} />,
     );
@@ -64,7 +64,7 @@ describe("diálogo de vendedor", () => {
       viajantes: [10, 40], usuarioId: null, usuarioNombre: null, activo: true,
     };
     render(
-      <VendedorDialog vendedor={propio} sucursales={sucursales} viajantes={viajantes}
+      <VendedorDialog vendedor={propio} viajanteInicial={null} sucursales={sucursales} viajantes={viajantes}
         usuarios={usuarios} vendedores={[propio]} guardando={false}
         onClose={vi.fn()} onGuardar={guardar} onDirtyChange={vi.fn()} />,
     );
@@ -93,7 +93,7 @@ describe("diálogo de vendedor", () => {
       viajantes: [10, 20], usuarioId: null, usuarioNombre: null, activo: true,
     };
     render(
-      <VendedorDialog vendedor={propio} sucursales={sucursales} viajantes={viajantes}
+      <VendedorDialog vendedor={propio} viajanteInicial={null} sucursales={sucursales} viajantes={viajantes}
         usuarios={usuarios} vendedores={[propio]} guardando={false}
         onClose={vi.fn()} onGuardar={guardar} onDirtyChange={vi.fn()} />,
     );
@@ -111,27 +111,26 @@ describe("diálogo de vendedor", () => {
     });
   });
 
-  it("exige sucursal y al menos un código antes de guardar", async () => {
+  it("toma nombre y código de MacroGest y sólo exige la sucursal", async () => {
     const guardar = vi.fn().mockResolvedValue(undefined);
     render(
-      <VendedorDialog vendedor={null} sucursales={sucursales} viajantes={viajantes}
+      <VendedorDialog vendedor={null} viajanteInicial={viajantes[2]} sucursales={sucursales} viajantes={viajantes}
         usuarios={usuarios} vendedores={[]} guardando={false}
         onClose={vi.fn()} onGuardar={guardar} onDirtyChange={vi.fn()} />,
     );
-    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del vendedor" }), {
-      target: { value: "Vendedor Nuevo" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar vendedor" }));
+    expect(screen.getByRole("textbox", { name: "Nombre del vendedor" })).toHaveValue("Viajante libre");
+    expect(screen.getByRole("textbox", { name: "Nombre del vendedor" })).toHaveAttribute("readonly");
+    expect(screen.getByRole("checkbox", { name: /30 Viajante libre/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /30 Viajante libre/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
     expect(screen.getByText("Elegí una sucursal.")).toBeInTheDocument();
-    expect(screen.getByText("Elegí al menos un código de viajante.")).toBeInTheDocument();
     expect(guardar).not.toHaveBeenCalled();
     fireEvent.change(screen.getByRole("combobox", { name: "Sucursal" }), {
       target: { value: "1" },
     });
-    fireEvent.click(screen.getByRole("checkbox", { name: /30 Viajante libre/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Guardar vendedor" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
     expect(guardar).toHaveBeenCalledWith({
-      nombre: "Vendedor Nuevo", sucursalId: 1, viajantes: [30], usuarioId: null, activo: true,
+      nombre: "Viajante libre", sucursalId: 1, viajantes: [30], usuarioId: null, activo: true,
     });
   });
 });

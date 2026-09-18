@@ -50,7 +50,10 @@ beforeEach(() => {
     isError: false,
   } as ReturnType<typeof useVendedoresPlanificacion>);
   vi.mocked(useViajantesMacroGest).mockReturnValue({
-    data: [{ codigo: 10, nombre: "Viajante de prueba", vendedorId: 1, vendedorNombre: "Vendedor A" }],
+    data: [
+      { codigo: 10, nombre: "Viajante de prueba", vendedorId: 1, vendedorNombre: "Vendedor A" },
+      { codigo: 30, nombre: "Viajante sin configurar", vendedorId: null, vendedorNombre: null },
+    ],
     isError: false,
   } as ReturnType<typeof useViajantesMacroGest>);
   vi.mocked(useUsuariosAsignables).mockReturnValue({
@@ -71,6 +74,22 @@ beforeEach(() => {
 });
 
 describe("solapa Vendedores", () => {
+  it("muestra vendedores de MacroGest aunque todavía no haya fichas locales", () => {
+    vi.mocked(useVendedoresPlanificacion).mockReturnValue({
+      data: [], isError: false,
+    } as ReturnType<typeof useVendedoresPlanificacion>);
+    vi.mocked(useViajantesMacroGest).mockReturnValue({
+      data: [
+        { codigo: 10, nombre: "Viajante de prueba", vendedorId: null, vendedorNombre: null },
+        { codigo: 30, nombre: "Viajante sin configurar", vendedorId: null, vendedorNombre: null },
+      ], isError: false,
+    } as ReturnType<typeof useViajantesMacroGest>);
+    render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    expect(screen.getByRole("row", { name: /Viajante de prueba/ })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /Viajante sin configurar/ })).toBeInTheDocument();
+    expect(screen.queryByText("Todavía no hay vendedores cargados.")).not.toBeInTheDocument();
+  });
+
   it("crea, renombra y desactiva sucursales desde el ABM", async () => {
     render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
     fireEvent.change(screen.getByRole("textbox", { name: "Nueva sucursal" }), {
@@ -121,20 +140,45 @@ describe("solapa Vendedores", () => {
     expect(retryControl).toHaveBeenCalledOnce();
   });
 
+  it("muestra viajantes de MacroGest sin alta manual y permite configurar la sucursal", async () => {
+    const guardar = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useGuardarVendedor).mockReturnValue({
+      mutateAsync: guardar, isPending: false,
+    } as unknown as ReturnType<typeof useGuardarVendedor>);
+    render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Nuevo vendedor" })).not.toBeInTheDocument();
+    const fila = screen.getByRole("row", { name: /Viajante sin configurar/ });
+    expect(within(fila).getByText("Sin configurar")).toBeInTheDocument();
+    fireEvent.click(within(fila).getByRole("button", { name: "Configurar" }));
+    expect(screen.getByRole("dialog", { name: "Configurar vendedor" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Nombre del vendedor" }))
+      .toHaveValue("Viajante sin configurar");
+    fireEvent.change(screen.getByRole("combobox", { name: "Sucursal" }), {
+      target: { value: "1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
+    await waitFor(() => expect(guardar).toHaveBeenCalledWith({
+      id: undefined,
+      request: { nombre: "Viajante sin configurar", sucursalId: 1,
+        viajantes: [30], usuarioId: null, activo: true },
+    }));
+  });
+
   it("un diálogo con borrador impide abrir otro desde el fondo con teclado", () => {
     render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", { name: "Nuevo vendedor" }));
+    const editar = within(screen.getByRole("row", { name: /Vendedor A/ }))
+      .getByRole("button", { name: "Editar" });
+    fireEvent.click(editar);
     fireEvent.change(screen.getByRole("textbox", { name: "Nombre del vendedor" }), {
       target: { value: "Borrador pendiente" },
     });
-    const dialogo = screen.getByRole("dialog", { name: "Nuevo vendedor" });
-    const editarFondo = within(screen.getByRole("row", { name: /Vendedor A/ }))
-      .getByRole("button", { name: "Editar" });
-    expect(editarFondo).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Nuevo vendedor" })).toBeDisabled();
-    fireEvent.keyDown(editarFondo, { key: "Tab" });
-    fireEvent.click(editarFondo);
-    expect(screen.getByRole("dialog", { name: "Nuevo vendedor" })).toBe(dialogo);
+    const dialogo = screen.getByRole("dialog", { name: "Editar vendedor" });
+    const configurarFondo = within(screen.getByRole("row", { name: /Viajante sin configurar/ }))
+      .getByRole("button", { name: "Configurar" });
+    expect(configurarFondo).toBeDisabled();
+    fireEvent.keyDown(configurarFondo, { key: "Tab" });
+    fireEvent.click(configurarFondo);
+    expect(screen.getByRole("dialog", { name: "Editar vendedor" })).toBe(dialogo);
     expect(screen.getByRole("textbox", { name: "Nombre del vendedor" }))
       .toHaveValue("Borrador pendiente");
   });

@@ -10,7 +10,9 @@ import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { numero } from "@/shared/format/format";
 import { toAppError } from "@/lib/api-error";
 import { confirmarCambioConBorrador } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
-import type { ContextoPlanificacion, SucursalComercial, VendedorComercial } from "../types";
+import type {
+  ContextoPlanificacion, SucursalComercial, VendedorComercial, ViajanteAsignable,
+} from "../types";
 import { useActualizarDatosPlan } from "../queries/use-guardar-plan";
 import { useVendedoresPlanificacion } from "../queries/use-plan-siembra";
 import {
@@ -26,6 +28,17 @@ interface EdicionSucursal {
   activa: boolean;
   baseNombre: string;
   baseActiva: boolean;
+}
+
+interface FilaVendedor {
+  clave: string;
+  nombre: string;
+  sucursal: string;
+  viajantes: number[];
+  usuarioNombre: string | null;
+  activo: boolean | null;
+  vendedor: VendedorComercial | null;
+  viajante: ViajanteAsignable | null;
 }
 
 export function VendedoresPanel({
@@ -49,7 +62,7 @@ export function VendedoresPanel({
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [edicion, setEdicion] = useState<EdicionSucursal | null>(null);
   const [errorSucursal, setErrorSucursal] = useState<string>();
-  const [dialogo, setDialogo] = useState<VendedorComercial | "nuevo" | null>(null);
+  const [dialogo, setDialogo] = useState<VendedorComercial | ViajanteAsignable | null>(null);
   const dialogoAbierto = useRef(false);
   const [dialogoDirty, setDialogoDirty] = useState(false);
   const sucursalDirty = !!nuevoNombre.trim() ||
@@ -118,7 +131,7 @@ export function VendedoresPanel({
 
   const datosControl = control.data?.campania === campania && !control.isError &&
     !(control.isStale && control.isFetching) ? control.data : undefined;
-  function abrirDialogo(vendedor: VendedorComercial | "nuevo") {
+  function abrirDialogo(vendedor: VendedorComercial | ViajanteAsignable) {
     if (dialogo !== null || dialogoAbierto.current) return;
     dialogoAbierto.current = true;
     setDialogo(vendedor);
@@ -131,15 +144,31 @@ export function VendedoresPanel({
 
   const nombresViajantes = new Map((viajantes.data ?? [])
     .map((item) => [item.codigo, item.nombre]));
+  const configurados = vendedores.data ?? [];
+  const codigosConfigurados = new Set(configurados.flatMap((item) => item.viajantes));
+  const filas: FilaVendedor[] = [
+    ...configurados.map((item) => ({
+      clave: "vendedor-" + item.id, nombre: item.nombre, sucursal: item.sucursal,
+      viajantes: item.viajantes, usuarioNombre: item.usuarioNombre, activo: item.activo,
+      vendedor: item, viajante: null,
+    })),
+    ...(viajantes.data ?? []).filter((item) =>
+      item.vendedorId === null && !codigosConfigurados.has(item.codigo)).map((item) => ({
+      clave: "viajante-" + item.codigo, nombre: item.nombre, sucursal: "Sin asignar",
+      viajantes: [item.codigo], usuarioNombre: null, activo: null,
+      vendedor: null, viajante: item,
+    })),
+  ];
   const productores = new Map(
     (datosControl?.productoresPorVendedor ?? [])
       .map((item) => [item.vendedorId, item.productores]),
   );
-  const columnas: Column<VendedorComercial>[] = [
+  const columnas: Column<FilaVendedor>[] = [
     { key: "nombre", header: "Vendedor", sortBy: (item) => item.nombre,
       cell: (item) => <span className="font-semibold text-ink">{item.nombre}</span> },
-    { key: "sucursal", header: "Sucursal", sortBy: (item) => item.sucursal,
-      cell: (item) => item.sucursal },
+    { key: "sucursal", header: "Sucursal", sortBy: (item) => item.vendedor?.sucursal ?? null,
+      cell: (item) => item.vendedor ? item.sucursal :
+        <span className="text-ink-soft">Sin asignar</span> },
     { key: "viajantes", header: "Viajantes MacroGest",
       cell: (item) => <div className="flex max-w-sm flex-wrap gap-1">
         {item.viajantes.map((codigo) => (
@@ -150,18 +179,21 @@ export function VendedoresPanel({
         ))}
       </div> },
     { key: "usuario", header: "Usuario", cell: (item) => item.usuarioNombre ?? "—" },
-    { key: "estado", header: "Estado", sortBy: (item) => item.activo ? 1 : 0,
+    { key: "estado", header: "Estado", sortBy: (item) => item.activo === null ? null : item.activo ? 1 : 0,
       cell: (item) => <span className={item.activo ? "text-verde" : "text-ink-soft"}>
-        {item.activo ? "Activo" : "Inactivo"}
+        {item.activo === null ? "Sin configurar" : item.activo ? "Activo" : "Inactivo"}
       </span> },
     { key: "productores", header: "Productores", align: "right",
-      sortBy: (item) => productores.get(item.id) ?? 0,
-      cell: (item) => datosControl
-        ? numero(productores.get(item.id) ?? 0) : "—" },
+      sortBy: (item) => item.vendedor && datosControl ?
+        productores.get(item.vendedor.id) ?? 0 : null,
+      cell: (item) => item.vendedor && datosControl
+        ? numero(productores.get(item.vendedor.id) ?? 0) : "—" },
     { key: "acciones", header: "Acciones", align: "right",
       cell: (item) => <Button type="button" variant="outline" size="sm"
         disabled={dialogo !== null || !sucursales.data || !viajantes.data || !usuarios.data}
-        onClick={() => abrirDialogo(item)}>Editar</Button> },
+        onClick={() => abrirDialogo(item.vendedor ?? item.viajante!)}>
+        {item.vendedor ? "Editar" : "Configurar"}
+      </Button> },
   ];
   const catalogosListos = !!sucursales.data && !!viajantes.data && !!usuarios.data &&
     !!vendedores.data;
@@ -251,21 +283,19 @@ export function VendedoresPanel({
           <div>
             <h2 className="font-display text-lg font-semibold text-ink">Vendedores</h2>
             <p className="text-sm text-ink-soft">
-              Los códigos de MacroGest determinan la cartera. Productores: CUIT activos o con movimiento.
+              Viajantes tomados de MacroGest. La sucursal y el usuario se configuran en la app.
+              Los códigos determinan la cartera.
             </p>
           </div>
-          <Button type="button" disabled={!catalogosListos || dialogo !== null}
-            onClick={() => abrirDialogo("nuevo")}>
-            Nuevo vendedor
-          </Button>
         </div>
         {vendedores.isError ? (
           <ErrorState error={vendedores.error} onRetry={() => void vendedores.refetch()} />
-        ) : !vendedores.data ? (
+        ) : !vendedores.data || !viajantes.data ? (
           <EmptyState mensaje="Cargando vendedores…" />
         ) : (
-          <DataTable columns={columnas} rows={vendedores.data}
-            getRowKey={(item) => item.id} empty="Todavía no hay vendedores cargados." />
+          <DataTable columns={columnas} rows={filas}
+            getRowKey={(item) => item.clave} defaultSort={{ key: "nombre" }}
+            empty="No hay viajantes en MacroGest." />
         )}
         {viajantes.isError && <ErrorState error={viajantes.error}
           onRetry={() => void viajantes.refetch()} />}
@@ -294,8 +324,9 @@ export function VendedoresPanel({
       </aside>
 
       {dialogo !== null && catalogosListos && (
-        <VendedorDialog key={dialogo === "nuevo" ? "nuevo" : dialogo.id}
-          vendedor={dialogo === "nuevo" ? null : dialogo}
+        <VendedorDialog key={"codigo" in dialogo ? "viajante-" + dialogo.codigo : "vendedor-" + dialogo.id}
+          vendedor={"codigo" in dialogo ? null : dialogo}
+          viajanteInicial={"codigo" in dialogo ? dialogo : null}
           sucursales={sucursales.data ?? []}
           viajantes={viajantes.data ?? []}
           usuarios={usuarios.data ?? []}
@@ -305,9 +336,9 @@ export function VendedoresPanel({
           onClose={cerrarDialogo}
           onGuardar={async (request) => {
             await guardarVendedor.mutateAsync({
-              id: dialogo === "nuevo" ? undefined : dialogo.id, request,
+              id: "codigo" in dialogo ? undefined : dialogo.id, request,
             });
-            toast.success(dialogo === "nuevo" ? "Vendedor creado." : "Vendedor actualizado.");
+            toast.success("codigo" in dialogo ? "Vendedor configurado." : "Vendedor actualizado.");
           }} />
       )}
     </div>
