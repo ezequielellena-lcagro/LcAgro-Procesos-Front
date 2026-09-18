@@ -1,0 +1,97 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { http, HttpResponse, passthrough } from "msw";
+import { setupServer } from "msw/node";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { env } from "@/lib/env";
+import { semilleroHandlers } from "@/mocks/handlers/semillero";
+import { semilleroKeys } from "../queries/keys";
+import type { StockSemilleroDto } from "../types";
+import { SemilleroPage } from "./semillero-page";
+
+void passthrough;
+const server = setupServer(...semilleroHandlers);
+beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
+afterEach(() => server.resetHandlers(...semilleroHandlers));
+afterAll(() => server.close());
+
+function renderPagina() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  render(<QueryClientProvider client={queryClient}><SemilleroPage /></QueryClientProvider>);
+  return { queryClient };
+}
+
+async function filtrarPropio() {
+  fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "Propio" } });
+  await waitFor(() => expect(screen.queryByRole("button", { name: "Editar lote 26S-C01" })).not.toBeInTheDocument());
+}
+
+describe("probe", () => {
+  it("A: stale {} tras invalidar -> el dialogo abre con datos viejos y muestra Supera espurio", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    await filtrarPropio();
+    const real = (await (await fetch(`${env.apiUrl}/semillero/stock`)).json()) as StockSemilleroDto;
+    const viejo: StockSemilleroDto = structuredClone(real);
+    const fila = viejo.filas.find((f) => f.loteCodigo === "26S-C01" && f.ubicacion === "PLANTA")!;
+    fila.disponible = -50;
+    let fase = "viejo";
+    let liberar = () => {};
+    const demora = new Promise<void>((r) => (liberar = r));
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, async ({ request }) => {
+        if (new URL(request.url).search !== "") return;
+        if (fase === "viejo") return HttpResponse.json(viejo);
+        await demora;
+        return HttpResponse.json(real);
+      }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Editar orden N° 1" }));
+    let d = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
+    console.log("PRIMERA APERTURA Supera?", !!within(d).queryByText("Supera lo disponible."));
+    fireEvent.click(within(d).getByRole("button", { name: "Cancelar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    // un ingreso en esta sesion (simulado): invalida todo
+    fase = "nuevo";
+    await queryClient.invalidateQueries({ queryKey: semilleroKeys.all });
+    fireEvent.click(await screen.findByRole("button", { name: "Editar orden N° 1" }));
+    d = await screen.findByRole("dialog", { name: "Editar orden N° 1" });
+    console.log("REAPERTURA fetchStatus", queryClient.getQueryState(semilleroKeys.stock({}))?.fetchStatus);
+    console.log("REAPERTURA Supera (espurio)?", !!within(d).queryByText("Supera lo disponible."));
+    fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
+    console.log("ALERT:", (await screen.findByRole("alert")).textContent);
+    liberar();
+    await waitFor(() => expect(within(d).queryByText("Supera lo disponible.")).not.toBeInTheDocument());
+    console.log("tras llegar datos frescos: Supera desaparece");
+  });
+
+  it("B: error del stock completo -> pantalla de error sin forma de cancelar", async () => {
+    const { queryClient } = renderPagina();
+    await screen.findByText("BigBags propios");
+    await filtrarPropio();
+    await queryClient.resetQueries({ queryKey: semilleroKeys.stock({}), exact: true });
+    server.use(
+      http.get(`${env.apiUrl}/semillero/stock`, ({ request }) => {
+        if (new URL(request.url).search === "") return HttpResponse.json(null, { status: 500 });
+      }),
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Nueva orden" }));
+    expect(await screen.findByText(/error del servidor/i)).toBeInTheDocument();
+    console.log("tabs visibles:", screen.queryAllByRole("tab").length, "botones:", screen.getAllByRole("button").map((b) => b.textContent));
+    fireEvent.click(screen.getByRole("button", { name: /reintentar/i }));
+    await new Promise((r) => setTimeout(r, 300));
+    console.log("tras reintentar, tabs:", screen.queryAllByRole("tab").length);
+  });
+
+  it("C: copia de clientes falla -> aviso de cliente inactivo aunque el cliente este activo", async () => {
+    renderPagina();
+    await screen.findByText("BigBags propios");
+    server.use(http.get(`${env.apiUrl}/semillero/clientes`, () => HttpResponse.json(null, { status: 500 })));
+    fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
+    const d = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
+    console.log("aviso inactivo?", !!within(d).queryByText(/no está activo en la copia de MacroGest/));
+    console.log("texto dialogo:", d.textContent?.slice(0, 400));
+  });
+});
