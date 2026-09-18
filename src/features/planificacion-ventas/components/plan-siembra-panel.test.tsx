@@ -492,6 +492,21 @@ describe("plan de siembra", () => {
     );
   });
 
+  it("gestión ofrece de entrada los vendedores activos de MacroGest", () => {
+    vi.mocked(useVendedoresPlanificacion).mockReturnValue({
+      data: [
+        { id: 1, nombre: "TRUCCO JUAN JOSE", activo: true, sucursalId: null,
+          sucursal: "", viajantes: [3], usuarioId: null, usuarioNombre: null },
+        { id: 2, nombre: "MOSTRADOR", activo: false, sucursalId: null,
+          sucursal: "", viajantes: [1], usuarioId: null, usuarioNombre: null },
+      ],
+    } as unknown as ReturnType<typeof useVendedoresPlanificacion>);
+    render(<PlanSiembraPanel contexto={{ ...contexto, alcance: { veTodo: true, vendedor: null } }} />);
+    const selector = screen.getByRole("combobox", { name: "Vendedor" });
+    expect(within(selector).getByRole("option", { name: "TRUCCO JUAN JOSE" })).toBeInTheDocument();
+    expect(within(selector).queryByRole("option", { name: "MOSTRADOR" })).not.toBeInTheDocument();
+  });
+
   it("gestión debe elegir vendedor; un usuario sin vendedor ve EmptyState", () => {
     const gestion: ContextoPlanificacion = {
       ...contexto,

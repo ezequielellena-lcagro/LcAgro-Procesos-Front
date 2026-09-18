@@ -263,9 +263,9 @@ export function PlanSiembraPanel({
               }
             >
               <option value="">Elegí un vendedor…</option>
-              {vendedores.data?.map((vendedor) => (
+              {vendedores.data?.filter((vendedor) => vendedor.activo).map((vendedor) => (
                 <option key={vendedor.id} value={vendedor.id}>
-                  {vendedor.nombre} · {vendedor.sucursal}
+                  {vendedor.nombre}
                 </option>
               ))}
             </Select>

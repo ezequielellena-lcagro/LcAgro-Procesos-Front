@@ -1,193 +1,58 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { VendedoresPanel } from "./vendedores-panel";
-import { useActualizarDatosPlan } from "../queries/use-guardar-plan";
 import { useVendedoresPlanificacion } from "../queries/use-plan-siembra";
-import {
-  useControlPadron, useGuardarSucursal, useGuardarVendedor, useSucursales,
-  useUsuariosAsignables, useViajantesMacroGest,
-} from "../queries/use-vendedores";
-import type { ContextoPlanificacion, ControlPadron } from "../types";
+import { useCambiarActivoVendedor } from "../queries/use-vendedores";
+import type { ContextoPlanificacion } from "../types";
 
 vi.mock("../queries/use-plan-siembra", () => ({ useVendedoresPlanificacion: vi.fn() }));
-vi.mock("../queries/use-guardar-plan", () => ({ useActualizarDatosPlan: vi.fn() }));
-vi.mock("../queries/use-vendedores", () => ({
-  useControlPadron: vi.fn(), useGuardarSucursal: vi.fn(), useGuardarVendedor: vi.fn(),
-  useSucursales: vi.fn(), useUsuariosAsignables: vi.fn(), useViajantesMacroGest: vi.fn(),
-}));
+vi.mock("../queries/use-vendedores", () => ({ useCambiarActivoVendedor: vi.fn() }));
 
 const contexto: ContextoPlanificacion = {
   campaniaVigente: "2026-2027",
   campanias: [{ codigo: "2026-2027", editable: true }],
   alcance: { veTodo: true, vendedor: null },
 };
-const control: ControlPadron = {
-  campania: "2026-2027",
-  datosMacroGestAl: "2026-09-17T12:00:00-03:00",
-  codigosSinVendedorConMovimiento: [{ codigo: 99, cuentas: 3 }],
-  cuitsAmbiguos: 2,
-  productoresPorVendedor: [],
-  cuentasSinCuitValidoPorVendedor: [{ vendedorId: 1, cuentas: 4 }],
-  cuentasSinClienteConMovimiento: 1,
-  facturacionSinCuitUsd: { cuentas: 2, total: 50 },
-  originacionSinCuitTn: { cuentas: 1, total: 3 },
-};
-const guardarSucursal = vi.fn().mockResolvedValue(undefined);
-const retryControl = vi.fn();
+const cambiar = vi.fn().mockResolvedValue(undefined);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  guardarSucursal.mockResolvedValue(undefined);
-  vi.mocked(useSucursales).mockReturnValue({
-    data: [{ id: 1, nombre: "Sucursal A", activa: true }],
-    isError: false,
-  } as ReturnType<typeof useSucursales>);
+  cambiar.mockResolvedValue(undefined);
   vi.mocked(useVendedoresPlanificacion).mockReturnValue({
-    data: [{
-      id: 1, nombre: "Vendedor A", sucursalId: 1, sucursal: "Sucursal A",
-      viajantes: [10], usuarioId: null, usuarioNombre: null, activo: true,
-    }],
-    isError: false,
-  } as ReturnType<typeof useVendedoresPlanificacion>);
-  vi.mocked(useViajantesMacroGest).mockReturnValue({
     data: [
-      { codigo: 10, nombre: "Viajante de prueba", vendedorId: 1, vendedorNombre: "Vendedor A" },
-      { codigo: 30, nombre: "Viajante sin configurar", vendedorId: null, vendedorNombre: null },
-    ],
-    isError: false,
-  } as ReturnType<typeof useViajantesMacroGest>);
-  vi.mocked(useUsuariosAsignables).mockReturnValue({
-    data: [], isError: false,
-  } as unknown as ReturnType<typeof useUsuariosAsignables>);
-  vi.mocked(useControlPadron).mockReturnValue({
-    data: control, isError: false, isFetching: false, isStale: false, refetch: retryControl,
-  } as unknown as ReturnType<typeof useControlPadron>);
-  vi.mocked(useGuardarSucursal).mockReturnValue({
-    mutateAsync: guardarSucursal, isPending: false,
-  } as unknown as ReturnType<typeof useGuardarSucursal>);
-  vi.mocked(useGuardarVendedor).mockReturnValue({
-    mutateAsync: vi.fn(), isPending: false,
-  } as unknown as ReturnType<typeof useGuardarVendedor>);
-  vi.mocked(useActualizarDatosPlan).mockReturnValue({
-    mutateAsync: vi.fn(), isPending: false,
-  } as unknown as ReturnType<typeof useActualizarDatosPlan>);
+      { id: 1, nombre: "TRUCCO JUAN JOSE", sucursalId: null, sucursal: "",
+        viajantes: [3], usuarioId: null, usuarioNombre: null, activo: true },
+      { id: 2, nombre: "ASL", sucursalId: null, sucursal: "",
+        viajantes: [20], usuarioId: null, usuarioNombre: null, activo: false },
+    ], isError: false,
+  } as ReturnType<typeof useVendedoresPlanificacion>);
+  vi.mocked(useCambiarActivoVendedor).mockReturnValue({
+    mutateAsync: cambiar, isPending: false,
+  } as unknown as ReturnType<typeof useCambiarActivoVendedor>);
 });
 
 describe("solapa Vendedores", () => {
-  it("muestra vendedores de MacroGest aunque todavía no haya fichas locales", () => {
-    vi.mocked(useVendedoresPlanificacion).mockReturnValue({
-      data: [], isError: false,
-    } as ReturnType<typeof useVendedoresPlanificacion>);
-    vi.mocked(useViajantesMacroGest).mockReturnValue({
-      data: [
-        { codigo: 10, nombre: "Viajante de prueba", vendedorId: null, vendedorNombre: null },
-        { codigo: 30, nombre: "Viajante sin configurar", vendedorId: null, vendedorNombre: null },
-      ], isError: false,
-    } as ReturnType<typeof useViajantesMacroGest>);
+  it("muestra el catálogo completo sin pedir nombre ni sucursal", () => {
     render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    expect(screen.getByRole("row", { name: /Viajante de prueba/ })).toBeInTheDocument();
-    expect(screen.getByRole("row", { name: /Viajante sin configurar/ })).toBeInTheDocument();
-    expect(screen.queryByText("Todavía no hay vendedores cargados.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Sucursales comerciales")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Configurar" })).not.toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /TRUCCO JUAN JOSE/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("row", { name: /ASL/ }))
+      .getByRole("checkbox", { name: "Mostrar ASL" })).not.toBeChecked();
+    expect(screen.queryByRole("textbox", { name: "Buscar vendedor" })).not.toBeInTheDocument();
   });
 
-  it("crea, renombra y desactiva sucursales desde el ABM", async () => {
+  it("habilita un viajante para que aparezca en el plan", async () => {
     render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    fireEvent.change(screen.getByRole("textbox", { name: "Nueva sucursal" }), {
-      target: { value: "Sucursal B" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar sucursal" }));
-    await waitFor(() => expect(guardarSucursal).toHaveBeenCalledWith({
-      nombre: "Sucursal B", activa: true,
-    }));
-
-    const seccion = screen.getByText("Sucursales comerciales").closest("section")!;
-    fireEvent.click(within(seccion).getByRole("button", { name: "Editar" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Nombre" }), {
-      target: { value: "Sucursal Renombrada" },
-    });
-    fireEvent.click(screen.getByRole("checkbox", { name: "Activa" }));
-    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(guardarSucursal).toHaveBeenCalledWith({
-      id: 1, nombre: "Sucursal Renombrada", activa: false,
-    }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mostrar ASL" }));
+    await waitFor(() => expect(cambiar).toHaveBeenCalledWith({ id: 2, activo: true }));
   });
 
-  it("muestra código y nombre, espera el control antes de dar cero y permite reintentar", () => {
-    vi.mocked(useControlPadron).mockReturnValue({
-      data: undefined, isError: false, isFetching: true, isStale: true, refetch: retryControl,
-    } as unknown as ReturnType<typeof useControlPadron>);
-    const { rerender } = render(
-      <VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />,
-    );
-    const fila = screen.getByRole("row", { name: /Vendedor A/ });
-    expect(within(fila).getAllByRole("cell")[2]).toHaveTextContent("10 Viajante de prueba");
-    expect(within(fila).getAllByRole("cell")[5]).toHaveTextContent("—");
-
-    vi.mocked(useControlPadron).mockReturnValue({
-      data: control, isError: false, isFetching: false, isStale: false, refetch: retryControl,
-    } as unknown as ReturnType<typeof useControlPadron>);
-    rerender(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    expect(within(fila).getAllByRole("cell")[5]).toHaveTextContent("0");
-    expect(screen.getByText("Código 99")).toBeInTheDocument();
-
-    vi.mocked(useControlPadron).mockReturnValue({
-      data: control, isError: true, error: new Error("Falla"), isFetching: false,
-      isStale: true, refetch: retryControl,
-    } as unknown as ReturnType<typeof useControlPadron>);
-    rerender(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    expect(within(fila).getAllByRole("cell")[5]).toHaveTextContent("—");
-    fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
-    expect(retryControl).toHaveBeenCalledOnce();
-  });
-
-  it("muestra viajantes de MacroGest sin alta manual y permite configurar la sucursal", async () => {
-    const guardar = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useGuardarVendedor).mockReturnValue({
-      mutateAsync: guardar, isPending: false,
-    } as unknown as ReturnType<typeof useGuardarVendedor>);
-    render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    expect(screen.queryByRole("button", { name: "Nuevo vendedor" })).not.toBeInTheDocument();
-    const fila = screen.getByRole("row", { name: /Viajante sin configurar/ });
-    expect(within(fila).getByText("Sin configurar")).toBeInTheDocument();
-    fireEvent.click(within(fila).getByRole("button", { name: "Configurar" }));
-    expect(screen.getByRole("dialog", { name: "Configurar vendedor" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Nombre del vendedor" }))
-      .toHaveValue("Viajante sin configurar");
-    fireEvent.change(screen.getByRole("combobox", { name: "Sucursal" }), {
-      target: { value: "1" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar configuración" }));
-    await waitFor(() => expect(guardar).toHaveBeenCalledWith({
-      id: undefined,
-      request: { nombre: "Viajante sin configurar", sucursalId: 1,
-        viajantes: [30], usuarioId: null, activo: true },
-    }));
-  });
-
-  it("un diálogo con borrador impide abrir otro desde el fondo con teclado", () => {
-    render(<VendedoresPanel contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    const editar = within(screen.getByRole("row", { name: /Vendedor A/ }))
-      .getByRole("button", { name: "Editar" });
-    fireEvent.click(editar);
-    fireEvent.change(screen.getByRole("textbox", { name: "Nombre del vendedor" }), {
-      target: { value: "Borrador pendiente" },
-    });
-    const dialogo = screen.getByRole("dialog", { name: "Editar vendedor" });
-    const configurarFondo = within(screen.getByRole("row", { name: /Viajante sin configurar/ }))
-      .getByRole("button", { name: "Configurar" });
-    expect(configurarFondo).toBeDisabled();
-    fireEvent.keyDown(configurarFondo, { key: "Tab" });
-    fireEvent.click(configurarFondo);
-    expect(screen.getByRole("dialog", { name: "Editar vendedor" })).toBe(dialogo);
-    expect(screen.getByRole("textbox", { name: "Nombre del vendedor" }))
-      .toHaveValue("Borrador pendiente");
-  });
-
-  it("no consulta ni muestra el panel sin permiso de gestión", () => {
+  it("sólo consulta el catálogo con permiso de gestión", () => {
     render(<VendedoresPanel contexto={{ ...contexto, alcance: {
       veTodo: false, vendedor: null,
     } }} activo onDirtyChange={vi.fn()} />);
-    expect(screen.queryByText("Sucursales comerciales")).not.toBeInTheDocument();
-    expect(useControlPadron).toHaveBeenCalledWith("2026-2027", false);
+    expect(screen.queryByText("Vendedores")).not.toBeInTheDocument();
+    expect(useVendedoresPlanificacion).toHaveBeenCalledWith(false);
   });
 });

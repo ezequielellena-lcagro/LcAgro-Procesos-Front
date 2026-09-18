@@ -23,9 +23,8 @@ import { FuenteDatos, LEYENDA_AJUSTE, LEYENDA_CONSOLIDADO, NOTA_D10 } from "./fu
 export function ConsolidadoPanel({ contexto }: { contexto: ContextoPlanificacion }) {
   const [campaniaElegida, setCampaniaElegida] = useState<string>();
   const campania = campaniaElegida ?? contexto.campaniaVigente;
-  const [sucursalId, setSucursalId] = useState<number>();
   const [vendedorId, setVendedorId] = useState<number>();
-  const [agrupacion, setAgrupacion] = useState<"sucursal" | "vendedor">("sucursal");
+  const agrupacion = "vendedor";
   const [verSorgoGirasol, setVerSorgoGirasol] = useState(false);
   const gestion = contexto.alcance.veTodo;
   const vendedorPropioId = contexto.alcance.vendedor?.id;
@@ -34,20 +33,15 @@ export function ConsolidadoPanel({ contexto }: { contexto: ContextoPlanificacion
   const consulta = useConsolidado(
     campania,
     gestion ? vendedorId : undefined,
-    gestion ? sucursalId : undefined,
+    undefined,
     puedeConsultar,
   );
   const actualizar = useActualizarDatosPlan();
   const dataVigente = consulta.data?.campania === campania && !consulta.isPlaceholderData
     ? consulta.data : undefined;
   const lineas = useMemo(() => dataVigente
-    ? armarLineasConsolidado(dataVigente, agrupacion, gestion, { vendedorId, sucursalId, vendedorPropioId })
-    : [], [dataVigente, agrupacion, gestion, vendedorId, sucursalId, vendedorPropioId]);
-  const sucursales = useMemo(() => {
-    const porId = new Map<number, string>();
-    for (const vendedor of vendedores.data ?? []) porId.set(vendedor.sucursalId, vendedor.sucursal);
-    return [...porId.entries()].sort((a, b) => a[1].localeCompare(b[1], "es-AR"));
-  }, [vendedores.data]);
+    ? armarLineasConsolidado(dataVigente, agrupacion, gestion, { vendedorId, vendedorPropioId })
+    : [], [dataVigente, gestion, vendedorId, vendedorPropioId]);
   const total = dataVigente?.totalGeneral;
   const participacionOrigen = total?.potencialTn && total.potencialTn > 0
     ? total.originacionTn.campania / total.potencialTn : null;
@@ -79,30 +73,15 @@ export function ConsolidadoPanel({ contexto }: { contexto: ContextoPlanificacion
         </FilterField>
         {gestion && (
           <>
-            <FilterField label="Sucursal">
-              <Select value={sucursalId ?? ""} onChange={(evento) => {
-                setSucursalId(Number(evento.target.value) || undefined);
-                setVendedorId(undefined);
-              }}>
-                <option value="">Todas</option>
-                {sucursales.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
-              </Select>
-            </FilterField>
             <FilterField label="Vendedor">
               <Select value={vendedorId ?? ""} onChange={(evento) => setVendedorId(Number(evento.target.value) || undefined)}>
                 <option value="">Todos</option>
-                {vendedores.data?.filter((item) => sucursalId === undefined || item.sucursalId === sucursalId)
+                {vendedores.data?.filter((item) => item.activo)
                   .map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}
               </Select>
             </FilterField>
           </>
         )}
-        <FilterField label="Agrupar por">
-          <Select value={agrupacion} onChange={(evento) => setAgrupacion(evento.target.value as "sucursal" | "vendedor")}>
-            <option value="sucursal">Sucursal</option>
-            <option value="vendedor">Vendedor</option>
-          </Select>
-        </FilterField>
         <div className="flex items-center gap-2">
           <Button type="button" variant="outline" size="sm" aria-pressed={verSorgoGirasol} onClick={() => setVerSorgoGirasol((actual) => !actual)}>
             {verSorgoGirasol ? "Ocultar sorgo/girasol" : "Ver sorgo/girasol"}

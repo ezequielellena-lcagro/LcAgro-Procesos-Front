@@ -77,3 +77,13 @@ export function useGuardarVendedor() {
     onSuccess: () => invalidarCatalogo(queryClient),
   });
 }
+
+export function useCambiarActivoVendedor() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, activo }: { id: number; activo: boolean }) =>
+      (await apiClient.put<VendedorComercial>(
+        "/planificacion-ventas/vendedores/" + id + "/activo", { activo })).data,
+    onSuccess: () => invalidarCatalogo(queryClient),
+  });
+}

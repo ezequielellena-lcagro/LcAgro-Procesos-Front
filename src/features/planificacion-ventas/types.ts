@@ -64,7 +64,7 @@ export interface ContextoPlanificacion {
 export interface VendedorComercial {
   id: number;
   nombre: string;
-  sucursalId: number;
+  sucursalId: number | null;
   sucursal: string;
   viajantes: number[];
   usuarioId: number | null;

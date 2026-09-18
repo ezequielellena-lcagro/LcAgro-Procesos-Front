@@ -188,7 +188,7 @@ describe("solapa Consolidado", () => {
     expect(useConsolidado).toHaveBeenCalledWith("2026-2027", undefined, undefined, true);
   });
 
-  it("gestión ve fila de conciliación, ajuste y TOTAL; puede agrupar por vendedor", () => {
+  it("gestión ve la conciliación, el ajuste y el TOTAL agrupados por vendedor", () => {
     preparar({ ...seller, alcance: { veTodo: true, vendedor: null } });
     render(<PlanificacionVentasPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Consolidado" }));
@@ -196,9 +196,6 @@ describe("solapa Consolidado", () => {
     expect(screen.getByText(/Fuera de carteras \/ sin CUIT/)).toBeInTheDocument();
     expect(screen.getByText("Ajuste de redondeo")).toBeInTheDocument();
     expect(screen.getByText("TOTAL")).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "Agrupar por" }), {
-      target: { value: "vendedor" },
-    });
     const grupos = screen.getAllByRole("rowgroup");
     expect(grupos.length).toBeGreaterThan(0);
     expect(screen.getByText("Subtotal Vendedor Ficticio")).toBeInTheDocument();
