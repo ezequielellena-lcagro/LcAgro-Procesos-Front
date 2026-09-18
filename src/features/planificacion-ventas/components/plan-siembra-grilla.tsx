@@ -27,6 +27,7 @@ function planCalculable(fila: PlanSiembraFila, borrador: BorradorPlan): Hectarea
 
 export function PlanSiembraGrilla({
   filas,
+  mensajeVacio = "No hay productores para estos filtros.",
   marketShare,
   campania,
   editable,
@@ -39,6 +40,7 @@ export function PlanSiembraGrilla({
   onCopiarAnterior,
 }: {
   filas: PlanSiembraFila[];
+  mensajeVacio?: string;
   marketShare: MarketShareGrilla | null;
   campania: string;
   editable: boolean;
@@ -174,7 +176,7 @@ export function PlanSiembraGrilla({
       columns={columnas}
       rows={filas}
       getRowKey={(fila) => fila.cuit}
-      empty="No hay productores para estos filtros."
+      empty={mensajeVacio}
       stickyHeader
       scrollClassName="max-h-[65vh] overflow-auto"
       rowClassName={(fila) =>

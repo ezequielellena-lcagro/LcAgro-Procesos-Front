@@ -467,7 +467,8 @@ describe("plan de siembra", () => {
     const selector = screen.getByRole("combobox", { name: "Vendedor" });
     expect(within(selector).queryByRole("option", { name: "Todos" })).not.toBeInTheDocument();
     fireEvent.change(selector, { target: { value: "1" } });
-    expect(vi.mocked(usePlanSiembra).mock.lastCall).toEqual(["2026-2027", 1, false, true]);
+    expect(vi.mocked(usePlanSiembra).mock.lastCall).toEqual(["2026-2027", 1, true, true]);
+    expect(screen.getByRole("checkbox", { name: "Incluir activos sin movimiento" })).toBeChecked();
     fireEvent.change(screen.getByRole("textbox", { name: "Hectáreas de soja de Alfa Ficticia" }), {
       target: { value: "3" },
     });
@@ -505,6 +506,16 @@ describe("plan de siembra", () => {
     const selector = screen.getByRole("combobox", { name: "Vendedor" });
     expect(within(selector).getByRole("option", { name: "TRUCCO JUAN JOSE" })).toBeInTheDocument();
     expect(within(selector).queryByRole("option", { name: "MOSTRADOR" })).not.toBeInTheDocument();
+  });
+
+  it("explica cuando un vendedor activo no tiene clientes con CUIT cargable", () => {
+    vi.mocked(usePlanSiembra).mockReturnValue({
+      data: { ...data, filas: [] }, isPending: false, isError: false,
+      isPlaceholderData: false, isFetching: false, refetch: recargar,
+    } as unknown as ReturnType<typeof usePlanSiembra>);
+    render(<PlanSiembraPanel contexto={{ ...contexto, alcance: { veTodo: true, vendedor: null } }} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Vendedor" }), { target: { value: "1" } });
+    expect(screen.getByText(/no tiene clientes con CUIT válido para cargar el plan/i)).toBeInTheDocument();
   });
 
   it("gestión debe elegir vendedor; un usuario sin vendedor ve EmptyState", () => {

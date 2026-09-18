@@ -65,7 +65,7 @@ export function PlanSiembraPanel({
   const [campaniaElegida, setCampaniaElegida] = useState<string>();
   const campania = campaniaElegida ?? contexto.campaniaVigente;
   const [vendedorId, setVendedorId] = useState<number>();
-  const [incluirSinMovimiento, setIncluirSinMovimiento] = useState(false);
+  const [incluirSinMovimiento, setIncluirSinMovimiento] = useState(true);
   const [soloSinPlan, setSoloSinPlan] = useState(false);
   const [buscar, setBuscar] = useState("");
   const [borrador, setBorrador] = useState<BorradorPlan>({});
@@ -379,6 +379,9 @@ export function PlanSiembraPanel({
           )}
           <PlanSiembraGrilla
             filas={filtradas}
+            mensajeVacio={filas.length === 0
+              ? "Este vendedor no tiene clientes con CUIT válido para cargar el plan. Revisá sus cuentas en MacroGest."
+              : "No hay productores para estos filtros."}
             marketShare={dataVigente.marketShare}
             campania={campania}
             editable={editable}
