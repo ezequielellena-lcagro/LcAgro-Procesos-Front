@@ -4,6 +4,10 @@ import type { CatalogosSemilleroDto, ClienteCopiaDto, DestinoDto, EstadoCopiaCli
 import { CatalogosPanel } from "./catalogos-panel";
 
 const datos: CatalogosSemilleroDto = {
+  especies: [
+    { codigoRubro: 100, nombre: "Trigo", activo: true },
+    { codigoRubro: 101, nombre: "Soja", activo: true },
+  ],
   variedades: [{ id: 1, especie: "Soja", nombre: "DM 46E25", activo: true, enUso: 3 }],
   ubicaciones: [{ id: 1, codigo: "G1-6", descripcion: "Galpón 1", activo: true, enUso: 5 }],
   campanias: ["2025-2026", "2026-2027"],
@@ -27,6 +31,7 @@ const copiaOk: EstadoCopiaClientesDto = {
 const destinos: DestinoDto[] = [{ id: 1, clienteNumero: 1234, nombre: "Campo El Roble", activo: true, enUso: 2 }];
 
 interface RenderOpts {
+  datos?: CatalogosSemilleroDto;
   clienteElegido?: number | null;
   destinos?: DestinoDto[];
 }
@@ -47,7 +52,7 @@ function renderPanel(opts: RenderOpts = {}) {
   const onGuardarDestino = vi.fn().mockResolvedValue(undefined);
   render(
     <CatalogosPanel
-      datos={datos}
+      datos={opts.datos ?? datos}
       onGuardarVariedad={onGuardarVariedad}
       onGuardarUbicacion={onGuardarUbicacion}
       clientes={clientes}
@@ -66,6 +71,18 @@ function renderPanel(opts: RenderOpts = {}) {
 }
 
 describe("CatalogosPanel", () => {
+  it("ofrece una especie nueva del catálogo de MacroGest para agregar variedades", async () => {
+    const props = renderPanel({
+      datos: { ...datos, especies: [...datos.especies, { codigoRubro: 102, nombre: "Maíz", activo: true }] },
+    });
+    fireEvent.change(screen.getByLabelText("Especie de la nueva variedad"), { target: { value: "Maíz" } });
+    fireEvent.change(screen.getByLabelText("Nueva variedad"), { target: { value: "DK 7210" } });
+    fireEvent.click(screen.getByRole("button", { name: "Agregar variedad" }));
+    await waitFor(() =>
+      expect(props.onGuardarVariedad).toHaveBeenCalledWith({ especie: "Maíz", nombre: "DK 7210", activo: true }),
+    );
+  });
+
   it("agrega una variedad a la especie elegida y limpia el campo", async () => {
     const props = renderPanel();
     fireEvent.change(screen.getByLabelText("Especie de la nueva variedad"), { target: { value: "Trigo" } });

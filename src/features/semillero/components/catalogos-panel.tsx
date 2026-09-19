@@ -5,11 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { toAppError } from "@/lib/api-error";
 import {
-  ESPECIES,
   type CatalogosSemilleroDto,
   type ClienteCopiaDto,
   type DestinoActualizarInput,
   type DestinoDto,
+  type EspecieDto,
   type EspecieSemillero,
   type EstadoCopiaClientesDto,
   type UbicacionDto,
@@ -23,6 +23,7 @@ import { CopiaClientesAviso } from "./copia-clientes-aviso";
 interface Props {
   datos: CatalogosSemilleroDto | undefined;
   onGuardarVariedad: (input: VariedadInput & { id?: number }) => Promise<unknown>;
+  onActualizarEspecies?: () => Promise<unknown>;
   onGuardarUbicacion: (input: UbicacionInput & { id?: number }) => Promise<unknown>;
   clientes: ClienteCopiaDto[];
   copiaClientes: EstadoCopiaClientesDto;
@@ -61,6 +62,7 @@ function useIntento() {
 export function CatalogosPanel({
   datos,
   onGuardarVariedad,
+  onActualizarEspecies,
   onGuardarUbicacion,
   clientes,
   copiaClientes,
@@ -78,7 +80,7 @@ export function CatalogosPanel({
     <div className="space-y-4">
       <CopiaClientesAviso estado={copiaClientes} onActualizar={onActualizarClientes} actualizando={actualizandoClientes} />
       <div className="grid gap-4 lg:grid-cols-2">
-        <Variedades variedades={datos.variedades} onGuardar={onGuardarVariedad} />
+        <Variedades especies={datos.especies ?? []} variedades={datos.variedades} onGuardar={onGuardarVariedad} onActualizar={onActualizarEspecies} />
         <Ubicaciones ubicaciones={datos.ubicaciones} onGuardar={onGuardarUbicacion} />
         <DestinosPorCliente
           clientes={clientes}
@@ -94,19 +96,29 @@ export function CatalogosPanel({
   );
 }
 
-function Variedades({ variedades, onGuardar }: { variedades: VariedadDto[]; onGuardar: Props["onGuardarVariedad"] }) {
-  const [especie, setEspecie] = useState<EspecieSemillero>("Soja");
+function Variedades({ especies, variedades, onGuardar, onActualizar }: {
+  especies: EspecieDto[];
+  variedades: VariedadDto[];
+  onGuardar: Props["onGuardarVariedad"];
+  onActualizar: Props["onActualizarEspecies"];
+}) {
+  const [especie, setEspecie] = useState<EspecieSemillero>("");
   const [nombre, setNombre] = useState("");
   const [renombrando, setRenombrando] = useState<{ id: number; nombre: string } | null>(null);
   const { error, intentar } = useIntento();
 
   const agregar = async () => {
-    if (nombre.trim() === "") return;
+    if (nombre.trim() === "" || especie === "") return;
     if (await intentar(() => onGuardar({ especie, nombre: nombre.trim(), activo: true }))) setNombre("");
   };
 
   return (
     <Tarjeta titulo="Variedades">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+        <span>Especies de MacroGest:</span>
+        {especies.filter((e) => e.activo).map((e) => <span key={e.codigoRubro}>{e.nombre}</span>)}
+        {onActualizar && <Button type="button" size="sm" variant="ghost" onClick={() => void intentar(onActualizar)}>Actualizar especies</Button>}
+      </div>
       <div className="flex gap-2">
         <Select
           aria-label="Especie de la nueva variedad"
@@ -114,9 +126,10 @@ function Variedades({ variedades, onGuardar }: { variedades: VariedadDto[]; onGu
           value={especie}
           onChange={(e) => setEspecie(e.target.value as EspecieSemillero)}
         >
-          {ESPECIES.map((e) => (
-            <option key={e.valor} value={e.valor}>
-              {e.etiqueta}
+          <option value="">Elegí especie…</option>
+          {especies.filter((e) => e.activo).map((e) => (
+            <option key={e.codigoRubro} value={e.nombre}>
+              {e.nombre}
             </option>
           ))}
         </Select>
@@ -137,12 +150,12 @@ function Variedades({ variedades, onGuardar }: { variedades: VariedadDto[]; onGu
           {error}
         </p>
       )}
-      {ESPECIES.map((e) => (
-        <div key={e.valor}>
-          <h4 className="mb-1 mt-3 text-xs font-semibold uppercase text-ink-soft">{e.etiqueta}</h4>
+      {especies.map((e) => (
+        <div key={e.codigoRubro}>
+          <h4 className="mb-1 mt-3 text-xs font-semibold uppercase text-ink-soft">{e.nombre}</h4>
           <ul className="divide-y divide-line-soft">
             {variedades
-              .filter((v) => v.especie === e.valor)
+              .filter((v) => v.especie === e.nombre)
               .map((v) => (
                 <li key={v.id} className="flex items-center gap-3 py-1.5 text-sm">
                   {renombrando?.id === v.id ? (

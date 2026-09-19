@@ -16,6 +16,7 @@ import type {
   UbicacionInput,
   VariedadDto,
   VariedadInput,
+  EspecieDto,
 } from "../types";
 import { semilleroKeys } from "./keys";
 
@@ -118,6 +119,12 @@ export const useAnularOrden = () =>
   );
 
 // ── Catálogos: variedades y ubicaciones (R1.1/R1.2) ──────────────────────
+
+export const useSincronizarEspecies = () =>
+  useEscritura(
+    async () => (await apiClient.post<EspecieDto[]>("/semillero/catalogos/especies/sincronizar")).data,
+    () => "Especies actualizadas desde MacroGest.",
+  );
 
 export const useGuardarVariedad = () =>
   useEscritura(

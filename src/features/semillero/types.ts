@@ -6,7 +6,7 @@
  * cliente se guarda y se despacha, pero no es stock vendible propio (ADR-13).
  */
 
-export type EspecieSemillero = "Soja" | "Trigo";
+export type EspecieSemillero = string;
 export type EnvaseSemillero = "BigBag" | "Bolsa";
 export type TipoMovimientoSemillero =
   | "Ingreso"
@@ -25,11 +25,6 @@ export type MotivoAjusteSemillero =
   | "DescarteAcopio"
   | "Otro";
 export type MotivoAnulacionOrdenCarga = "ClienteNoRetiro" | "ErrorArmado" | "CambioPedido" | "Duplicada" | "Otro";
-
-export const ESPECIES: { valor: EspecieSemillero; etiqueta: string }[] = [
-  { valor: "Soja", etiqueta: "Soja" },
-  { valor: "Trigo", etiqueta: "Trigo" },
-];
 
 export const ENVASES: { valor: EnvaseSemillero; etiqueta: string; pesoPorDefecto: number }[] = [
   { valor: "BigBag", etiqueta: "BigBag", pesoPorDefecto: 800 },
@@ -84,6 +79,11 @@ export interface VariedadDto {
   activo: boolean;
   enUso: number;
 }
+export interface EspecieDto {
+  codigoRubro: number;
+  nombre: string;
+  activo: boolean;
+}
 export interface UbicacionDto {
   id: number;
   codigo: string;
@@ -100,6 +100,7 @@ export interface DestinoDto {
   enUso: number;
 }
 export interface CatalogosSemilleroDto {
+  especies: EspecieDto[];
   variedades: VariedadDto[];
   ubicaciones: UbicacionDto[];
   /** Opciones ya calculadas por el backend (ADR-09): sugerida ± 1 más las campañas de lotes existentes. */

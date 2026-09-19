@@ -10,6 +10,7 @@ import type {
   DestinoAltaInput,
   DestinoDto,
   DuenioLote,
+  EspecieDto,
   EnvaseSemillero,
   EspecieSemillero,
   EstadoCopiaClientesDto,
@@ -40,6 +41,14 @@ const API = env.apiUrl;
 const haceHoras = (h: number) => new Date(Date.now() - h * 3_600_000).toISOString();
 
 // ── Catálogos: variedades y ubicaciones ───────────────────────────────────
+
+const ESPECIES: EspecieDto[] = [
+  { codigoRubro: 100, nombre: "Trigo", activo: true },
+  { codigoRubro: 101, nombre: "Soja", activo: true },
+  { codigoRubro: 102, nombre: "Maíz", activo: true },
+  { codigoRubro: 103, nombre: "Sorgo", activo: true },
+  { codigoRubro: 211, nombre: "Girasol", activo: true },
+];
 
 let seqVariedad = 3;
 const VARIEDADES: VariedadDto[] = [
@@ -891,12 +900,15 @@ export const semilleroHandlers = [
   // Catálogos
   http.get(`${API}/semillero/catalogos`, () =>
     HttpResponse.json({
+      especies: ESPECIES,
       variedades: VARIEDADES.map((v) => ({ ...v, enUso: enUsoVariedad(v.id) })),
       ubicaciones: UBICACIONES.map((u) => ({ ...u, enUso: enUsoUbicacion(u.id) })),
       campanias: opcionesCampania(),
       campaniaSugerida: campaniaSugerida(),
     } satisfies CatalogosSemilleroDto),
   ),
+
+  http.post(`${API}/semillero/catalogos/especies/sincronizar`, () => HttpResponse.json(ESPECIES)),
 
   http.post(`${API}/semillero/catalogos/variedades`, async ({ request }) => {
     const input = (await request.json()) as VariedadInput;

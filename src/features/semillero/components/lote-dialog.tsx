@@ -13,8 +13,8 @@ import { CampaniaSelect } from "@/shared/components/campania-select";
 import {
   DUENIOS,
   ENVASES,
-  ESPECIES,
   type ClienteCopiaDto,
+  type EspecieDto,
   type EnvaseSemillero,
   type LoteAltaInput,
   type LoteDatosInput,
@@ -111,6 +111,7 @@ interface Props {
   /** `null` = alta. */
   lote: LoteDto | null;
   variedades: VariedadDto[];
+  especies?: EspecieDto[];
   ubicaciones: UbicacionDto[];
   campanias: string[];
   campaniaSugerida: string;
@@ -145,6 +146,7 @@ export function LoteDialog({ open, lote, onClose, ...resto }: Props) {
 function LoteForm({
   lote,
   variedades,
+  especies = [],
   ubicaciones,
   campanias,
   campaniaSugerida,
@@ -212,10 +214,10 @@ function LoteForm({
         <Campo id="variedadId" label="Variedad" error={errors.variedadId?.message}>
           <Select id="variedadId" {...form.register("variedadId")}>
             <option value="">Elegí…</option>
-            {ESPECIES.map((e) => (
-              <optgroup key={e.valor} label={e.etiqueta}>
+            {especies.map((e) => (
+              <optgroup key={e.codigoRubro} label={e.nombre}>
                 {opciones
-                  .filter((v) => v.especie === e.valor)
+                  .filter((v) => v.especie === e.nombre)
                   .map((v) => (
                     <option key={v.id} value={v.id}>
                       {v.nombre}

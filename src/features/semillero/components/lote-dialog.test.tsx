@@ -24,6 +24,7 @@ function renderDialog(lote: LoteDto | null = null) {
       open
       lote={lote}
       variedades={VARIEDADES}
+      especies={[{ codigoRubro: 101, nombre: "Soja", activo: true }]}
       ubicaciones={UBICACIONES}
       campanias={CAMPANIAS}
       campaniaSugerida="2026-2027"

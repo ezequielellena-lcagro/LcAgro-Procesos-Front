@@ -49,6 +49,10 @@ function renderPanel(over: Partial<Parameters<typeof StockPanel>[0]> = {}) {
     datos: datos([fila()]),
     cargando: false,
     variedades,
+    especies: [
+      { codigoRubro: 100, nombre: "Trigo", activo: true },
+      { codigoRubro: 101, nombre: "Soja", activo: true },
+    ],
     campanias,
     filtros: {},
     onFiltros: vi.fn(),

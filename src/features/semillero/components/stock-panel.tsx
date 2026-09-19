@@ -8,8 +8,8 @@ import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { kg, unidades } from "../format";
 import { duenioEtiqueta, envaseEtiqueta, tratamientoEtiqueta } from "../lib/etiquetas-lote";
 import {
-  ESPECIES,
   type DuenioLote,
+  type EspecieDto,
   type EspecieSemillero,
   type StockFilaDto,
   type StockFiltros,
@@ -24,6 +24,7 @@ interface Props {
   datos: StockSemilleroDto | undefined;
   cargando: boolean;
   variedades: VariedadDto[];
+  especies?: EspecieDto[];
   campanias: string[];
   filtros: StockFiltros;
   onFiltros: (filtros: StockFiltros) => void;
@@ -54,6 +55,7 @@ export function StockPanel({
   datos,
   cargando,
   variedades,
+  especies = [],
   campanias,
   filtros,
   onFiltros,
@@ -172,9 +174,9 @@ export function StockPanel({
             }
           >
             <option value="">Todas</option>
-            {ESPECIES.map((e) => (
-              <option key={e.valor} value={e.valor}>
-                {e.etiqueta}
+            {especies.map((e) => (
+              <option key={e.codigoRubro} value={e.nombre}>
+                {e.nombre}
               </option>
             ))}
           </Select>

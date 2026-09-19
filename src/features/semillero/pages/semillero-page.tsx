@@ -26,6 +26,7 @@ import {
   useDespacharOrden,
   useGuardarUbicacion,
   useGuardarVariedad,
+  useSincronizarEspecies,
   useRegistrarAjuste,
   useRegistrarIngreso,
   useReubicar,
@@ -114,6 +115,7 @@ export function SemilleroPage() {
   const despacharOrden = useDespacharOrden();
   const anularOrden = useAnularOrden();
   const guardarVariedad = useGuardarVariedad();
+  const sincronizarEspecies = useSincronizarEspecies();
   const guardarUbicacion = useGuardarUbicacion();
   const crearDestinoOrden = useCrearDestino(pedidoOrden.cliente ?? 0);
   const crearDestinoCatalogo = useCrearDestino(clienteCatalogoElegido ?? 0);
@@ -219,6 +221,7 @@ export function SemilleroPage() {
                 datos={stock.data}
                 cargando={stock.isPending || stock.isFetching}
                 variedades={catalogos.data.variedades}
+                especies={catalogos.data.especies}
                 campanias={catalogos.data.campanias}
                 filtros={stockFiltros}
                 onFiltros={setStockFiltros}
@@ -265,6 +268,7 @@ export function SemilleroPage() {
             <TabsContent value="catalogos">
               <CatalogosPanel
                 datos={catalogos.data}
+                onActualizarEspecies={() => sincronizarEspecies.mutateAsync(undefined)}
                 onGuardarVariedad={(input) => guardarVariedad.mutateAsync(input)}
                 onGuardarUbicacion={(input) => guardarUbicacion.mutateAsync(input)}
                 clientes={listaClientes}
@@ -287,6 +291,7 @@ export function SemilleroPage() {
         open={loteDialogListoParaAbrir}
         lote={loteParaEditar}
         variedades={catalogos.data?.variedades ?? []}
+        especies={catalogos.data?.especies ?? []}
         ubicaciones={catalogos.data?.ubicaciones ?? []}
         campanias={catalogos.data?.campanias ?? []}
         campaniaSugerida={catalogos.data?.campaniaSugerida ?? ""}
