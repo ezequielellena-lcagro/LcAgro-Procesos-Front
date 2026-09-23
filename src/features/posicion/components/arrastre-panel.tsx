@@ -1,9 +1,8 @@
-import { Pencil, Plus } from "lucide-react";
+import { ArrowLeft, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Modal } from "@/components/ui/modal";
 import { useConfig, useGuardarConfig } from "@/features/config/queries/use-config";
 import { ErrorState } from "@/shared/components/error-state";
 import { numero, usd } from "@/shared/format/format";
@@ -14,7 +13,16 @@ import { ArrastreForm } from "./arrastre-form";
 
 const CLAVE_INICIO = "campania_minima";
 
-export function ArrastreTab({ puedeGestionar, puedeConfig, campanias }: {
+/**
+ * Arrastre inicial por campaña. Vive como pestaña DENTRO del diálogo de Ajustes (es configuración, no
+ * una vista del panel), así que no dibuja tarjetas propias ni abre un modal anidado: el formulario
+ * reemplaza el contenido de la pestaña, igual que el de los ajustes manuales.
+ */
+export function ArrastrePanel({
+  puedeGestionar,
+  puedeConfig,
+  campanias,
+}: {
   puedeGestionar: boolean;
   puedeConfig: boolean;
   campanias: string[];
@@ -49,24 +57,45 @@ export function ArrastreTab({ puedeGestionar, puedeConfig, campanias }: {
 
   const editandoCamp = editing && editing !== "new" ? editing : null;
 
+  if (editing) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="ghost" size="icon" aria-label="Volver" onClick={() => setEditing(null)}>
+            <ArrowLeft className="size-4" />
+          </Button>
+          <h3 className="font-display text-base font-semibold text-ink">
+            {editandoCamp ? `Arrastre · ${editandoCamp}` : "Nuevo arrastre"}
+          </h3>
+        </div>
+        <ArrastreForm
+          campaniaFija={editandoCamp}
+          campaniasDisponibles={campaniasNuevas}
+          existentes={editandoCamp ? existentesDe(editandoCamp) : []}
+          submitting={guardar.isPending}
+          onSubmit={onSubmit}
+          onCancel={() => setEditing(null)}
+        />
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <CampaniaInicioBox inicioRaw={inicioRaw} puedeConfig={puedeConfig} />
 
-      <div className="rounded-card border border-line bg-panel p-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="font-display text-base font-semibold text-ink">Arrastre por campaña</h3>
-            <p className="text-sm text-ink-soft">
-              La primera fila (inicio) es la semilla. Agregá una fila solo para pisar el arrastre de un año; el resto
-              se calcula solo.
-            </p>
-          </div>
+      <div>
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <p className="text-sm text-ink-soft">
+            La primera fila (inicio) es la semilla. Agregá una fila solo para pisar el arrastre de un año; el resto
+            se calcula solo.
+          </p>
           {puedeGestionar && (
             <Button
               type="button"
               variant="accent"
               size="sm"
+              className="flex-none"
               onClick={() => setEditing("new")}
               disabled={campaniasNuevas.length === 0}
             >
@@ -127,7 +156,13 @@ export function ArrastreTab({ puedeGestionar, puedeConfig, campanias }: {
                     })}
                     {puedeGestionar && (
                       <td className="py-2 pl-2 text-right">
-                        <Button type="button" variant="ghost" size="icon" aria-label={`Editar arrastre ${camp}`} onClick={() => setEditing(camp)}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Editar arrastre ${camp}`}
+                          onClick={() => setEditing(camp)}
+                        >
                           <Pencil className="size-4" />
                         </Button>
                       </td>
@@ -139,23 +174,6 @@ export function ArrastreTab({ puedeGestionar, puedeConfig, campanias }: {
           </div>
         )}
       </div>
-
-      {editing && (
-        <Modal
-          open
-          onClose={() => setEditing(null)}
-          title={editandoCamp ? `Arrastre · ${editandoCamp}` : "Nuevo arrastre"}
-        >
-          <ArrastreForm
-            campaniaFija={editandoCamp}
-            campaniasDisponibles={campaniasNuevas}
-            existentes={editandoCamp ? existentesDe(editandoCamp) : []}
-            submitting={guardar.isPending}
-            onSubmit={onSubmit}
-            onCancel={() => setEditing(null)}
-          />
-        </Modal>
-      )}
     </div>
   );
 }
@@ -188,7 +206,7 @@ function CampaniaInicioBox({ inicioRaw, puedeConfig }: { inicioRaw: string | und
   const inicio = desdeConfig(inicioRaw);
 
   return (
-    <div className="rounded-card border border-line bg-panel p-4">
+    <div className="rounded-card border border-line bg-panel-soft p-3.5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <h3 className="font-display text-base font-semibold text-ink">Campaña de inicio</h3>

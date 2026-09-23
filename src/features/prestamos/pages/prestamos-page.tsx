@@ -14,7 +14,6 @@ import { OperacionesTable } from "../components/operaciones-table";
 import { PagarCuotaDialog } from "../components/pagar-cuota-dialog";
 import { PagosPanel } from "../components/pagos-panel";
 import { PrestamoDialog } from "../components/prestamo-dialog";
-import { PrestamosKpis } from "../components/prestamos-kpis";
 import { PrestamosSkeleton } from "../components/prestamos-skeleton";
 import { ReportePanel } from "../components/reporte-panel";
 import { ResumenMatriz } from "../components/resumen-matriz";
@@ -48,6 +47,20 @@ type Pestania =
   | "reporte"
   | "conciliacion"
   | "pagos";
+
+/**
+ * Qué filtros aplican a cada pestaña. La barra va debajo de las solapas, así que filtra lo que se
+ * está mirando: un control que no cambia nada en la vista activa confunde más de lo que ayuda.
+ * Reporte muestra las dos monedas juntas, y MacroGest y los pagos del banco vienen sin filtrar.
+ */
+const FILTROS: Record<Pestania, { moneda: boolean; cuotas: boolean; agrupar: boolean }> = {
+  vencimientos: { moneda: true, cuotas: true, agrupar: true },
+  operaciones: { moneda: true, cuotas: false, agrupar: false },
+  resumen: { moneda: true, cuotas: true, agrupar: false },
+  reporte: { moneda: false, cuotas: false, agrupar: false },
+  conciliacion: { moneda: false, cuotas: false, agrupar: false },
+  pagos: { moneda: false, cuotas: false, agrupar: false },
+};
 
 /**
  * Préstamos y créditos bancarios. Reemplaza el Excel de Administración (`Prestamos La Clementina`),
@@ -122,6 +135,9 @@ export function PrestamosPage() {
       ? { vencimientos: vencimientos.data, operaciones: operaciones.data }
       : null;
 
+  const filtros = FILTROS[pestania];
+  const hayFiltros = filtros.moneda || filtros.cuotas || filtros.agrupar;
+
   return (
     <>
       <PageHeader
@@ -156,40 +172,6 @@ export function PrestamosPage() {
         </p>
       )}
 
-      <FilterBar>
-        <FilterField label="Moneda">
-          <Select value={moneda} onChange={(e) => setMoneda(e.target.value as Moneda)}>
-            <option value="USD">Dólares (U$S)</option>
-            <option value="ARS">Pesos ($)</option>
-          </Select>
-        </FilterField>
-        <FilterField label="Cuotas">
-          <Select
-            value={incluirPagadas ? "todas" : "pendientes"}
-            onChange={(e) => setIncluirPagadas(e.target.value === "todas")}
-          >
-            <option value="pendientes">Sólo pendientes</option>
-            <option value="todas">Todas (con las pagadas)</option>
-          </Select>
-        </FilterField>
-        {/* Sólo aplica al calendario; en las otras pestañas confundiría más de lo que ayuda. */}
-        {pestania === "vencimientos" ? (
-          <FilterField
-            label="Agrupar"
-            title="Junta las cuotas de un mismo préstamo, que en el calendario quedan intercaladas."
-          >
-            <Select
-              value={agrupaVto}
-              onChange={(e) => setAgrupaVto(e.target.value as AgrupacionVencimientos)}
-            >
-              <option value="ninguna">Sin agrupar (calendario)</option>
-              <option value="operacion">Por operación</option>
-              <option value="banco">Por banco</option>
-            </Select>
-          </FilterField>
-        ) : null}
-      </FilterBar>
-
       {error ? (
         <ErrorState
           error={error}
@@ -201,99 +183,128 @@ export function PrestamosPage() {
       ) : !datos ? (
         <PrestamosSkeleton />
       ) : (
-        <div className="space-y-4">
-          <div className={pestania === "reporte" ? "no-print" : undefined}>
-            <PrestamosKpis
-              moneda={moneda}
-              vencimientos={datos.vencimientos}
-              operaciones={datos.operaciones}
+        <Tabs value={pestania} onValueChange={setPestania} className="space-y-3">
+          <TabsList className={pestania === "reporte" ? "no-print" : undefined}>
+            <TabsTrigger value="vencimientos">
+              Vencimientos ({datos.vencimientos.items.length})
+            </TabsTrigger>
+            <TabsTrigger value="operaciones">
+              Operaciones ({datos.operaciones.length})
+            </TabsTrigger>
+            <TabsTrigger value="resumen">Resumen</TabsTrigger>
+            <TabsTrigger value="reporte">Reporte</TabsTrigger>
+            <TabsTrigger value="conciliacion">MacroGest</TabsTrigger>
+            <TabsTrigger value="pagos">Pagos del banco</TabsTrigger>
+          </TabsList>
+
+          {hayFiltros ? (
+            <FilterBar>
+              {filtros.moneda ? (
+                <FilterField label="Moneda">
+                  <Select value={moneda} onChange={(e) => setMoneda(e.target.value as Moneda)}>
+                    <option value="USD">Dólares (U$S)</option>
+                    <option value="ARS">Pesos ($)</option>
+                  </Select>
+                </FilterField>
+              ) : null}
+              {filtros.cuotas ? (
+                <FilterField label="Cuotas">
+                  <Select
+                    value={incluirPagadas ? "todas" : "pendientes"}
+                    onChange={(e) => setIncluirPagadas(e.target.value === "todas")}
+                  >
+                    <option value="pendientes">Sólo pendientes</option>
+                    <option value="todas">Todas (con las pagadas)</option>
+                  </Select>
+                </FilterField>
+              ) : null}
+              {filtros.agrupar ? (
+                <FilterField
+                  label="Agrupar"
+                  title="Junta las cuotas de un mismo préstamo, que en el calendario quedan intercaladas."
+                >
+                  <Select
+                    value={agrupaVto}
+                    onChange={(e) => setAgrupaVto(e.target.value as AgrupacionVencimientos)}
+                  >
+                    <option value="ninguna">Sin agrupar (calendario)</option>
+                    <option value="operacion">Por operación</option>
+                    <option value="banco">Por banco</option>
+                  </Select>
+                </FilterField>
+              ) : null}
+            </FilterBar>
+          ) : null}
+
+          <TabsContent value="vencimientos">
+            <VencimientosTable
+              datos={datos.vencimientos}
+              agrupacion={agrupaVto}
+              puedeGestionar={puedeGestionar}
+              onPagar={(cuotaId) =>
+                setPagando(datos.vencimientos.items.find((v) => v.cuotaId === cuotaId) ?? null)
+              }
             />
-          </div>
+          </TabsContent>
 
-          <Tabs value={pestania} onValueChange={setPestania} className="space-y-3">
-            <TabsList className={pestania === "reporte" ? "no-print" : undefined}>
-              <TabsTrigger value="vencimientos">
-                Vencimientos ({datos.vencimientos.items.length})
-              </TabsTrigger>
-              <TabsTrigger value="operaciones">
-                Operaciones ({datos.operaciones.length})
-              </TabsTrigger>
-              <TabsTrigger value="resumen">Resumen</TabsTrigger>
-              <TabsTrigger value="reporte">Reporte</TabsTrigger>
-              <TabsTrigger value="conciliacion">MacroGest</TabsTrigger>
-              <TabsTrigger value="pagos">Pagos del banco</TabsTrigger>
-            </TabsList>
+          <TabsContent value="operaciones">
+            <OperacionesTable
+              filas={datos.operaciones}
+              puedeGestionar={puedeGestionar}
+              onEditar={setEditando}
+              onVer={setEditando}
+            />
+          </TabsContent>
 
-            <TabsContent value="vencimientos">
-              <VencimientosTable
-                datos={datos.vencimientos}
-                agrupacion={agrupaVto}
-                puedeGestionar={puedeGestionar}
-                onPagar={(cuotaId) =>
-                  setPagando(datos.vencimientos.items.find((v) => v.cuotaId === cuotaId) ?? null)
-                }
-              />
-            </TabsContent>
+          <TabsContent value="resumen">
+            <ResumenMatriz
+              datos={resumen.data}
+              agrupacion={agrupacion}
+              onAgrupacionChange={setAgrupacion}
+              cargando={resumen.isPending}
+            />
+          </TabsContent>
 
-            <TabsContent value="operaciones">
-              <OperacionesTable
-                filas={datos.operaciones}
-                puedeGestionar={puedeGestionar}
-                onEditar={setEditando}
-                onVer={setEditando}
-              />
-            </TabsContent>
+          <TabsContent value="pagos">
+            <PagosPanel
+              datos={pagos.data}
+              cargando={pagos.isPending || pagos.isFetching}
+              error={pagos.error}
+              onReintentar={() => void pagos.refetch()}
+              onConfirmar={(items) => confirmarPagos.mutate(items)}
+              confirmando={confirmarPagos.isPending}
+              cuotasPendientes={[
+                ...(pendientesArs.data?.items ?? []),
+                ...(pendientesUsd.data?.items ?? []),
+              ]}
+              puedeGestionar={puedeGestionar}
+            />
+          </TabsContent>
 
-            <TabsContent value="resumen">
-              <ResumenMatriz
-                datos={resumen.data}
-                agrupacion={agrupacion}
-                onAgrupacionChange={setAgrupacion}
-                cargando={resumen.isPending}
-              />
-            </TabsContent>
+          <TabsContent value="reporte">
+            <ReportePanel
+              usd={pendientesUsd.data}
+              ars={pendientesArs.data}
+              cargando={pendientesUsd.isPending || pendientesArs.isPending}
+              onDescargarExcel={() => exportarReporte.mutate()}
+              descargando={exportarReporte.isPending}
+              onImprimir={imprimirApaisado}
+            />
+          </TabsContent>
 
-            <TabsContent value="pagos">
-              <PagosPanel
-                datos={pagos.data}
-                cargando={pagos.isPending || pagos.isFetching}
-                error={pagos.error}
-                onReintentar={() => void pagos.refetch()}
-                onConfirmar={(items) => confirmarPagos.mutate(items)}
-                confirmando={confirmarPagos.isPending}
-                cuotasPendientes={[
-                  ...(pendientesArs.data?.items ?? []),
-                  ...(pendientesUsd.data?.items ?? []),
-                ]}
-                puedeGestionar={puedeGestionar}
-              />
-            </TabsContent>
-
-            <TabsContent value="reporte">
-              <ReportePanel
-                usd={pendientesUsd.data}
-                ars={pendientesArs.data}
-                cargando={pendientesUsd.isPending || pendientesArs.isPending}
-                onDescargarExcel={() => exportarReporte.mutate()}
-                descargando={exportarReporte.isPending}
-                onImprimir={imprimirApaisado}
-              />
-            </TabsContent>
-
-            <TabsContent value="conciliacion">
-              <ConciliacionPanel
-                datos={conciliacion.data}
-                cargando={conciliacion.isPending || conciliacion.isFetching}
-                error={conciliacion.error}
-                onReintentar={() => void conciliacion.refetch()}
-                onDescartar={(input) => descartar.mutate(input)}
-                onQuitarDescarte={(id) => quitarDescarte.mutate(id)}
-                onDarDeAlta={darDeAlta}
-                puedeGestionar={puedeGestionar}
-              />
-            </TabsContent>
-          </Tabs>
-        </div>
+          <TabsContent value="conciliacion">
+            <ConciliacionPanel
+              datos={conciliacion.data}
+              cargando={conciliacion.isPending || conciliacion.isFetching}
+              error={conciliacion.error}
+              onReintentar={() => void conciliacion.refetch()}
+              onDescartar={(input) => descartar.mutate(input)}
+              onQuitarDescarte={(id) => quitarDescarte.mutate(id)}
+              onDarDeAlta={darDeAlta}
+              puedeGestionar={puedeGestionar}
+            />
+          </TabsContent>
+        </Tabs>
       )}
 
       <PrestamoDialog

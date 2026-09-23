@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
+/**
+ * Barra de filtros sobre una tabla o panel.
+ *
+ * El `mb-4` es lo que la separa de lo que viene abajo: NO lo anules con `mb-0` confiando en el
+ * `space-y-*` del contenedor. Tailwind v4 genera `space-y` como `:where(& > :not(:last-child))`,
+ * y el `:where()` deja la especificidad en 0 → cualquier `mb-*` del hijo lo pisa y la barra queda
+ * pegada a la tabla.
+ */
 export function FilterBar({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <div

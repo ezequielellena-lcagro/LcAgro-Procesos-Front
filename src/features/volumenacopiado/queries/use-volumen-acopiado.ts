@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import type {
   AnalisisVendedorDto,
+  ContactoVendedorGuardado,
   ObjetivoRequest,
   SeguimientoVendedorDto,
   VolumenAcopiadoDto,
@@ -64,9 +66,37 @@ export function useSeguimiento(vendedor: string | undefined, campania: string | 
 
 /** Envía el mail de seguimiento. Acción no reversible: el diálogo la confirma. */
 export function useEnviarSeguimiento() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (req: { vendedor: string; campania: string; email: string }) => {
       await apiClient.post("/volumen-acopiado/seguimiento", req);
+    },
+    // El backend deja el destinatario usado como contacto del vendedor: se refresca también cuentas.
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: volumenAcopiadoKeys.all });
+      qc.invalidateQueries({ queryKey: ["cuentas", "vendedores"] });
+    },
+  });
+}
+
+/**
+ * Guarda el email del vendedor. Es el MISMO contacto que usa el link de devolución de cuentas
+ * corrientes, así que se invalidan las dos pantallas: se carga una vez y sirve para las dos.
+ */
+export function useGuardarContactoVendedor() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { vendNro: number; email: string }) => {
+      const { data } = await apiClient.put<ContactoVendedorGuardado>(
+        `/volumen-acopiado/vendedores/${input.vendNro}/contacto`,
+        { email: input.email },
+      );
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: volumenAcopiadoKeys.all });
+      qc.invalidateQueries({ queryKey: ["cuentas", "vendedores"] });
+      toast.success("Email del vendedor guardado.");
     },
   });
 }

@@ -8,14 +8,11 @@ import { CampaniaSelect } from "@/shared/components/campania-select";
 import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
-import { KpiCard } from "@/shared/components/kpi-card";
+import { Pagination, type UnidadPaginacion } from "@/shared/components/pagination";
 import { confirmarCambioConBorrador } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
-import { numero, tn, usd } from "@/shared/format/format";
 import {
-  CULTIVOS,
   type ContextoPlanificacion,
   type Cultivo,
-  type HectareasPlan,
   type PlanSiembraFila,
 } from "../types";
 import {
@@ -28,38 +25,29 @@ import {
   finalizarEdicion,
   planBase,
   usarAnteriorEnFila,
-  valorHectareas,
   type BorradorPlan,
 } from "../lib/borrador-plan";
-import { mercadoUsd, potencialTn, totalHectareas } from "../lib/calculos";
 import { usePlanSiembra, useVendedoresPlanificacion } from "../queries/use-plan-siembra";
 import { useActualizarDatosPlan, useGuardarPlan } from "../queries/use-guardar-plan";
-import { BarraGuardado } from "./barra-guardado";
+import { AccionesGuardado } from "./acciones-guardado";
+import { FuenteDatos } from "./fuente-datos";
 import { PlanSiembraGrilla } from "./plan-siembra-grilla";
 
 type ErroresCeldas = Record<string, Partial<Record<Cultivo, string>>>;
 
-function planCalculable(fila: PlanSiembraFila, borrador: BorradorPlan): HectareasPlan | null {
-  const plan = valorHectareas(fila, borrador);
-  if (CULTIVOS.every((cultivo) => plan[cultivo] === null)) return null;
-  if (CULTIVOS.some((cultivo) => plan[cultivo] !== null && !Number.isFinite(plan[cultivo])))
-    return null;
-  return plan;
-}
-
-function horaMacroGest(fecha: string): string {
-  return new Date(fecha).toLocaleTimeString("es-AR", {
-    timeZone: "America/Argentina/Buenos_Aires",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const FILAS_POR_PAGINA = 50;
+const PRODUCTORES: UnidadPaginacion = { singular: "productor", plural: "productores" };
 
 export function PlanSiembraPanel({
   contexto,
+  activo = true,
+  slotFuente,
   onDirtyChange,
 }: {
   contexto: ContextoPlanificacion;
+  /** La solapa visible es la única que manda su fuente de datos al encabezado. */
+  activo?: boolean;
+  slotFuente?: HTMLElement | null;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [campaniaElegida, setCampaniaElegida] = useState<string>();
@@ -73,6 +61,7 @@ export function PlanSiembraPanel({
   const [conflictos, setConflictos] = useState<Set<string>>(new Set());
   const [mensajeError, setMensajeError] = useState<string>();
   const [requiereRecarga, setRequiereRecarga] = useState(false);
+  const [pagina, setPagina] = useState(1);
 
   const sinVendedor = !contexto.alcance.veTodo && !contexto.alcance.vendedor;
   const puedeConsultar = !sinVendedor && (!contexto.alcance.veTodo || vendedorId !== undefined);
@@ -114,21 +103,14 @@ export function PlanSiembraPanel({
     );
   }, [filas, buscar, soloSinPlan, borrador]);
 
-  const resumen = useMemo(() => {
-    let conPlan = 0,
-      hectareas = 0,
-      mercado = 0,
-      potencial = 0;
-    for (const fila of filas) {
-      const plan = planCalculable(fila, borrador);
-      if (!plan) continue;
-      conPlan++;
-      hectareas += totalHectareas(plan);
-      mercado += mercadoUsd(plan, dataVigente?.marketShare ?? null) ?? 0;
-      potencial += potencialTn(plan, dataVigente?.marketShare ?? null) ?? 0;
-    }
-    return { conPlan, hectareas, mercado, potencial };
-  }, [filas, borrador, dataVigente?.marketShare]);
+  // Paginado en el cliente: el GET trae la cartera completa y el borrador vive por CUIT, así que
+  // cambiar de página no pierde ediciones ni recorta lo que se guarda.
+  const totalPaginas = Math.max(1, Math.ceil(filtradas.length / FILAS_POR_PAGINA));
+  const paginaVigente = Math.min(pagina, totalPaginas);
+  const visibles = useMemo(
+    () => filtradas.slice((paginaVigente - 1) * FILAS_POR_PAGINA, paginaVigente * FILAS_POR_PAGINA),
+    [filtradas, paginaVigente],
+  );
 
   function descartar() {
     setBorrador({});
@@ -141,6 +123,7 @@ export function PlanSiembraPanel({
   function cambiarSeleccion(accion: () => void) {
     if (!confirmarCambio()) return;
     descartar();
+    setPagina(1);
     accion();
   }
 
@@ -275,7 +258,10 @@ export function PlanSiembraPanel({
           <Input
             aria-label="Buscar productor"
             value={buscar}
-            onChange={(evento) => setBuscar(evento.target.value)}
+            onChange={(evento) => {
+              setBuscar(evento.target.value);
+              setPagina(1);
+            }}
             placeholder="Nombre, CUIT o cuenta"
             className="min-w-52"
           />
@@ -284,7 +270,10 @@ export function PlanSiembraPanel({
           <input
             type="checkbox"
             checked={soloSinPlan}
-            onChange={(evento) => setSoloSinPlan(evento.target.checked)}
+            onChange={(evento) => {
+              setSoloSinPlan(evento.target.checked);
+              setPagina(1);
+            }}
           />
           Sólo sin plan
         </label>
@@ -298,6 +287,15 @@ export function PlanSiembraPanel({
           />
           Incluir activos sin movimiento
         </label>
+        {editable && (
+          <AccionesGuardado
+            cantidad={cambios.length}
+            hayErrores={hayErrores || conflictos.size > 0}
+            guardando={guardar.isPending}
+            onDescartar={descartar}
+            onGuardar={() => void guardarCambios()}
+          />
+        )}
       </FilterBar>
 
       {sinVendedor ? (
@@ -318,27 +316,6 @@ export function PlanSiembraPanel({
             </div>
           )}
           {query.isError && <ErrorState error={query.error} onRetry={() => void query.refetch()} />}
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <KpiCard
-              label="Avance de carga"
-              value={resumen.conPlan + " de " + filas.length}
-              hint="productores con plan"
-            />
-            <KpiCard
-              label="Hectáreas"
-              value={hayErrores ? "—" : numero(resumen.hectareas)}
-              hint="según el borrador"
-            />
-            <KpiCard
-              label="Mercado"
-              value={hayErrores || !dataVigente.marketShare ? "—" : usd(resumen.mercado)}
-              hint="USD estimados"
-            />
-            <KpiCard
-              label="Potencial"
-              value={hayErrores || !dataVigente.marketShare ? "—" : tn(resumen.potencial)}
-            />
-          </div>
           {editable && filas.some((fila) => fila.anterior) && (
             <Button
               type="button"
@@ -378,7 +355,7 @@ export function PlanSiembraPanel({
             </div>
           )}
           <PlanSiembraGrilla
-            filas={filtradas}
+            filas={visibles}
             mensajeVacio={filas.length === 0
               ? "Este vendedor no tiene clientes con CUIT válido para cargar el plan. Revisá sus cuentas en MacroGest."
               : "No hay productores para estos filtros."}
@@ -394,29 +371,26 @@ export function PlanSiembraPanel({
             onCopiarAnterior={(fila) => setBorrador((actual) => usarAnteriorEnFila(fila, actual))}
             onRecargarConflictos={() => void recargarConflictos()}
           />
-          <div className="flex items-center justify-between text-xs text-ink-soft">
-            <span>
-              {dataVigente.datosMacroGestAl
-                ? "Datos de MacroGest al " + horaMacroGest(dataVigente.datosMacroGestAl)
-                : "Sin datos de MacroGest"}
-            </span>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => void refrescarMacroGest()}
-              disabled={actualizar.isPending}
-            >
-              Actualizar
-            </Button>
-          </div>
-          {editable && (
-            <BarraGuardado
-              cantidad={cambios.length}
-              hayErrores={hayErrores || conflictos.size > 0}
-              guardando={guardar.isPending}
-              onDescartar={descartar}
-              onGuardar={() => void guardarCambios()}
+          {filtradas.length > 0 && (
+            <Pagination
+              page={paginaVigente}
+              totalPages={totalPaginas}
+              total={filtradas.length}
+              onPage={setPagina}
+              unidad={PRODUCTORES}
+              detalle={
+                cambios.length > 0
+                  ? "los cambios de todas las páginas se guardan juntos"
+                  : undefined
+              }
+            />
+          )}
+          {activo && (
+            <FuenteDatos
+              slot={slotFuente}
+              datosMacroGestAl={dataVigente.datosMacroGestAl}
+              onActualizar={() => void refrescarMacroGest()}
+              actualizando={actualizar.isPending}
             />
           )}
         </>

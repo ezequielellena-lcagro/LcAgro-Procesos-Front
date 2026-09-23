@@ -73,10 +73,16 @@ function errorHttp(status: number, body: object) {
   });
 }
 
+/** Abre el modal de carga y devuelve el diálogo ya montado. */
+function abrirDialogo(): HTMLElement {
+  fireEvent.click(screen.getByRole("button", { name: /Market Share$/ }));
+  return screen.getByRole("dialog");
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   guardar.mockResolvedValue({ cultivos: [] });
-  recargar.mockResolvedValue({ data });
+  recargar.mockResolvedValue({ data, isError: false });
   vi.mocked(useMarketShare).mockImplementation(
     (campania) =>
       ({
@@ -94,30 +100,41 @@ beforeEach(() => {
 });
 
 describe("Market Share", () => {
-  it("muestra textos y etiquetas de campaña en español sin escapes literales", () => {
+  it("muestra tablas de solo lectura, sin KPIs y con el boton de carga", () => {
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
     expect(screen.getByRole("combobox", { name: "Campaña" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Parámetros por cultivo" })).toBeInTheDocument();
     expect(screen.getByText(/hectárea × precio USD\/tn ÷ 10\./)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Editar Market Share" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+
+    const soja = screen.getByTestId("market-row-soja");
+    expect(within(soja).getByText("9,000")).toBeInTheDocument();
+    expect(within(soja).getByText("US$ 325,00")).toBeInTheDocument();
+    expect(within(soja).getByText("US$ 292,50")).toBeInTheDocument();
+    expect(within(screen.getByTestId("market-row-maiz")).getAllByText("—")).toHaveLength(4);
+    expect(within(screen.getByTestId("market-row-otro")).getByText("—")).toBeInTheDocument();
+
     const resumen = screen.getByRole("region", { name: "Resumen de campaña" });
-    expect(within(resumen).getByRole("heading", { name: "Resumen de la campaña" }))
-      .toBeInTheDocument();
-    expect(within(resumen).getByText("Facturación LC")).toBeInTheDocument();
-    expect(within(resumen).getByRole("columnheader", { name: "Hectáreas" }))
-      .toBeInTheDocument();
-    expect(within(screen.getByTestId("market-form-row-otro")).getByText("—"))
-      .toBeInTheDocument();
+    expect(
+      within(resumen).getByRole("heading", { name: "Resumen de la campaña" }),
+    ).toBeInTheDocument();
+    expect(within(resumen).getByRole("columnheader", { name: "Hectáreas" })).toBeInTheDocument();
+    expect(screen.queryByText("Facturación LC")).not.toBeInTheDocument();
+    expect(screen.queryByText("Participación LC")).not.toBeInTheDocument();
+    expect(screen.queryByText("Originación")).not.toBeInTheDocument();
   });
 
-  it("recalcula costo USD/ha al tipear y Otro queda deshabilitado", () => {
+  it("recalcula costo USD/ha al tipear en el modal y Otro queda deshabilitado", () => {
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    const soja = screen.getByTestId("market-form-row-soja");
+    const dialogo = abrirDialogo();
+    const soja = within(dialogo).getByTestId("market-form-row-soja");
     expect(within(soja).getByText("US$ 292,50")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
       target: { value: "10" },
     });
     expect(within(soja).getByText("US$ 325,00")).toBeInTheDocument();
-    const otro = screen.getByTestId("market-form-row-otro");
+    const otro = within(dialogo).getByTestId("market-form-row-otro");
     expect(within(otro).getByText("sin costo por ahora: no suma")).toBeInTheDocument();
     expect(
       within(otro)
@@ -128,6 +145,7 @@ describe("Market Share", () => {
 
   it("muestra precision invalida y bloquea guardado", () => {
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    abrirDialogo();
     fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
       target: { value: "1,0001" },
     });
@@ -135,7 +153,7 @@ describe("Market Share", () => {
     expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeDisabled();
   });
 
-  it("campania de solo lectura bloquea todos los inputs", () => {
+  it("campania de solo lectura no ofrece cargar valores", () => {
     vi.mocked(useMarketShare).mockReturnValue({
       data: { ...data, editable: false },
       isPending: false,
@@ -145,13 +163,11 @@ describe("Market Share", () => {
     } as unknown as ReturnType<typeof useMarketShare>);
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
     expect(screen.getByText(/solo lectura/)).toBeInTheDocument();
-    expect(
-      screen.getAllByRole("textbox").every((input) => (input as HTMLInputElement).disabled),
-    ).toBe(true);
-    expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Market Share$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
-  it("copia parametros previos a un form vacio sin guardar", () => {
+  it("copia parametros previos a una campania vacia sin guardar", () => {
     const sinDatos: MarketShareResponse = {
       ...data,
       copiarDe: "2025-2026",
@@ -171,10 +187,11 @@ describe("Market Share", () => {
     const { rerender } = render(
       <MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Nuevo Market Share" }));
     fireEvent.click(screen.getByRole("button", { name: /Copiar valores de 2025\/26/ }));
     expect(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" })).toHaveValue("9");
     expect(guardar).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeEnabled();
 
     vi.mocked(useGuardarMarketShare).mockReturnValue({
       mutateAsync: guardar,
@@ -182,22 +199,27 @@ describe("Market Share", () => {
     } as unknown as ReturnType<typeof useGuardarMarketShare>);
     rerender(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
     expect(screen.getByRole("button", { name: /Copiar valores de 2025\/26/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Descartar" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   });
 
-  it("confirma cambiar campania si el formulario tiene borrador", () => {
+  it("confirma cerrar el modal y cambiar de campania con borrador sin guardar", () => {
     const confirmar = vi
       .spyOn(window, "confirm")
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(true);
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    abrirDialogo();
     fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
       target: { value: "10" },
     });
-    const selector = screen.getByRole("combobox", { name: /Campa/ });
-    fireEvent.change(selector, { target: { value: "2025-2026" } });
-    expect(selector).toHaveValue("2026-2027");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" })).toHaveValue("10");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(confirmar).toHaveBeenCalledTimes(2);
+
+    const selector = screen.getByRole("combobox", { name: /Campa/ });
     fireEvent.change(selector, { target: { value: "2025-2026" } });
     expect(selector).toHaveValue("2025-2026");
     expect(confirmar).toHaveBeenCalledTimes(2);
@@ -207,6 +229,7 @@ describe("Market Share", () => {
     const { rerender } = render(
       <MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />,
     );
+    abrirDialogo();
     fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
       target: { value: "10" },
     });
@@ -245,12 +268,11 @@ describe("Market Share", () => {
       }),
     );
     expect(await screen.findByText(/Revision cambiada/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeDisabled();
   });
 
-  it("bloquea cambio de campania y edicion mientras recarga tras 409", async () => {
-    guardar.mockRejectedValue(
-      errorHttp(409, { codigo: "conflict", detail: "Revision cambiada." }),
-    );
+  it("descarta el borrador y bloquea la edicion mientras recarga tras un 409", async () => {
+    guardar.mockRejectedValue(errorHttp(409, { codigo: "conflict", detail: "Revision cambiada." }));
     let terminarRecarga!: (valor: unknown) => void;
     recargar.mockImplementationOnce(
       () =>
@@ -260,25 +282,27 @@ describe("Market Share", () => {
     );
     const confirmar = vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
-    const soja = screen.getByRole("textbox", { name: "qq insumo/ha de Soja" });
-    fireEvent.change(soja, { target: { value: "10" } });
+    abrirDialogo();
+    fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
+      target: { value: "10" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     expect(await screen.findByText(/Revision cambiada/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Descartar y recargar cultivos" }));
     expect(recargar).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     const selector = screen.getByRole("combobox", { name: /Campa/ });
     expect(selector).toBeDisabled();
-    expect(soja).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Editar Market Share" })).toBeDisabled();
     fireEvent.change(selector, { target: { value: "2025-2026" } });
-    fireEvent.change(soja, { target: { value: "20" } });
     expect(selector).toHaveValue("2026-2027");
-    expect(soja).toHaveValue("10");
     expect(confirmar).not.toHaveBeenCalled();
 
     await act(async () => terminarRecarga({ data, isError: false }));
     expect(selector).toHaveValue("2026-2027");
-    expect(soja).toHaveValue("9");
+    expect(screen.getByRole("button", { name: "Editar Market Share" })).toBeEnabled();
+    expect(within(screen.getByTestId("market-row-soja")).getByText("9,000")).toBeInTheDocument();
   });
 
   it("limpia dirty al perder permiso de gestion y desmontar el formulario", () => {
@@ -293,6 +317,7 @@ describe("Market Share", () => {
     }
 
     const { rerender } = render(<ConPermiso veTodo />);
+    abrirDialogo();
     fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
       target: { value: "10" },
     });
@@ -301,7 +326,7 @@ describe("Market Share", () => {
     expect(screen.getByText("Sin borrador")).toBeInTheDocument();
   });
 
-  it("bloquea cambiar campania y editar durante un PUT pendiente", async () => {
+  it("bloquea la edicion durante un PUT pendiente y cierra al confirmarse", async () => {
     let terminarGuardado!: (valor: unknown) => void;
     guardar.mockImplementationOnce(
       () =>
@@ -309,43 +334,35 @@ describe("Market Share", () => {
           terminarGuardado = resolve;
         }),
     );
-    const { rerender } = render(
-      <MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />,
-    );
+    render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    abrirDialogo();
     const soja = screen.getByRole("textbox", { name: "qq insumo/ha de Soja" });
     fireEvent.change(soja, { target: { value: "10" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     expect(guardar).toHaveBeenCalledTimes(1);
-
-    vi.mocked(useGuardarMarketShare).mockReturnValue({
-      mutateAsync: guardar,
-      isPending: true,
-    } as unknown as ReturnType<typeof useGuardarMarketShare>);
-    rerender(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
-
-    const selector = screen.getByRole("combobox", { name: /Campa/ });
-    expect(selector).toBeDisabled();
     expect(soja).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Descartar" })).toBeDisabled();
-    fireEvent.change(selector, { target: { value: "2025-2026" } });
+    expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
     fireEvent.change(soja, { target: { value: "20" } });
-    expect(selector).toHaveValue("2026-2027");
     expect(soja).toHaveValue("10");
 
     await act(async () => terminarGuardado({ cultivos: [] }));
     expect(guardar).toHaveBeenCalledWith({
       campania: "2026-2027",
       request: {
-        cultivos: [{
-          cultivo: "soja",
-          qqInsumoHa: 10,
-          precioUsdTn: 325,
-          rindeTnHa: 4,
-          revisionEsperada: 1,
-        }],
+        cultivos: [
+          {
+            cultivo: "soja",
+            qqInsumoHa: 10,
+            precioUsdTn: 325,
+            rindeTnHa: 4,
+            revisionEsperada: 1,
+          },
+        ],
       },
     });
-    expect(selector).toHaveValue("2026-2027");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await waitFor(() => expect(recargar).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole("button", { name: "Editar Market Share" })).toBeEnabled();
   });
 
   it("muestra rechazo 400 de validacion y conserva borrador", async () => {
@@ -353,11 +370,14 @@ describe("Market Share", () => {
       errorHttp(400, { codigo: "validation", detail: "Cultivos[0].QqInsumoHa: Valor rechazado." }),
     );
     render(<MarketShareForm contexto={contexto} activo onDirtyChange={vi.fn()} />);
+    abrirDialogo();
     fireEvent.change(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" }), {
       target: { value: "10" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
     expect(await screen.findByText(/Valor rechazado/)).toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "qq insumo/ha de Soja" })).toHaveValue("10");
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeEnabled();
   });
 });

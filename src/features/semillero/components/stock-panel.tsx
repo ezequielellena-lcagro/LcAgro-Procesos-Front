@@ -163,8 +163,8 @@ export function StockPanel({
   ];
 
   return (
-    <div className="space-y-3">
-      <FilterBar className="mb-0">
+    <div className="space-y-4">
+      <FilterBar>
         <FilterField label="Especie">
           <Select
             aria-label="Especie"

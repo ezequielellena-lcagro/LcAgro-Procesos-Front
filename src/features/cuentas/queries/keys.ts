@@ -9,5 +9,9 @@ export const cuentasKeys = {
   cierre: () => [...cuentasKeys.all, "cierre"] as const,
   cierreEstado: () => [...cuentasKeys.cierre(), "estado"] as const,
   cierrePeriodos: () => [...cuentasKeys.cierre(), "periodos"] as const,
-  cierrePeriodo: (anio: number, mes: number) => [...cuentasKeys.cierre(), "periodo", anio, mes] as const,
+  cierrePeriodo: (anio: number, mes: number, revision?: number) =>
+    [...cuentasKeys.cierre(), "periodo", anio, mes, revision ?? "vigente"] as const,
+  cierreRevisiones: (anio: number, mes: number) =>
+    [...cuentasKeys.cierre(), "revisiones", anio, mes] as const,
+  cierreDiff: (anio: number, mes: number) => [...cuentasKeys.cierre(), "diff", anio, mes] as const,
 };

@@ -3,11 +3,13 @@ import { apiClient } from "@/lib/api-client";
 import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
 import type { CuentasFiltros } from "../types";
 
-type ExportFiltros = Pick<CuentasFiltros, "q" | "vendNro" | "minUsd">;
+type ExportFiltros = Pick<CuentasFiltros, "q" | "vendNro" | "minUsd" | "corte">;
 
-function nombrePorDefecto(): string {
-  const hoy = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  return `Cuentas_Clientes_${hoy}.xlsx`;
+/** El nombre lleva el corte del informe, no el día de la descarga: bajar dos veces el del 07-10 da el
+ * mismo archivo. Solo se usa si el backend no mandó Content-Disposition. */
+function nombrePorDefecto(corte?: string): string {
+  const fecha = (corte ?? new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+  return `Cuentas_Clientes_${fecha}.xlsx`;
 }
 
 /**
@@ -23,12 +25,13 @@ export function useExportarCuentas() {
           q: filtros.q || undefined,
           vendNro: filtros.vendNro,
           minUsd: filtros.minUsd,
+          corte: filtros.corte || undefined,
         },
         responseType: "blob",
       });
       const filename = filenameFromContentDisposition(
         res.headers["content-disposition"],
-        nombrePorDefecto(),
+        nombrePorDefecto(filtros.corte),
       );
       downloadBlob(res.data as Blob, filename);
     },

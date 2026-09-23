@@ -162,8 +162,8 @@ export function OrdenesPanel({
   ];
 
   return (
-    <div className="space-y-3">
-      <FilterBar className="mb-0">
+    <div className="space-y-4">
+      <FilterBar>
         <FilterField label="Estado">
           <Select
             aria-label="Estado"

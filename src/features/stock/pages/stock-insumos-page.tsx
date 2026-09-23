@@ -9,7 +9,6 @@ import { Pagination, type UnidadPaginacion } from "@/shared/components/paginatio
 import { InmovilizadoTable } from "../components/inmovilizado-table";
 import { StockFiltrosBar } from "../components/stock-filtros-bar";
 import { StockGlobalTable } from "../components/stock-global-table";
-import { StockKpis } from "../components/stock-kpis";
 import { StockPorRubro } from "../components/stock-por-rubro";
 import { StockSkeleton } from "../components/stock-skeleton";
 import { StockTable } from "../components/stock-table";
@@ -19,7 +18,6 @@ import { useStockExport } from "../queries/use-stock-export";
 import { useStockFiltros } from "../queries/use-stock-filtros";
 import { FILTROS_INICIALES, filtrosAQuery, type FiltrosCompartidos } from "../filtros";
 import {
-  estadoAplicaEnTab,
   estadoFijoDeTab,
   motivoEstadoIgnorado,
   presetDeTab,
@@ -109,89 +107,82 @@ export function StockInsumosPage() {
         </p>
       )}
 
-      <StockFiltrosBar
-        valor={filtros}
-        onChange={cambiarFiltros}
-        opciones={filtrosOpts.data}
-        cargando={filtrosOpts.isPending}
-        estadoFijo={estadoFijoDeTab(tab)}
-        estadoIgnorado={motivoEstadoIgnorado(tab)}
-      />
+      {/* Orden fijo e igual en las 5 solapas: solapas → filtros → tabla. La barra queda DENTRO del
+          Tabs porque depende de la solapa activa (estado fijo / ignorado), y se dibuja también
+          mientras carga o si la consulta falla: el error no te deja sin filtros. */}
+      <Tabs value={tab} onValueChange={cambiarTab} className="space-y-4">
+        <TabsList>
+          {TABS_STOCK.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {stock.isError ? (
-        <ErrorState error={stock.error} onRetry={() => void stock.refetch()} />
-      ) : (
-        <Tabs value={tab} onValueChange={cambiarTab} className="space-y-4">
-          <TabsList>
-            {TABS_STOCK.map((t) => (
-              <TabsTrigger key={t.value} value={t.value}>
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <StockFiltrosBar
+          valor={filtros}
+          onChange={cambiarFiltros}
+          opciones={filtrosOpts.data}
+          cargando={filtrosOpts.isPending}
+          estadoFijo={estadoFijoDeTab(tab)}
+          estadoIgnorado={motivoEstadoIgnorado(tab)}
+        />
 
-          {stock.isPending ? (
-            <StockSkeleton />
-          ) : (
-            <>
-              {/* `totales` sale del set base: los KPIs no cambian al cambiar de solapa (ni con el
-                  filtro de Estado, que el backend aplica como drill-down: de ahí la leyenda). */}
-              <StockKpis
-                tab={tab}
-                totales={stock.data.totales}
-                estadoFiltrado={filtros.estado !== "" && estadoAplicaEnTab(tab)}
-              />
+        {stock.isError ? (
+          <ErrorState error={stock.error} onRetry={() => void stock.refetch()} />
+        ) : stock.isPending ? (
+          <StockSkeleton />
+        ) : (
+          <>
+            <TabsContent value="stock" className="space-y-4">
+              <PanelPaginado
+                listado={stock.data}
+                onPage={setPage}
+                vacio="No hay artículos con esos filtros."
+              >
+                <StockTable filas={stock.data.items} />
+              </PanelPaginado>
+            </TabsContent>
 
-              <TabsContent value="stock" className="space-y-4">
-                <PanelPaginado
-                  listado={stock.data}
-                  onPage={setPage}
-                  vacio="No hay artículos con esos filtros."
-                >
-                  <StockTable filas={stock.data.items} />
-                </PanelPaginado>
-              </TabsContent>
+            {/* Mismo set, sumado por artículo: sin depósito, para ver la posición total. */}
+            <TabsContent value="global">
+              <PanelPaginado
+                listado={stock.data}
+                onPage={setPage}
+                vacio="No hay artículos con esos filtros."
+              >
+                <StockGlobalTable filas={stock.data.items} />
+              </PanelPaginado>
+            </TabsContent>
 
-              {/* Mismo set, sumado por artículo: sin depósito, para ver la posición total. */}
-              <TabsContent value="global">
-                <PanelPaginado
-                  listado={stock.data}
-                  onPage={setPage}
-                  vacio="No hay artículos con esos filtros."
-                >
-                  <StockGlobalTable filas={stock.data.items} />
-                </PanelPaginado>
-              </TabsContent>
+            <TabsContent value="vencimientos">
+              {/* Una fila por lote, pero el paginado cuenta artículos: se aclaran las dos cosas. */}
+              <PanelPaginado
+                listado={stock.data}
+                onPage={setPage}
+                vacio="No hay lotes vencidos ni próximos a vencer con esos filtros."
+                detalle={detalleDeLotes(stock.data)}
+              >
+                <VencimientosTable filas={stock.data.items} />
+              </PanelPaginado>
+            </TabsContent>
 
-              <TabsContent value="vencimientos">
-                {/* Una fila por lote, pero el paginado cuenta artículos: se aclaran las dos cosas. */}
-                <PanelPaginado
-                  listado={stock.data}
-                  onPage={setPage}
-                  vacio="No hay lotes vencidos ni próximos a vencer con esos filtros."
-                  detalle={detalleDeLotes(stock.data)}
-                >
-                  <VencimientosTable filas={stock.data.items} />
-                </PanelPaginado>
-              </TabsContent>
+            <TabsContent value="inmovilizado">
+              <PanelPaginado
+                listado={stock.data}
+                onPage={setPage}
+                vacio="No hay artículos inmovilizados con esos filtros."
+              >
+                <InmovilizadoTable filas={stock.data.items} />
+              </PanelPaginado>
+            </TabsContent>
 
-              <TabsContent value="inmovilizado">
-                <PanelPaginado
-                  listado={stock.data}
-                  onPage={setPage}
-                  vacio="No hay artículos inmovilizados con esos filtros."
-                >
-                  <InmovilizadoTable filas={stock.data.items} />
-                </PanelPaginado>
-              </TabsContent>
-
-              <TabsContent value="rubro">
-                <StockPorRubro porRubro={stock.data.porRubro} />
-              </TabsContent>
-            </>
-          )}
-        </Tabs>
-      )}
+            <TabsContent value="rubro">
+              <StockPorRubro porRubro={stock.data.porRubro} />
+            </TabsContent>
+          </>
+        )}
+      </Tabs>
     </>
   );
 }

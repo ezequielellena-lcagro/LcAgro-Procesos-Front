@@ -29,9 +29,17 @@ export function Tabs<T extends string>({ value, onValueChange, className, childr
   );
 }
 
-export function TabsList({ className, children }: { className?: string; children: ReactNode }) {
+export function TabsList({
+  label,
+  className,
+  children,
+}: {
+  label?: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <div role="tablist" className={cn("flex gap-3", className)}>
+    <div role="tablist" aria-label={label} className={cn("flex gap-3", className)}>
       {children}
     </div>
   );
@@ -49,7 +57,7 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
       aria-controls={`tabpanel-${value}`}
       onClick={() => ctx.onValueChange(value)}
       className={cn(
-        "rounded-md border px-4 py-2 text-sm font-semibold transition-colors",
+        "whitespace-nowrap rounded-md border px-4 py-2 text-sm font-semibold transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active
           ? "border-primary bg-primary text-primary-foreground"

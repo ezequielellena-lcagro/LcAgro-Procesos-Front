@@ -37,6 +37,11 @@ function fila(nombre: string) {
   return within(campo.closest("[data-fila]") as HTMLElement);
 }
 
+/** Las dos listas están en solapas: abre la que corresponde antes de tocar nada. */
+function irASolapa(nombre: RegExp) {
+  fireEvent.click(screen.getByRole("tab", { name: nombre }));
+}
+
 /**
  * Administración de bancos y líneas de crédito.
  *
@@ -44,11 +49,29 @@ function fila(nombre: string) {
  * pedía una migración y un deploy.
  */
 describe("CatalogosDialog", () => {
-  it("lista las líneas y los bancos que ya existen", () => {
+  it("abre en las líneas, que es lo que más se toca", () => {
     renderDialog();
 
     expect(screen.getByDisplayValue("CAPITAL DE TRABAJO")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("NACIÓN")).not.toBeInTheDocument();
+  });
+
+  /** Apiladas, llegar a los bancos pedía scrollear todas las líneas. */
+  it("los bancos están en la otra solapa", () => {
+    renderDialog();
+
+    irASolapa(/bancos/i);
+
     expect(screen.getByDisplayValue("NACIÓN")).toBeInTheDocument();
+    expect(screen.queryByDisplayValue("CAPITAL DE TRABAJO")).not.toBeInTheDocument();
+  });
+
+  /** El contador dice de entrada cuánto hay de cada cosa. */
+  it("cada solapa dice cuántos ítems tiene", () => {
+    renderDialog();
+
+    expect(screen.getByRole("tab", { name: /líneas de crédito \(3\)/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /bancos \(2\)/i })).toBeInTheDocument();
   });
 
   /** Los desactivados también se ven: si no, no habría forma de volver a activarlos. */
@@ -79,6 +102,7 @@ describe("CatalogosDialog", () => {
     const onCrear = vi.fn();
     renderDialog({ onCrear });
 
+    irASolapa(/bancos/i);
     fireEvent.change(screen.getByLabelText(/nuevo banco/i), { target: { value: "PATAGONIA" } });
     fireEvent.click(screen.getByRole("button", { name: /agregar banco/i }));
 

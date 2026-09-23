@@ -86,8 +86,8 @@ export function MovimientosPanel({
   ];
 
   return (
-    <div className="space-y-3">
-      <FilterBar className="mb-0">
+    <div className="space-y-4">
+      <FilterBar>
         <FilterField label="Desde">
           <DateField value={filtros.desde ?? ""} onChange={(v) => onFiltros({ ...filtros, desde: v || undefined })} />
         </FilterField>

@@ -18,7 +18,6 @@ import type { ExportColumn, ExportKpi, ExportSpec } from "@/shared/export/export
 import { exportToXlsx } from "@/shared/export/export-xlsx";
 import { numero } from "@/shared/format/format";
 import { AjustesDialog } from "../components/ajustes-dialog";
-import { ArrastreTab } from "../components/arrastre-tab";
 import { DescartadosAlerta } from "../components/descartados-alerta";
 import { PosicionCard } from "../components/posicion-card";
 import { PosicionDetalle } from "../components/posicion-detalle";
@@ -40,14 +39,14 @@ export function PosicionPage() {
   const [precioMin, setPrecioMin] = useState(50);
   const [precioMax, setPrecioMax] = useState(700);
   const [ajustesOpen, setAjustesOpen] = useState(false);
-  const [tab, setTab] = useState<"resumen" | "detalle" | "arrastre">("resumen");
+  const [tab, setTab] = useState<"resumen" | "detalle">("resumen");
 
   // Campaña por defecto: la vigente si está en la lista, si no la más reciente (derivado, sin efecto).
   const campania = resolverCampania(campaniaSel, campanias.data);
 
   const posicion = usePosicion(campania, cereal || undefined, precioMin, precioMax);
   const detalle = usePosicionDetalle(cereal || undefined, precioMin, precioMax, tab === "detalle");
-  const descartados = useDescartados(cereal || undefined, precioMin, precioMax, tab !== "arrastre");
+  const descartados = useDescartados(cereal || undefined, precioMin, precioMax);
 
   const exportColumns: ExportColumn<PosicionDto>[] = [
     { header: "Cereal", get: (r) => r.cereal },
@@ -103,62 +102,61 @@ export function PosicionPage() {
         }
       />
 
-      <FilterBar>
-        <FilterField label="Campaña">
-          <CampaniaSelect
-            value={campania}
-            campanias={campanias.data}
-            onChange={setCampaniaSel}
-            disabled={tab !== "resumen"}
-          />
-        </FilterField>
-        <FilterField label="Cereal">
-          <Select value={cereal} onChange={(e) => setCereal(e.target.value)}>
-            <option value="">Todos</option>
-            {CEREALES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-        <FilterField label="Precio mín (US$/tn)">
-          <Input
-            type="number"
-            min={0}
-            defaultValue={precioMin}
-            className="w-28"
-            onBlur={(e) => setPrecioMin(Number(e.target.value) || 0)}
-          />
-        </FilterField>
-        <FilterField label="Precio máx (US$/tn)">
-          <Input
-            type="number"
-            min={0}
-            defaultValue={precioMax}
-            className="w-28"
-            onBlur={(e) => setPrecioMax(Number(e.target.value) || 0)}
-          />
-        </FilterField>
-      </FilterBar>
-
-      {descartados.data && descartados.data.length > 0 && tab !== "arrastre" && (
-        <DescartadosAlerta descartados={descartados.data} />
-      )}
-
       {campanias.isError ? (
         <ErrorState error={campanias.error} onRetry={() => void campanias.refetch()} />
       ) : (
-        <Tabs
-          value={tab}
-          onValueChange={(v) => setTab(v as "resumen" | "detalle" | "arrastre")}
-          className="space-y-4"
-        >
+        // Orden de la pantalla: primero QUÉ se mira (pestañas), después CON QUÉ filtros, y recién
+        // ahí los números. Los filtros son los mismos en las dos pestañas, así que viven fuera de
+        // los paneles y no se redibujan al cambiar de pestaña.
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList>
             <TabsTrigger value="resumen">Resumen actual</TabsTrigger>
             <TabsTrigger value="detalle">Detalle campañas</TabsTrigger>
-            <TabsTrigger value="arrastre">Arrastre</TabsTrigger>
           </TabsList>
+
+          <FilterBar>
+            <FilterField
+              label="Campaña"
+              title={tab === "detalle" ? "El detalle muestra todas las campañas." : undefined}
+            >
+              <CampaniaSelect
+                value={campania}
+                campanias={campanias.data}
+                onChange={setCampaniaSel}
+                disabled={tab !== "resumen"}
+              />
+            </FilterField>
+            <FilterField label="Cereal">
+              <Select value={cereal} onChange={(e) => setCereal(e.target.value)}>
+                <option value="">Todos</option>
+                {CEREALES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </Select>
+            </FilterField>
+            <FilterField label="Precio mín (US$/tn)">
+              <Input
+                type="number"
+                min={0}
+                defaultValue={precioMin}
+                className="w-28"
+                onBlur={(e) => setPrecioMin(Number(e.target.value) || 0)}
+              />
+            </FilterField>
+            <FilterField label="Precio máx (US$/tn)">
+              <Input
+                type="number"
+                min={0}
+                defaultValue={precioMax}
+                className="w-28"
+                onBlur={(e) => setPrecioMax(Number(e.target.value) || 0)}
+              />
+            </FilterField>
+          </FilterBar>
+
+          {descartados.data && descartados.data.length > 0 && <DescartadosAlerta descartados={descartados.data} />}
 
           <TabsContent value="resumen">
             {posicion.isError ? (
@@ -190,19 +188,18 @@ export function PosicionPage() {
               <PosicionDetalle filas={detalle.data} />
             ) : null}
           </TabsContent>
-
-          <TabsContent value="arrastre">
-            <ArrastreTab
-              puedeGestionar={puedeGestionar}
-              puedeConfig={puedeConfig}
-              campanias={campanias.data ?? []}
-            />
-          </TabsContent>
         </Tabs>
       )}
 
       {campania && (
-        <AjustesDialog open={ajustesOpen} onClose={() => setAjustesOpen(false)} campania={campania} />
+        <AjustesDialog
+          open={ajustesOpen}
+          onClose={() => setAjustesOpen(false)}
+          campania={campania}
+          campanias={campanias.data ?? []}
+          puedeGestionar={puedeGestionar}
+          puedeConfig={puedeConfig}
+        />
       )}
     </>
   );

@@ -305,7 +305,8 @@ function fueraDeCarteras(campania: string): FueraDeCarteras {
       return dato && (dato.facturacion !== 0 || dato.originacion !== 0);
     }) ? 1 : 0 };
 }
-function consolidado(campania: string, veTodo: boolean, vendedorId?: number,
+/** `vendedorIds` vacío = todas las carteras del alcance; con uno o varios, recorta la hoja. */
+function consolidado(campania: string, veTodo: boolean, vendedorIds: number[] = [],
   sucursalId?: number): ConsolidadoResponse {
   const filas = PRODUCTORES.filter((productor) =>
     (vendedorDe(productor) || planGuardado(campania, productor.cuit) ||
@@ -313,8 +314,9 @@ function consolidado(campania: string, veTodo: boolean, vendedorId?: number,
     (tieneMovimiento(productor, campania) || !!planGuardado(campania, productor.cuit) ||
       !!planGuardado(anteriorDe(campania), productor.cuit)))
     .map((productor) => filaConsolidado(productor, campania))
-    .filter((fila) => (veTodo || fila.vendedorId === vendedorId) &&
-      (vendedorId === undefined || fila.vendedorId === vendedorId) &&
+    .filter((fila) => (veTodo || vendedorIds.length > 0) &&
+      (vendedorIds.length === 0 ||
+        (fila.vendedorId !== null && vendedorIds.includes(fila.vendedorId))) &&
       (sucursalId === undefined || fila.sucursalId === sucursalId));
   const carteras = filas.filter((fila) => fila.vendedorId !== null);
   const subtotal = (campo: "vendedor" | "sucursal") => {
@@ -329,7 +331,7 @@ function consolidado(campania: string, veTodo: boolean, vendedorId?: number,
   };
   const total = totales(carteras);
   const base = totales(filas);
-  const fuera = veTodo && vendedorId === undefined && sucursalId === undefined
+  const fuera = veTodo && vendedorIds.length === 0 && sucursalId === undefined
     ? fueraDeCarteras(campania) : null;
   const facturacionLcUsd = base.facturacionLcUsd + (fuera?.facturacionLcUsd ?? 0);
   const facturacionLcAnteriorUsd = base.facturacionLcAnteriorUsd +
@@ -502,16 +504,18 @@ export const planificacionVentasHandlers = [
     const error = verificarCampania(campania);
     if (error) return error;
     const propio = vendedorDeUsuario(auth.id);
-    const pedido = Number(url.searchParams.get("vendedorId")) || undefined;
-    if (!auth.veTodo && (pedido !== undefined && pedido !== propio?.id ||
+    // Clave repetible: `?vendedorId=3&vendedorId=7`.
+    const pedidos = [...new Set(url.searchParams.getAll("vendedorId").map(Number))]
+      .filter((id) => id > 0);
+    if (!auth.veTodo && (pedidos.some((id) => id !== propio?.id) ||
       url.searchParams.has("sucursalId")))
       return problema(403, "forbidden", "No podés acceder a otra cartera.");
-    const vendedorId = auth.veTodo ? pedido : propio?.id;
     const sucursalId = auth.veTodo ? Number(url.searchParams.get("sucursalId")) || undefined : undefined;
     if (!auth.veTodo && !propio) return HttpResponse.json({
-      ...consolidado(campania, false, 0), sinVendedor: true, datosMacroGestAl: null,
+      ...consolidado(campania, false, [0]), sinVendedor: true, datosMacroGestAl: null,
     } satisfies ConsolidadoResponse);
-    return HttpResponse.json(consolidado(campania, auth.veTodo, vendedorId, sucursalId));
+    const vendedorIds = auth.veTodo ? pedidos : [propio!.id];
+    return HttpResponse.json(consolidado(campania, auth.veTodo, vendedorIds, sucursalId));
   }),
 
   http.get(`${API}/market-share/:campania`, ({ request, params }) => {

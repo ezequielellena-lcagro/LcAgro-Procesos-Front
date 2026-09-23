@@ -1,13 +1,16 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-export function CuentasSkeleton({ rows = 8 }: { rows?: number }) {
+/** `kpis`: la fila de tarjetas se dibuja solo donde después van a aparecer (la lista completa). */
+export function CuentasSkeleton({ rows = 8, kpis = true }: { rows?: number; kpis?: boolean }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-20 rounded-card" />
-        ))}
-      </div>
+      {kpis && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 rounded-card" />
+          ))}
+        </div>
+      )}
       <div className="space-y-2 rounded-card border border-line bg-panel p-4">
         {Array.from({ length: rows }).map((_, i) => (
           <Skeleton key={i} className="h-8 w-full" />

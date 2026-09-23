@@ -1,3 +1,5 @@
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { numero, oDash, usd } from "@/shared/format/format";
 import { type PosicionDto, TIPOS_AJUSTE } from "../types";
@@ -18,58 +20,98 @@ function agruparPorCampania(filas: PosicionDto[]): [string, PosicionDto[]][] {
 export function PosicionDetalle({ filas }: { filas: PosicionDto[] }) {
   const campanias = agruparPorCampania(filas);
   return (
-    <div className="space-y-4">
-      {campanias.map(([campania, rows]) => (
-        <CampaniaBloque key={campania} campania={campania} rows={rows} />
+    <div className="space-y-3">
+      {campanias.map(([campania, rows], i) => (
+        // Solo la campaña más nueva arranca abierta: el resto se despliega a pedido para no scrollear
+        // toda la historia. El estado vive en cada bloque y React lo conserva por la key (campaña).
+        <CampaniaBloque key={campania} campania={campania} rows={rows} defaultAbierto={i === 0} />
       ))}
     </div>
   );
 }
 
-function CampaniaBloque({ campania, rows }: { campania: string; rows: PosicionDto[] }) {
+function CampaniaBloque({
+  campania,
+  rows,
+  defaultAbierto,
+}: {
+  campania: string;
+  rows: PosicionDto[];
+  defaultAbierto: boolean;
+}) {
+  const [abierto, setAbierto] = useState(defaultAbierto);
   const sinVentas = rows.every((r) => r.tnVenta === 0);
   // Los totales de la campaña suman los CONSOLIDADOS (con ajustes), que es lo que el cliente compara.
   const totCompra = rows.reduce((s, r) => s + r.tnCompraTotal, 0);
   const totVenta = rows.reduce((s, r) => s + r.tnVentaTotal, 0);
   const totPosicion = rows.reduce((s, r) => s + r.posicionFinal, 0);
+  const panelId = `detalle-${campania}`;
 
   return (
-    <section className="rounded-card border border-line bg-panel p-5 shadow-card">
-      <header className="mb-3 flex items-center gap-2">
-        <h3 className="font-display text-lg text-ink">Campaña {campania}</h3>
+    <section className="rounded-card border border-line bg-panel px-5 py-4 shadow-card">
+      <header className={cn("flex flex-wrap items-center gap-2", abierto && "mb-3")}>
+        <h3 className="font-display text-lg text-ink">
+          <button
+            type="button"
+            onClick={() => setAbierto((v) => !v)}
+            aria-expanded={abierto}
+            aria-controls={panelId}
+            className="flex items-center gap-2 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {abierto ? (
+              <ChevronDown className="size-4 flex-none text-ink-soft" />
+            ) : (
+              <ChevronRight className="size-4 flex-none text-ink-soft" />
+            )}
+            Campaña {campania}
+          </button>
+        </h3>
         {sinVentas && (
           <span className="rounded bg-clementina/15 px-2 py-0.5 text-xs font-semibold text-clementina-deep">
             sin ventas cargadas
           </span>
         )}
+        {/* Colapsada, la campaña sigue diciendo lo esencial: es la fila Total en una línea. */}
+        {!abierto && (
+          <span className="tabular ml-auto flex items-center gap-3 text-xs text-ink-soft">
+            <span>Compra {numero(totCompra)}</span>
+            <span>Venta {numero(totVenta)}</span>
+            <span className={cn("font-semibold", totPosicion >= 0 ? "text-verde" : "text-rojo")}>
+              Posición {numero(totPosicion)}
+            </span>
+          </span>
+        )}
       </header>
-      <table className="tabular w-full text-sm">
-        <thead>
-          <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-soft">
-            <th scope="col" className="py-1.5 text-left font-semibold">Cereal</th>
-            <th scope="col" className="py-1.5 text-right font-semibold">Compra tn</th>
-            <th scope="col" className="py-1.5 text-right font-semibold">P. compra</th>
-            <th scope="col" className="py-1.5 text-right font-semibold">Venta tn</th>
-            <th scope="col" className="py-1.5 text-right font-semibold">P. venta</th>
-            <th scope="col" className="py-1.5 text-right font-semibold">Posición</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <CerealFilas key={`${r.campania}-${r.cereal}`} fila={r} />
-          ))}
-          <tr className="border-t-2 border-line font-semibold text-ink">
-            <td className="py-2 text-left">Total</td>
-            <td className="py-2 text-right">{numero(totCompra)}</td>
-            <td />
-            <td className="py-2 text-right">{numero(totVenta)}</td>
-            <td />
-            <td className={cn("py-2 text-right", totPosicion >= 0 ? "text-verde" : "text-rojo")}>
-              {numero(totPosicion)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+
+      {abierto && (
+        <table id={panelId} className="tabular w-full text-sm">
+          <thead>
+            <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-soft">
+              <th scope="col" className="py-1.5 text-left font-semibold">Cereal</th>
+              <th scope="col" className="py-1.5 text-right font-semibold">Compra tn</th>
+              <th scope="col" className="py-1.5 text-right font-semibold">P. compra</th>
+              <th scope="col" className="py-1.5 text-right font-semibold">Venta tn</th>
+              <th scope="col" className="py-1.5 text-right font-semibold">P. venta</th>
+              <th scope="col" className="py-1.5 text-right font-semibold">Posición</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <CerealFilas key={`${r.campania}-${r.cereal}`} fila={r} />
+            ))}
+            <tr className="border-t-2 border-line font-semibold text-ink">
+              <td className="py-2 text-left">Total</td>
+              <td className="py-2 text-right">{numero(totCompra)}</td>
+              <td />
+              <td className="py-2 text-right">{numero(totVenta)}</td>
+              <td />
+              <td className={cn("py-2 text-right", totPosicion >= 0 ? "text-verde" : "text-rojo")}>
+                {numero(totPosicion)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      )}
     </section>
   );
 }

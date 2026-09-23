@@ -17,8 +17,8 @@ describe("Market Share y derivados", () => {
     const anterior = planificacionKeys.marketShare("2025-2026");
     const planActivo = planificacionKeys.plan("2026-2027", 1, false);
     const planInactivo = planificacionKeys.plan("2026-2027", 1, true);
-    const consolidadoActivo = planificacionKeys.consolidado("2026-2027", 1, undefined);
-    const consolidadoInactivo = planificacionKeys.consolidado("2026-2027", 2, undefined);
+    const consolidadoActivo = planificacionKeys.consolidado("2026-2027", [1], undefined);
+    const consolidadoInactivo = planificacionKeys.consolidado("2026-2027", [2], undefined);
     for (const clave of [
       actual,
       anterior,

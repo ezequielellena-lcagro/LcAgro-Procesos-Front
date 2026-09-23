@@ -50,7 +50,7 @@ describe("guardado de plan e invalidación", () => {
 
   it("al volver del plan al consolidado pide los importes recalculados", async () => {
     const client = new QueryClient({ defaultOptions: { mutations: { retry: false, gcTime: Infinity } } });
-    const clave = planificacionKeys.consolidado("2026-2027", undefined, undefined);
+    const clave = planificacionKeys.consolidado("2026-2027", [], undefined);
     client.setQueryData(clave, { campania: "2026-2027", mercadoUsd: 10 });
     vi.spyOn(apiClient, "put").mockResolvedValue({ data: { guardados: [] } } as never);
     const wrapper = ({ children }: { children: ReactNode }) => (
@@ -69,7 +69,7 @@ describe("guardado de plan e invalidación", () => {
 
   it("refresca el consolidado activo si el PUT termina después de abrir esa solapa", async () => {
     const client = new QueryClient({ defaultOptions: { mutations: { retry: false }, queries: { retry: false } } });
-    const clave = planificacionKeys.consolidado("2026-2027", undefined, undefined);
+    const clave = planificacionKeys.consolidado("2026-2027", [], undefined);
     client.setQueryData(clave, { campania: "2026-2027", mercadoUsd: 10 });
     let completarGet: () => void = () => {};
     const consultar = vi.fn().mockImplementation(() => new Promise((resolver) => {

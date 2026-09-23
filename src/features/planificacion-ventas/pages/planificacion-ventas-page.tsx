@@ -1,89 +1,98 @@
+import { Sliders } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/shared/components/page-header";
 import { useAvisoCambiosSinGuardar } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
 import { ConsolidadoPanel } from "../components/consolidado-panel";
 import { MarketShareForm } from "../components/market-share-form";
 import { PlanSiembraPanel } from "../components/plan-siembra-panel";
-import { VendedoresPanel } from "../components/vendedores-panel";
+import { VendedoresDialog } from "../components/vendedores-dialog";
 import { useContextoPlanificacion } from "../queries/use-plan-siembra";
 
-type Solapa = "plan" | "consolidado" | "market-share" | "vendedores";
+type Solapa = "plan" | "consolidado" | "market-share";
 const SOLAPAS: { id: Solapa; nombre: string; gestion?: boolean }[] = [
   { id: "plan", nombre: "Plan de siembra" },
   { id: "consolidado", nombre: "Consolidado" },
   { id: "market-share", nombre: "Market Share", gestion: true },
-  { id: "vendedores", nombre: "Vendedores", gestion: true },
 ];
 
 export function PlanificacionVentasPage() {
   const contexto = useContextoPlanificacion();
   const [solapa, setSolapa] = useState<Solapa>("plan");
+  // Nodo del encabezado donde la solapa activa manda su "Datos de MacroGest al … / Actualizar".
+  const [slotFuente, setSlotFuente] = useState<HTMLElement | null>(null);
   const [planDirty, setPlanDirty] = useState(false);
   const [marketDirty, setMarketDirty] = useState(false);
-  const [vendedoresDirty, setVendedoresDirty] = useState(false);
-  useAvisoCambiosSinGuardar(planDirty || marketDirty || vendedoresDirty);
+  // Los vendedores no entran acá: el tilde de cada uno guarda solo, no deja borrador que avisar.
+  const [ajustesOpen, setAjustesOpen] = useState(false);
+  useAvisoCambiosSinGuardar(planDirty || marketDirty);
+  const puedeGestionar = contexto.data?.alcance.veTodo ?? false;
   const solapaVisible =
-    contexto.data &&
-    !contexto.data.alcance.veTodo &&
-    (solapa === "market-share" || solapa === "vendedores")
-      ? "plan"
-      : solapa;
+    contexto.data && !puedeGestionar && solapa === "market-share" ? "plan" : solapa;
   return (
     <div>
       <PageHeader
         title="Planificación de Ventas"
         subtitle="Plan de siembra y seguimiento comercial por campaña."
+        actions={
+          <>
+            <div ref={setSlotFuente} className="flex items-center gap-2" />
+            {puedeGestionar && (
+              <Button type="button" size="sm" onClick={() => setAjustesOpen(true)}>
+                <Sliders className="size-4" /> Ajustes
+              </Button>
+            )}
+          </>
+        }
       />
+      {/* Montado sólo mientras está abierto: así cada vez arranca en la primera página y sin
+          filtro, y el catálogo no se consulta al entrar a la pantalla. */}
+      {ajustesOpen && <VendedoresDialog open onClose={() => setAjustesOpen(false)} />}
       {contexto.data ? (
         <>
           {contexto.isError && (
             <ErrorState error={contexto.error} onRetry={() => void contexto.refetch()} />
           )}
-          <div
-            role="tablist"
-            aria-label="Planificación de Ventas"
-            className="mb-5 flex gap-1 overflow-x-auto border-b border-line pb-2"
-          >
-            {SOLAPAS.filter((item) => !item.gestion || contexto.data.alcance.veTodo).map((item) => (
-              <button
-                key={item.id}
-                id={`solapa-${item.id}`}
-                type="button"
-                role="tab"
-                aria-selected={solapaVisible === item.id}
-                aria-controls={`panel-${item.id}`}
-                onClick={() => setSolapa(item.id)}
-                className={
-                  solapaVisible === item.id
-                    ? "whitespace-nowrap rounded-md border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-                    : "whitespace-nowrap rounded-md px-4 py-2 text-sm text-ink-soft hover:bg-panel-soft hover:text-ink"
-                }
-              >
-                {item.nombre}
-              </button>
-            ))}
-          </div>
+          {/* Sólo la tira de solapas sale del componente compartido: los paneles se quedan
+              montados (hidden) para no perder el borrador, así que no usamos TabsContent. */}
+          <Tabs value={solapaVisible} onValueChange={setSolapa} className="mb-4">
+            <TabsList label="Planificación de Ventas">
+              {SOLAPAS.filter((item) => !item.gestion || puedeGestionar).map(
+                (item) => (
+                  <TabsTrigger key={item.id} value={item.id}>
+                    {item.nombre}
+                  </TabsTrigger>
+                ),
+              )}
+            </TabsList>
+          </Tabs>
           {/* La carga conserva su borrador y su aviso de salida al cambiar de solapa. */}
           <div
-            id="panel-plan"
+            id="tabpanel-plan"
             role="tabpanel"
-            aria-labelledby="solapa-plan"
+            aria-labelledby="tab-plan"
             hidden={solapaVisible !== "plan"}
           >
-            <PlanSiembraPanel contexto={contexto.data} onDirtyChange={setPlanDirty} />
+            <PlanSiembraPanel
+              contexto={contexto.data}
+              activo={solapaVisible === "plan"}
+              slotFuente={slotFuente}
+              onDirtyChange={setPlanDirty}
+            />
           </div>
           {solapaVisible === "consolidado" && (
-            <div id="panel-consolidado" role="tabpanel" aria-labelledby="solapa-consolidado">
-              <ConsolidadoPanel contexto={contexto.data} />
+            <div id="tabpanel-consolidado" role="tabpanel" aria-labelledby="tab-consolidado">
+              <ConsolidadoPanel contexto={contexto.data} slotFuente={slotFuente} />
             </div>
           )}
-          {contexto.data.alcance.veTodo && (
+          {puedeGestionar && (
             <div
-              id="panel-market-share"
+              id="tabpanel-market-share"
               role="tabpanel"
-              aria-labelledby="solapa-market-share"
+              aria-labelledby="tab-market-share"
               hidden={solapaVisible !== "market-share"}
             >
               <MarketShareForm
@@ -93,15 +102,6 @@ export function PlanificacionVentasPage() {
               />
             </div>
           )}
-          {contexto.data.alcance.veTodo &&
-            (solapaVisible === "vendedores" || vendedoresDirty) && (
-              <div id="panel-vendedores" role="tabpanel" aria-labelledby="solapa-vendedores"
-                hidden={solapaVisible !== "vendedores"}>
-                <VendedoresPanel contexto={contexto.data}
-                  activo={solapaVisible === "vendedores"}
-                  onDirtyChange={setVendedoresDirty} />
-              </div>
-            )}
         </>
       ) : contexto.isError ? (
         <ErrorState error={contexto.error} onRetry={() => void contexto.refetch()} />

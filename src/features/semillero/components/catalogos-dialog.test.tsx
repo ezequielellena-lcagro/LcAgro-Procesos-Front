@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { CatalogosSemilleroDto, ClienteCopiaDto, DestinoDto, EstadoCopiaClientesDto } from "../types";
-import { CatalogosPanel } from "./catalogos-panel";
+import type { CatalogosSemilleroDto, ClienteCopiaDto, DestinoDto } from "../types";
+import { CatalogosDialog } from "./catalogos-dialog";
 
 const datos: CatalogosSemilleroDto = {
   especies: [
@@ -19,46 +19,38 @@ const clientes: ClienteCopiaDto[] = [
   { numero: 5678, denominacion: "Agropecuaria del Sur SA", cuit: null },
 ];
 
-const copiaOk: EstadoCopiaClientesDto = {
-  ultimaSincronizacion: "2026-09-13T12:00:00Z",
-  ultimoIntentoFallido: null,
-  ultimoError: null,
-  desactualizada: false,
-  sinCopia: false,
-  cantidad: 2,
-};
-
 const destinos: DestinoDto[] = [{ id: 1, clienteNumero: 1234, nombre: "Campo El Roble", activo: true, enUso: 2 }];
 
 interface RenderOpts {
   datos?: CatalogosSemilleroDto;
   clienteElegido?: number | null;
   destinos?: DestinoDto[];
+  /** Solapa a abrir antes de la aserción; por defecto queda la que trae el diálogo (Variedades). */
+  solapa?: "Ubicaciones" | "Destinos por cliente";
 }
 
 /**
  * Cada mock se declara aparte (no como un objeto de props con `...over`): así conserva su tipo de
  * `Mock` completo (`mockRejectedValueOnce`, etc.), en vez de ensancharse a la unión con la firma de
- * la prop declarada en `CatalogosPanel` (mismo patrón que `renderDialog` en `orden-dialog.test.tsx`).
+ * la prop declarada en `CatalogosDialog` (mismo patrón que `renderDialog` en `orden-dialog.test.tsx`).
  */
-function renderPanel(opts: RenderOpts = {}) {
+function renderDialog(opts: RenderOpts = {}) {
+  const onClose = vi.fn();
   const onGuardarVariedad = vi.fn().mockResolvedValue(undefined);
   const onGuardarUbicacion = vi.fn().mockResolvedValue(undefined);
-  const onActualizarClientes = vi.fn();
   const onClienteChange = vi.fn();
   const onAgregarDestino = vi
     .fn()
     .mockResolvedValue({ id: 2, clienteNumero: 1234, nombre: "Campo Nuevo", activo: true, enUso: 0 });
   const onGuardarDestino = vi.fn().mockResolvedValue(undefined);
   render(
-    <CatalogosPanel
+    <CatalogosDialog
+      open
+      onClose={onClose}
       datos={opts.datos ?? datos}
       onGuardarVariedad={onGuardarVariedad}
       onGuardarUbicacion={onGuardarUbicacion}
       clientes={clientes}
-      copiaClientes={copiaOk}
-      actualizandoClientes={false}
-      onActualizarClientes={onActualizarClientes}
       clienteElegido={opts.clienteElegido === undefined ? 1234 : opts.clienteElegido}
       onClienteChange={onClienteChange}
       destinos={opts.destinos ?? destinos}
@@ -67,12 +59,21 @@ function renderPanel(opts: RenderOpts = {}) {
       onGuardarDestino={onGuardarDestino}
     />,
   );
-  return { onGuardarVariedad, onGuardarUbicacion, onActualizarClientes, onClienteChange, onAgregarDestino, onGuardarDestino };
+  if (opts.solapa) fireEvent.click(screen.getByRole("tab", { name: new RegExp(opts.solapa) }));
+  return { onClose, onGuardarVariedad, onGuardarUbicacion, onClienteChange, onAgregarDestino, onGuardarDestino };
 }
 
-describe("CatalogosPanel", () => {
+describe("CatalogosDialog", () => {
+  it("abre en Variedades y las otras listas no están montadas hasta elegir su solapa", () => {
+    renderDialog();
+    expect(screen.getByRole("dialog", { name: "Catálogos" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Nueva variedad")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Nueva ubicación")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Nuevo destino")).not.toBeInTheDocument();
+  });
+
   it("ofrece una especie nueva del catálogo de MacroGest para agregar variedades", async () => {
-    const props = renderPanel({
+    const props = renderDialog({
       datos: { ...datos, especies: [...datos.especies, { codigoRubro: 102, nombre: "Maíz", activo: true }] },
     });
     fireEvent.change(screen.getByLabelText("Especie de la nueva variedad"), { target: { value: "Maíz" } });
@@ -84,7 +85,7 @@ describe("CatalogosPanel", () => {
   });
 
   it("agrega una variedad a la especie elegida y limpia el campo", async () => {
-    const props = renderPanel();
+    const props = renderDialog();
     fireEvent.change(screen.getByLabelText("Especie de la nueva variedad"), { target: { value: "Trigo" } });
     fireEvent.change(screen.getByLabelText("Nueva variedad"), { target: { value: "DM CATALPA" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar variedad" }));
@@ -94,9 +95,23 @@ describe("CatalogosPanel", () => {
     expect(screen.getByLabelText("Nueva variedad")).toHaveValue("");
   });
 
+  /**
+   * Lo cargado es una tabla con encabezados, no una lista de renglones: la especie es una columna
+   * más (antes eran títulos sueltos, y las diez de MacroGest se titulaban aunque no tuvieran nada).
+   */
+  it("lista las variedades en una tabla con la especie como columna", () => {
+    renderDialog();
+    const tabla = screen.getByRole("table");
+    for (const columna of ["Especie", "Variedad", "Lotes", "Activa"]) {
+      expect(within(tabla).getByRole("columnheader", { name: new RegExp(columna) })).toBeInTheDocument();
+    }
+    const fila = within(tabla).getByRole("row", { name: /DM 46E25/ });
+    expect(within(fila).getByText("Soja")).toBeInTheDocument();
+    expect(within(fila).getByText("3")).toBeInTheDocument();
+  });
+
   it("una variedad en uso se desactiva, no se borra", async () => {
-    const props = renderPanel();
-    expect(screen.getByText("3 lotes")).toBeInTheDocument();
+    const props = renderDialog();
     fireEvent.click(screen.getByRole("checkbox", { name: "DM 46E25 activa" }));
     await waitFor(() =>
       expect(props.onGuardarVariedad).toHaveBeenCalledWith({ id: 1, especie: "Soja", nombre: "DM 46E25", activo: false }),
@@ -104,7 +119,7 @@ describe("CatalogosPanel", () => {
   });
 
   it("agrega una ubicación del galpón", async () => {
-    const props = renderPanel();
+    const props = renderDialog({ solapa: "Ubicaciones" });
     fireEvent.change(screen.getByLabelText("Nueva ubicación"), { target: { value: "G5-18" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar ubicación" }));
     await waitFor(() =>
@@ -113,7 +128,7 @@ describe("CatalogosPanel", () => {
   });
 
   it("si el servidor rechaza (duplicado) muestra el motivo", async () => {
-    const props = renderPanel();
+    const props = renderDialog({ solapa: "Ubicaciones" });
     props.onGuardarUbicacion.mockRejectedValueOnce(new Error("Ya existe la ubicación G1-6."));
     fireEvent.change(screen.getByLabelText("Nueva ubicación"), { target: { value: "g1-6" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar ubicación" }));
@@ -121,15 +136,15 @@ describe("CatalogosPanel", () => {
   });
 
   it("sin cliente elegido no se pueden ver ni agregar destinos", () => {
-    renderPanel({ clienteElegido: null, destinos: [] });
+    renderDialog({ solapa: "Destinos por cliente", clienteElegido: null, destinos: [] });
     expect(screen.getByText("Elegí un cliente para ver sus destinos.")).toBeInTheDocument();
     expect(screen.queryByLabelText("Nuevo destino")).not.toBeInTheDocument();
   });
 
   it("cambia de cliente para ver sus destinos", () => {
-    const props = renderPanel({ clienteElegido: null, destinos: [] });
-    // No `getByRole("combobox")`: los `<select>` nativos de Variedades/Ubicaciones también llevan
-    // ese rol implícito. El buscador de clientes se distingue por su placeholder.
+    const props = renderDialog({ solapa: "Destinos por cliente", clienteElegido: null, destinos: [] });
+    // No `getByRole("combobox")`: el `<select>` nativo de Variedades también lleva ese rol
+    // implícito. El buscador de clientes se distingue por su placeholder.
     const input = screen.getByPlaceholderText("Buscar cliente…");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "perez" } });
@@ -138,7 +153,7 @@ describe("CatalogosPanel", () => {
   });
 
   it("agrega un destino para el cliente elegido y limpia el campo", async () => {
-    const props = renderPanel();
+    const props = renderDialog({ solapa: "Destinos por cliente" });
     fireEvent.change(screen.getByLabelText("Nuevo destino"), { target: { value: "Campo Nuevo" } });
     fireEvent.click(screen.getByRole("button", { name: "Agregar destino" }));
     await waitFor(() => expect(props.onAgregarDestino).toHaveBeenCalledWith("Campo Nuevo"));
@@ -146,8 +161,7 @@ describe("CatalogosPanel", () => {
   });
 
   it("un destino en uso se desactiva, no se borra", async () => {
-    const props = renderPanel();
-    expect(screen.getByText("2 órdenes")).toBeInTheDocument();
+    const props = renderDialog({ solapa: "Destinos por cliente" });
     fireEvent.click(screen.getByRole("checkbox", { name: "Campo El Roble activo" }));
     await waitFor(() =>
       expect(props.onGuardarDestino).toHaveBeenCalledWith({ id: 1, nombre: "Campo El Roble", activo: false }),
@@ -155,7 +169,7 @@ describe("CatalogosPanel", () => {
   });
 
   it("se puede corregir el nombre de un destino", async () => {
-    const props = renderPanel();
+    const props = renderDialog({ solapa: "Destinos por cliente" });
     fireEvent.click(screen.getByRole("button", { name: "Renombrar Campo El Roble" }));
     fireEvent.change(screen.getByLabelText("Nombre de Campo El Roble"), { target: { value: "Campo El Roble Norte" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar nombre" }));
@@ -164,9 +178,25 @@ describe("CatalogosPanel", () => {
     );
   });
 
-  it("muestra el estado de la copia de clientes y permite actualizarla", () => {
-    const props = renderPanel();
-    fireEvent.click(screen.getByRole("button", { name: "Actualizar clientes" }));
-    expect(props.onActualizarClientes).toHaveBeenCalled();
+  /**
+   * El refresco manual de la copia de clientes vive sólo en el diálogo de la orden, que es donde
+   * frena el trabajo si falta un cliente; acá era ruido arriba de la única lista de la solapa.
+   */
+  it("no ofrece actualizar la copia de clientes", () => {
+    renderDialog({ solapa: "Destinos por cliente" });
+    expect(screen.queryByRole("button", { name: "Actualizar clientes" })).not.toBeInTheDocument();
+  });
+
+  /** Las especies se sincronizan solas cada 24 h contra MacroGest: el botón manual era ruido. */
+  it("no muestra la leyenda de especies de MacroGest", () => {
+    renderDialog();
+    expect(screen.queryByText(/Especies de MacroGest/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actualizar especies" })).not.toBeInTheDocument();
+  });
+
+  it("se cierra con el botón Cerrar del diálogo", () => {
+    const props = renderDialog();
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
+    expect(props.onClose).toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import { AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
 import { toAppError } from "@/lib/api-error";
 import { env } from "@/lib/env";
@@ -27,6 +28,9 @@ const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "O
 
 const HOY = new Date();
 
+/** Las dos solapas: el resumen del mes por vendedor y el detalle renglón por renglón. */
+type TabComisiones = "resumen" | "detalle";
+
 export function ComisionesPage() {
   const { hasAnyRole } = useAuth();
   const puedeGestionar = hasAnyRole(["comisiones"]);
@@ -41,6 +45,7 @@ export function ComisionesPage() {
   const [conflicto, setConflicto] = useState<string | null>(null);
   // Renglón cuyo costo se está corrigiendo (la fila entera, no un id): null = diálogo cerrado.
   const [corregirCosto, setCorregirCosto] = useState<ComisionDetalleDto | null>(null);
+  const [tab, setTab] = useState<TabComisiones>("resumen");
 
   const anioNum = Number(anio) || HOY.getFullYear();
 
@@ -203,33 +208,47 @@ export function ComisionesPage() {
       ) : isPending ? (
         <ComisionesSkeleton />
       ) : (
-        <div className="space-y-4">
-          <ComisionesResumen
-            resumen={resumen.data}
-            vendedorSeleccionado={vendNro}
-            onSeleccionarVendedor={(nro) => {
-              setVendNro((prev) => (prev === nro ? "" : nro));
-              setPage(1);
-            }}
-          />
-          {comisiones.data.items.length === 0 ? (
-            <EmptyState mensaje="No hay comisiones con esos filtros." />
-          ) : (
-            <>
-              <ComisionesTable
-                filas={comisiones.data.items}
-                puedeCorregirCosto={puedeGestionar}
-                onCorregirCosto={setCorregirCosto}
-              />
-              <Pagination
-                page={comisiones.data.page}
-                totalPages={comisiones.data.totalPages}
-                total={comisiones.data.total}
-                onPage={setPage}
-              />
-            </>
-          )}
-        </div>
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="resumen">Resumen por vendedor</TabsTrigger>
+            <TabsTrigger value="detalle">Detalle ({comisiones.data.total})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="resumen">
+            <ComisionesResumen
+              resumen={resumen.data}
+              vendedorSeleccionado={vendNro}
+              onSeleccionarVendedor={(nro) => {
+                // Elegir un vendedor es un drill-down: además de filtrar, lleva a donde se ve el
+                // efecto. Tocar el ya seleccionado sólo limpia el filtro y se queda en el resumen.
+                const limpia = vendNro === nro;
+                setVendNro(limpia ? "" : nro);
+                setPage(1);
+                if (!limpia) setTab("detalle");
+              }}
+            />
+          </TabsContent>
+
+          <TabsContent value="detalle" className="space-y-4">
+            {comisiones.data.items.length === 0 ? (
+              <EmptyState mensaje="No hay comisiones con esos filtros." />
+            ) : (
+              <>
+                <ComisionesTable
+                  filas={comisiones.data.items}
+                  puedeCorregirCosto={puedeGestionar}
+                  onCorregirCosto={setCorregirCosto}
+                />
+                <Pagination
+                  page={comisiones.data.page}
+                  totalPages={comisiones.data.totalPages}
+                  total={comisiones.data.total}
+                  onPage={setPage}
+                />
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* Montado siempre (fuera de isPending/isError): el Modal devuelve null si `fila` es null. */}

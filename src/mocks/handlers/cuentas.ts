@@ -8,6 +8,7 @@ import type {
 } from "@/features/cuentas/types";
 import type { ImportacionResultado } from "@/features/cuentas/queries/use-importar-cuentas";
 import { env } from "@/lib/env";
+import { CONTACTOS_VENDEDORES } from "../contactos-vendedores";
 
 const API = env.apiUrl;
 
@@ -16,8 +17,9 @@ type CuentaBase = Omit<CuentaDto, "devolucion" | "observaciones">;
 // Observaciones en memoria (upsert por cuenta) para el demo.
 const OBS: Record<number, { devolucion: string | null; observaciones: string | null }> = {};
 
-// Emails de vendedores: "nuestros" (editables, en memoria) y los que vendrían de MacroGest (solo algunos).
-const CONTACTOS: Record<number, string> = {};
+// Emails de vendedores: "nuestros" (editables, en memoria, compartidos con el seguimiento de acopio)
+// y los que vendrían de MacroGest (solo algunos).
+const CONTACTOS = CONTACTOS_VENDEDORES;
 const EMAIL_MACROGEST: Record<number, string> = { 1: "lcagro@demo.com" };
 
 // Cuentas ficticias (NUNCA PII real). vendedor de ejemplo.
@@ -230,14 +232,16 @@ function armarContado(u: URL) {
 }
 
 // ── Histórico mensual (cierre) ──────────────────────────────────────────────────
-// Foto append-only por (periodo, cuenta). En memoria: se siembran 2 meses cerrados y el POST agrega
-// uno nuevo (upsert por período → idempotente). El "mes en curso" es el primer mes NO cerrado.
+// Foto append-only por (periodo, revisión, cuenta). En memoria: se siembran 2 meses cerrados (uno con
+// dos revisiones, para poder probar el selector) y el POST agrega uno nuevo. Nada se pisa: re-cerrar
+// agrega una revisión. El período ABIERTO es el siguiente al último cerrado.
 
 interface CierreSnapshot {
   anio: number;
   mes: number;
-  corte: string; // yyyy-MM-dd (último día del mes)
-  fechaCierre: string; // ISO datetime
+  revision: number;
+  corte: string; // yyyy-MM-dd: la fecha del informe, la elige quien cierra (puede caer en el mes siguiente)
+  fechaCierre: string; // ISO datetime: cuándo se apretó "Cerrar mes"
   items: CierreCuenta[];
 }
 
@@ -281,10 +285,23 @@ mayo[0].devolucion = "Firmó plan a 90 días.";
 const junio = fotoItems(0.95);
 junio[1].observaciones = "Prometió cancelar contra cosecha.";
 
+// Junio tiene una segunda revisión: entró un movimiento con fecha vieja después de presentarlo, se
+// re-fotografió al MISMO corte y la revisión 1 quedó guardada.
+const junioRev2 = junio.map((c) =>
+  c.cuenta === junio[0].cuenta
+    ? { ...c, saldoVencido: round2(c.saldoVencido + 1500), saldo: round2(c.saldo + 1500) }
+    : { ...c },
+);
+
 const CIERRES: CierreSnapshot[] = [
-  { anio: 2026, mes: 5, corte: corteDe(2026, 5), fechaCierre: "2026-06-01T10:00:00.000Z", items: mayo },
-  { anio: 2026, mes: 6, corte: corteDe(2026, 6), fechaCierre: "2026-07-01T10:00:00.000Z", items: junio },
+  { anio: 2026, mes: 5, revision: 1, corte: "2026-06-05", fechaCierre: "2026-06-09T10:00:00.000Z", items: mayo },
+  { anio: 2026, mes: 6, revision: 1, corte: "2026-07-07", fechaCierre: "2026-07-12T10:00:00.000Z", items: junio },
+  { anio: 2026, mes: 6, revision: 2, corte: "2026-07-07", fechaCierre: "2026-07-20T09:30:00.000Z", items: junioRev2 },
 ];
+
+/** La revisión vigente (la más alta) de un período, o undefined si nunca se cerró. */
+const vigenteDe = (anio: number, mes: number) =>
+  CIERRES.filter((s) => s.anio === anio && s.mes === mes).sort((a, b) => b.revision - a.revision)[0];
 
 const totalesDe = (items: CierreCuenta[]) => ({
   cuentas: items.length,
@@ -301,8 +318,8 @@ function periodoAbierto() {
   return { ...abierto, faltaCerrar: antesDe(abierto, periodoActual()) };
 }
 
-/** Congela el período abierto (upsert por período) y limpia las notas del mes en curso. */
-function cerrarMesEnCurso(): CierreSnapshot {
+/** Congela el período abierto al corte elegido como revisión nueva y blanquea las notas. */
+function cerrarMesEnCurso(corte: string): CierreSnapshot {
   const { anio, mes } = periodoAbierto();
   const items = CUENTAS.map((c) => ({
     cuenta: c.cuenta,
@@ -316,14 +333,105 @@ function cerrarMesEnCurso(): CierreSnapshot {
     observaciones: OBS[c.cuenta]?.observaciones ?? null,
   })).sort((a, b) => a.vendedor.localeCompare(b.vendedor) || a.cuenta - b.cuenta);
 
-  const snap: CierreSnapshot = { anio, mes, corte: corteDe(anio, mes), fechaCierre: new Date().toISOString(), items };
-  const i = CIERRES.findIndex((s) => s.anio === anio && s.mes === mes);
-  if (i >= 0) CIERRES[i] = snap;
-  else CIERRES.push(snap);
+  const snap: CierreSnapshot = {
+    anio,
+    mes,
+    revision: (vigenteDe(anio, mes)?.revision ?? 0) + 1,
+    corte,
+    fechaCierre: new Date().toISOString(),
+    items,
+  };
+  CIERRES.push(snap);   // append-only: nunca pisa
 
   // El mes nuevo arranca en blanco (la foto ya guardó lo del mes que cierra).
   for (const k of Object.keys(OBS)) delete OBS[Number(k)];
   return snap;
+}
+
+/**
+ * Re-fotografía un período ya cerrado como revisión nueva: hereda las notas de la vigente y toma los
+ * saldos "de hoy" (en el mock, los de CUENTAS). No toca OBS (la carga del mes en curso).
+ */
+function recerrarPeriodo(anio: number, mes: number, corte?: string): CierreSnapshot | null {
+  const vigente = vigenteDe(anio, mes);
+  if (!vigente) return null;
+
+  const notas = new Map(vigente.items.map((c) => [c.cuenta, c]));
+  const items = CUENTAS.map((c) => ({
+    cuenta: c.cuenta,
+    denominacion: c.denominacion,
+    vendedor: c.vendedor,
+    vendNro: c.vendNro,
+    saldoVencido: c.saldoVencido,
+    saldoAVencer: c.saldoAVencer,
+    saldo: c.saldo,
+    devolucion: notas.get(c.cuenta)?.devolucion ?? null,
+    observaciones: notas.get(c.cuenta)?.observaciones ?? null,
+  })).sort((a, b) => a.vendedor.localeCompare(b.vendedor) || a.cuenta - b.cuenta);
+
+  const snap: CierreSnapshot = {
+    anio,
+    mes,
+    revision: vigente.revision + 1,
+    corte: corte ?? vigente.corte,
+    fechaCierre: new Date().toISOString(),
+    items,
+  };
+  CIERRES.push(snap);
+  return snap;
+}
+
+/** Contrasta la foto vigente contra los saldos "de hoy" (CUENTAS) al mismo corte. */
+function diffDe(anio: number, mes: number) {
+  const vigente = vigenteDe(anio, mes);
+  if (!vigente) return null;
+
+  const actual = new Map(CUENTAS.map((c) => [c.cuenta, c]));
+  const enFoto = new Set(vigente.items.map((c) => c.cuenta));
+  type Item = {
+    cuenta: number; denominacion: string; vendedor: string | null;
+    tipo: "Cambiada" | "Agregada" | "Quitada";
+    vencidoFoto: number; vencidoActual: number; saldoFoto: number; saldoActual: number; delta: number;
+  };
+  const items: Item[] = [];
+
+  for (const f of vigente.items) {
+    const a = actual.get(f.cuenta);
+    if (!a) {
+      items.push({
+        cuenta: f.cuenta, denominacion: f.denominacion, vendedor: f.vendedor, tipo: "Quitada",
+        vencidoFoto: f.saldoVencido, vencidoActual: 0, saldoFoto: f.saldo, saldoActual: 0,
+        delta: round2(-f.saldo),
+      });
+    } else if (a.saldo !== f.saldo || a.saldoVencido !== f.saldoVencido) {
+      items.push({
+        cuenta: f.cuenta, denominacion: f.denominacion, vendedor: f.vendedor, tipo: "Cambiada",
+        vencidoFoto: f.saldoVencido, vencidoActual: a.saldoVencido,
+        saldoFoto: f.saldo, saldoActual: a.saldo, delta: round2(a.saldo - f.saldo),
+      });
+    }
+  }
+  for (const a of CUENTAS.filter((c) => !enFoto.has(c.cuenta))) {
+    items.push({
+      cuenta: a.cuenta, denominacion: a.denominacion, vendedor: a.vendedor, tipo: "Agregada",
+      vencidoFoto: 0, vencidoActual: a.saldoVencido, saldoFoto: 0, saldoActual: a.saldo,
+      delta: round2(a.saldo),
+    });
+  }
+  items.sort((x, y) => Math.abs(y.delta) - Math.abs(x.delta) || x.cuenta - y.cuenta);
+
+  return {
+    anio,
+    mes,
+    revision: vigente.revision,
+    corte: vigente.corte,
+    hayCambios: items.length > 0,
+    cambiadas: items.filter((i) => i.tipo === "Cambiada").length,
+    agregadas: items.filter((i) => i.tipo === "Agregada").length,
+    quitadas: items.filter((i) => i.tipo === "Quitada").length,
+    deltaSaldo: round2(items.reduce((s, i) => s + i.delta, 0)),
+    items,
+  };
 }
 
 export const cuentasHandlers = [
@@ -369,6 +477,9 @@ export const cuentasHandlers = [
       hasPrevious: page > 1,
       totales,
       subtotales,
+      // El mock no reconstruye saldos a fechas pasadas (no tiene ledger), pero devuelve el corte
+      // pedido para que la pantalla muestre bien a qué día dice estar mirando.
+      corte: u.searchParams.get("corte") || isoLocal(new Date()),
     });
   }),
 
@@ -468,36 +579,93 @@ export const cuentasHandlers = [
     return HttpResponse.json(periodoAbierto());
   }),
 
-  // Períodos cerrados (más nuevo primero) para el selector.
+  // Períodos cerrados (más nuevo primero) para el selector: cada uno describe su revisión VIGENTE.
   http.get(`${API}/cuentas/cierre/periodos`, () => {
-    const lista = [...CIERRES]
-      .sort((a, b) => b.anio - a.anio || b.mes - a.mes)
-      .map((s) => ({
-        anio: s.anio,
-        mes: s.mes,
-        cuentas: s.items.length,
-        saldo: totalesDe(s.items).saldo,
-        fechaCierre: s.fechaCierre,
-      }));
-    return HttpResponse.json(lista);
+    const periodos = [...new Set(CIERRES.map((s) => `${s.anio}-${s.mes}`))]
+      .map((k) => {
+        const [anio, mes] = k.split("-").map(Number);
+        const s = vigenteDe(anio, mes);
+        return {
+          anio,
+          mes,
+          cuentas: s.items.length,
+          saldo: totalesDe(s.items).saldo,
+          corte: s.corte,
+          fechaCierre: s.fechaCierre,
+          revision: s.revision,
+          revisiones: CIERRES.filter((x) => x.anio === anio && x.mes === mes).length,
+        };
+      })
+      .sort((a, b) => b.anio - a.anio || b.mes - a.mes);
+    return HttpResponse.json(periodos);
   }),
 
-  // Cierra el mes en curso (idempotente: upsert por período).
-  http.post(`${API}/cuentas/cierre`, () => {
-    const snap = cerrarMesEnCurso();
+  // Cierra el período abierto al corte que manda el body (agrega revisión, no pisa).
+  http.post(`${API}/cuentas/cierre`, async ({ request }) => {
+    const body = (await request.json()) as { corte?: string } | null;
+    const corte = body?.corte || isoLocal(new Date());
+    const snap = cerrarMesEnCurso(corte);
     return HttpResponse.json({
       anio: snap.anio,
       mes: snap.mes,
       cuentas: snap.items.length,
       saldo: totalesDe(snap.items).saldo,
+      corte: snap.corte,
+      revision: snap.revision,
     });
   }),
 
-  // Foto de un período cerrado (solo lectura).
-  http.get(`${API}/cuentas/cierre/:anio/:mes`, ({ params }) => {
+  // Revisiones de un período (la vigente primero).
+  http.get(`${API}/cuentas/cierre/:anio/:mes/revisiones`, ({ params }) => {
     const anio = Number(params.anio);
     const mes = Number(params.mes);
-    const snap = CIERRES.find((s) => s.anio === anio && s.mes === mes);
+    const todas = CIERRES.filter((s) => s.anio === anio && s.mes === mes);
+    if (todas.length === 0) return new HttpResponse("Período no encontrado.", { status: 404 });
+
+    const ultima = Math.max(...todas.map((s) => s.revision));
+    const lista = todas
+      .map((s) => ({
+        revision: s.revision,
+        corte: s.corte,
+        fechaCierre: s.fechaCierre,
+        cuentas: s.items.length,
+        saldo: totalesDe(s.items).saldo,
+        vigente: s.revision === ultima,
+      }))
+      .sort((a, b) => b.revision - a.revision);
+    return HttpResponse.json(lista);
+  }),
+
+  // Diff contra MacroGest al mismo corte (registraciones retroactivas).
+  http.get(`${API}/cuentas/cierre/:anio/:mes/diff`, ({ params }) => {
+    const diff = diffDe(Number(params.anio), Number(params.mes));
+    if (!diff) return new HttpResponse("Período no encontrado.", { status: 404 });
+    return HttpResponse.json(diff);
+  }),
+
+  // Re-cierre: guarda una revisión nueva sin tocar la anterior.
+  http.post(`${API}/cuentas/cierre/:anio/:mes/revision`, async ({ params, request }) => {
+    const body = (await request.json().catch(() => null)) as { corte?: string | null } | null;
+    const snap = recerrarPeriodo(Number(params.anio), Number(params.mes), body?.corte ?? undefined);
+    if (!snap) return new HttpResponse("Período no encontrado.", { status: 404 });
+    return HttpResponse.json({
+      anio: snap.anio,
+      mes: snap.mes,
+      cuentas: snap.items.length,
+      saldo: totalesDe(snap.items).saldo,
+      corte: snap.corte,
+      revision: snap.revision,
+    });
+  }),
+
+  // Foto de un período cerrado (solo lectura). ?revision=N o, sin él, la vigente.
+  http.get(`${API}/cuentas/cierre/:anio/:mes`, ({ params, request }) => {
+    const anio = Number(params.anio);
+    const mes = Number(params.mes);
+    const rev = new URL(request.url).searchParams.get("revision");
+    const snap = rev
+      ? CIERRES.find((s) => s.anio === anio && s.mes === mes && s.revision === Number(rev))
+      : vigenteDe(anio, mes);
     if (!snap) return new HttpResponse("Período no encontrado.", { status: 404 });
     return HttpResponse.json({
       anio: snap.anio,
@@ -505,14 +673,19 @@ export const cuentasHandlers = [
       corte: snap.corte,
       totales: totalesDe(snap.items),
       items: snap.items,
+      revision: snap.revision,
+      fechaCierre: snap.fechaCierre,
     });
   }),
 
   // Export .xlsx de la foto de un período (demo: mismo patrón que /cuentas/export).
-  http.get(`${API}/cuentas/cierre/:anio/:mes/export`, async ({ params }) => {
+  http.get(`${API}/cuentas/cierre/:anio/:mes/export`, async ({ params, request }) => {
     const anio = Number(params.anio);
     const mes = Number(params.mes);
-    const snap = CIERRES.find((s) => s.anio === anio && s.mes === mes);
+    const rev = new URL(request.url).searchParams.get("revision");
+    const snap = rev
+      ? CIERRES.find((s) => s.anio === anio && s.mes === mes && s.revision === Number(rev))
+      : vigenteDe(anio, mes);
     if (!snap) return new HttpResponse("Período no encontrado.", { status: 404 });
 
     const { default: writeXlsxFile } = await import("write-excel-file/browser");

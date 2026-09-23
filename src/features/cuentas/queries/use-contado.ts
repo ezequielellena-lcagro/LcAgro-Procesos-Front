@@ -15,6 +15,7 @@ export function useContado(filtros: ContadoFiltros, enabled: boolean) {
         params: {
           vendNro: filtros.vendNro,
           minUsd: filtros.minUsd,
+          corte: filtros.corte || undefined,
         },
       });
       return data;

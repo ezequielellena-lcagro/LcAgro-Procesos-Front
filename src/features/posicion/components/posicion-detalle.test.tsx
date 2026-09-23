@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { PosicionDto } from "../types";
 import { PosicionDetalle } from "./posicion-detalle";
@@ -108,6 +108,41 @@ describe("PosicionDetalle", () => {
   it("marca 'sin ventas cargadas' cuando todas las filas tienen venta 0", () => {
     render(<PosicionDetalle filas={[fila({ campania: "2023-2024", cereal: "Maíz", tnCompra: 100, tnVenta: 0 })]} />);
     expect(screen.getByText("sin ventas cargadas")).toBeInTheDocument();
+  });
+
+  it("arranca con la campaña más nueva abierta y el resto colapsado", () => {
+    render(
+      <PosicionDetalle
+        filas={[
+          fila({ campania: "2025-2026", cereal: "Soja", tnCompra: 100, tnVenta: 60, posicionFinal: 40 }),
+          fila({ campania: "2024-2025", cereal: "Maíz", tnCompra: 50, tnVenta: 20, posicionFinal: 30 }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("Soja")).toBeInTheDocument();
+    expect(screen.queryByText("Maíz")).not.toBeInTheDocument();
+    // Colapsada, la campaña igual muestra su total en el encabezado.
+    expect(screen.getByText("Posición 30")).toBeInTheDocument();
+  });
+
+  it("despliega y vuelve a colapsar una campaña al hacer clic en su título", () => {
+    render(
+      <PosicionDetalle
+        filas={[
+          fila({ campania: "2025-2026", cereal: "Soja", tnCompra: 100, tnVenta: 60, posicionFinal: 40 }),
+          fila({ campania: "2024-2025", cereal: "Maíz", tnCompra: 50, tnVenta: 20, posicionFinal: 30 }),
+        ]}
+      />,
+    );
+    const toggle = screen.getByRole("button", { name: /Campaña 2024-2025/ });
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Maíz")).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Maíz")).not.toBeInTheDocument();
   });
 
   it("calcula la fila Total por campaña (suma compra, venta y posición)", () => {

@@ -3,11 +3,9 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
 import { CampaniaSelect } from "@/shared/components/campania-select";
 import { DataTable, type Column } from "@/shared/components/data-table";
-import { EmptyState } from "@/shared/components/empty-state";
 import { ErrorState } from "@/shared/components/error-state";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { ExportButtons } from "@/shared/components/export-buttons";
@@ -33,29 +31,27 @@ import type {
   VolumenAcopiadoDto,
 } from "../types";
 
-type Tab = "resumen" | "vendedor";
-
 export function VolumenAcopiadoPage() {
   const { hasAnyRole } = useAuth();
   const [campaniaSel, setCampaniaSel] = useState<string>();
-  const [tab, setTab] = useState<Tab>("resumen");
+  // El filtro de vendedor ES la navegación: sin vendedor se ve el ranking de todos; con uno elegido,
+  // su ficha. No hay solapas porque serían un segundo control para lo mismo que ya hace el filtro.
   const [vendedorSel, setVendedorSel] = useState<string>();
 
   const resumen = useVolumenAcopiado(campaniaSel);
   const campania = resumen.data?.campania;
-  const analisis = useAnalisisVendedor(tab === "vendedor" ? vendedorSel : undefined, campania);
+  const analisis = useAnalisisVendedor(vendedorSel, campania);
 
   const puedeAcordar = hasAnyRole(["volumenacopiado"]);
 
-  // En "Por vendedor" se exporta la ficha del vendedor elegido; en "Resumen", los objetivos de todos.
-  const hayQueExportar =
-    tab === "vendedor" ? analisis.data != null && campania != null : resumen.data != null;
+  // Con un vendedor elegido se exporta su ficha; sin filtrar, los objetivos de todos.
+  const hayQueExportar = vendedorSel ? analisis.data != null && campania != null : resumen.data != null;
 
   // Cada rama llama al exportador con su propio tipo de fila: unificarlas antes de llamar dejaría un
   // ExportSpec de dos filas distintas, que no tipa.
   function exportarCon(exportador: typeof exportToPdf) {
     const fallo = () => toast.error("No se pudo generar el archivo.");
-    if (tab === "vendedor") {
+    if (vendedorSel) {
       if (analisis.data && campania) void exportador(specFichaVendedor(analisis.data, campania)).catch(fallo);
       return;
     }
@@ -68,7 +64,7 @@ export function VolumenAcopiadoPage() {
         title="Volumen Acopiado por Vendedor"
         subtitle={
           campania
-            ? `Certificados de depósito 1116 A · campaña ${campania}`
+            ? `Certificados de depósito 1116 A · campaña ${campania}${vendedorSel ? ` · ${vendedorSel}` : ""}`
             : "Cuánto grano trae la cartera de cada vendedor"
         }
         actions={
@@ -90,56 +86,49 @@ export function VolumenAcopiadoPage() {
             disabled={resumen.isPending}
           />
         </FilterField>
-        {tab === "vendedor" && (
-          <FilterField label="Vendedor">
-            <Select value={vendedorSel ?? ""} onChange={(e) => setVendedorSel(e.target.value)}>
-              <option value="">Elegí un vendedor…</option>
-              {resumen.data?.vendedores
-                .filter((v) => !v.excluido)
-                .map((v) => (
-                  <option key={v.vendedor} value={v.vendedor}>
-                    {v.vendedor}
-                  </option>
-                ))}
-            </Select>
-          </FilterField>
-        )}
+        <FilterField label="Vendedor">
+          {/* "" es "todos": el valor vacío vuelve a `undefined` para que la query de la ficha quede
+              apagada (`enabled: !!vendedor`) y no se dispare un pedido sin vendedor. */}
+          <Select
+            value={vendedorSel ?? ""}
+            onChange={(e) => setVendedorSel(e.target.value || undefined)}
+            disabled={resumen.isPending}
+          >
+            <option value="">Todos (ranking)</option>
+            {resumen.data?.vendedores
+              .filter((v) => !v.excluido)
+              .map((v) => (
+                <option key={v.vendedor} value={v.vendedor}>
+                  {v.vendedor}
+                </option>
+              ))}
+          </Select>
+        </FilterField>
       </FilterBar>
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <TabsList>
-          <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="vendedor">Por vendedor</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="resumen">
-          {resumen.isError ? (
-            <ErrorState error={resumen.error} onRetry={() => void resumen.refetch()} />
-          ) : resumen.data ? (
-            <Resumen data={resumen.data} />
-          ) : (
-            <Cargando />
-          )}
-        </TabsContent>
-
-        <TabsContent value="vendedor">
-          {!vendedorSel ? (
-            <EmptyState mensaje="Elegí un vendedor para ver el análisis de su cartera." />
-          ) : analisis.isError ? (
-            <ErrorState error={analisis.error} onRetry={() => void analisis.refetch()} />
-          ) : analisis.data && campania ? (
-            <Vendedor data={analisis.data} campania={campania} puedeAcordar={puedeAcordar} />
-          ) : (
-            <Cargando />
-          )}
-        </TabsContent>
-      </Tabs>
+      {!vendedorSel ? (
+        resumen.isError ? (
+          <ErrorState error={resumen.error} onRetry={() => void resumen.refetch()} />
+        ) : resumen.data ? (
+          <Resumen data={resumen.data} />
+        ) : (
+          <Cargando kpis={0} />
+        )
+      ) : analisis.isError ? (
+        <ErrorState error={analisis.error} onRetry={() => void analisis.refetch()} />
+      ) : analisis.data && campania ? (
+        <Vendedor data={analisis.data} campania={campania} puedeAcordar={puedeAcordar} />
+      ) : (
+        <Cargando />
+      )}
     </div>
   );
 }
 
 function Resumen({ data }: { data: VolumenAcopiadoDto }) {
-  const t = data.totales;
+  // El total es la suma de la columna, no un número traído aparte: así el pie de la tabla siempre
+  // cierra con lo que está arriba (incluidas las sociedades vinculadas y los canales de baja).
+  const totalTn = data.vendedores.reduce((acc, v) => acc + v.tn, 0);
 
   const ranking: Column<VendedorResumen>[] = [
     {
@@ -180,21 +169,6 @@ function Resumen({ data }: { data: VolumenAcopiadoDto }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        <KpiCard label="Total acopiado" value={`${numero(t.tn)} tn`} hint={`${t.productores} productores`} />
-        <KpiCard
-          label="Vendedor líder"
-          value={t.vendedorLider}
-          hint={`${numero(t.tnLider)} tn · ${pct(t.shareLider)} del total`}
-        />
-        <KpiCard
-          label="Cartera dormida"
-          tone="rojo"
-          value={`${numero(t.tnDormidas)} tn`}
-          hint="mejor año de los clientes que hoy no entregan"
-        />
-      </div>
-
       <section>
         <h2 className="mb-2 font-display text-lg font-semibold text-ink">Ranking por vendedor</h2>
         <DataTable
@@ -202,6 +176,7 @@ function Resumen({ data }: { data: VolumenAcopiadoDto }) {
           rows={data.vendedores}
           getRowKey={(r) => r.vendedor}
           empty="Sin acopio en esta campaña."
+          footer={["Total acopiado", numero(totalTn), null, null, null, null, null]}
         />
         <p className="mt-2 text-xs text-ink-soft">
           El volumen es el de los certificados <b>1116 A</b> (bruto certificado: no se netean retiros ni
@@ -439,14 +414,16 @@ function Cumplimiento({ valor }: { valor: number | null }) {
   return <span className={cls}>{pct(valor)}</span>;
 }
 
-function Cargando() {
+function Cargando({ kpis = 3 }: { kpis?: number }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} className="h-24 w-full rounded-card" />
-        ))}
-      </div>
+      {kpis > 0 && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">
+          {Array.from({ length: kpis }, (_, i) => (
+            <Skeleton key={i} className="h-24 w-full rounded-card" />
+          ))}
+        </div>
+      )}
       <Skeleton className="h-64 w-full rounded-card" />
     </div>
   );

@@ -6,7 +6,8 @@ const TOPE = 8;
 /**
  * Lista accionable de contratos con la fijación ya vencida: el grano está entregado, el plazo para
  * ponerle precio pasó y hay que resolverlo. Ordena por tonelaje (lo que más pesa primero) y encabeza
- * con el total vencido, para leerse como una cola de trabajo, no como una tabla más.
+ * con el total vencido, para leerse como una cola de trabajo, no como una tabla más. Cierra con lo
+ * que vence dentro de 30 días, que es la misma cola un mes más adelante.
  */
 export function FijacionVencidaCard({ filas }: { filas: AFijarDetalleDto[] }) {
   const vencidas = filas
@@ -14,6 +15,11 @@ export function FijacionVencidaCard({ filas }: { filas: AFijarDetalleDto[] }) {
     .sort((a, b) => b.aFijarTn - a.aFijarTn);
   const totalTn = vencidas.reduce((acc, f) => acc + f.aFijarTn, 0);
   const visibles = vencidas.slice(0, TOPE);
+
+  // Se calcula sobre las filas que se están viendo (ya acotadas por cereal y vencimiento) y no
+  // sobre los totales del reporte: así el número nunca contradice a la lista que tiene al lado.
+  const proximas = filas.filter((f) => f.diasParaVto !== null && f.diasParaVto >= 0 && f.diasParaVto <= 30);
+  const proximasTn = proximas.reduce((acc, f) => acc + f.aFijarTn, 0);
 
   return (
     <section className="rounded-card border border-l-4 border-line border-l-rojo bg-panel p-4 shadow-card">
@@ -59,6 +65,11 @@ export function FijacionVencidaCard({ filas }: { filas: AFijarDetalleDto[] }) {
       {vencidas.length > TOPE && (
         <p className="mt-2 text-xs text-ink-soft">y {vencidas.length - TOPE} contratos más…</p>
       )}
+
+      <p className="mt-3 border-t border-line-soft pt-3 text-sm text-ink-soft">
+        Vence en ≤30 días: <b className="tabular text-ink">{numero(proximasTn)} tn</b> ·{" "}
+        {proximas.length} contrato{proximas.length === 1 ? "" : "s"}
+      </p>
     </section>
   );
 }

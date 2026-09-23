@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { EstadoFiltroField } from "./estado-filtro";
-import { MultiSelect } from "./multi-select";
+import { MultiSelect } from "@/shared/components/multi-select";
 import type { FiltrosCompartidos } from "../filtros";
 import type { EstadoStock, StockFiltrosResponse, TipoDeposito } from "../types";
 

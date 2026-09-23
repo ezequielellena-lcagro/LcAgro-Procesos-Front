@@ -82,6 +82,8 @@ export interface AnalisisVendedorDto {
 export interface SeguimientoVendedorDto {
   vendedor: string;
   campania: string;
+  /** Código de viajante en MacroGest: es la clave del email del vendedor. 0 = no está en el padrón. */
+  vendNro: number;
   /** Destinatario resuelto; null si el vendedor no tiene email en ningún lado. */
   email: string | null;
   /** "propia" (cargado en la app), "macrogest" o "sin". */
@@ -91,6 +93,14 @@ export interface SeguimientoVendedorDto {
   cuerpoTexto: string;
   dormidosListados: number;
   enviable: boolean;
+}
+
+/** El contacto del vendedor después de guardarlo. Es el mismo que usa Cuentas Corrientes. */
+export interface ContactoVendedorGuardado {
+  vendNro: number;
+  vendedor: string;
+  email: string;
+  origen: string;
 }
 
 export interface ObjetivoRequest {

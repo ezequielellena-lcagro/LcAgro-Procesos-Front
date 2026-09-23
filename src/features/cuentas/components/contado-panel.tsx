@@ -17,6 +17,13 @@ const AVISO =
   "Si la cuenta no tiene saldo vencido, sus facturas vencidas no se muestran: se consideran saldadas por " +
   "canje (LPG/LSG), retenciones u órdenes de pago, que bajan el saldo sin imputarse a la factura.";
 
+// Mirando una fecha pasada, esta solapa es aproximada: MacroGest guarda lo cancelado de cada factura
+// como un acumulado sin fecha, así que una factura cobrada DESPUÉS del corte ya no figura acá. Los
+// saldos del listado sí se reconstruyen exactos (cada cobranza es un renglón con su propia fecha).
+const AVISO_RETROACTIVO =
+  "A una fecha pasada, esta solapa es aproximada: las facturas cobradas después del corte no aparecen, " +
+  "así que la mora puede verse menor de lo que era ese día. Los saldos de la lista completa sí son exactos.";
+
 /** Fila plana del Excel: una por factura, con su cuenta y vendedor repetidos. */
 interface FilaExportContado {
   vendedor: string;
@@ -240,6 +247,8 @@ function ContadoSkeleton() {
 interface ContadoPanelProps {
   vendNro?: number;
   minUsd?: number;
+  /** Corte retroactivo de la pantalla (yyyy-MM-dd). Sin valor = hoy. */
+  corte?: string;
   /** La solapa está visible: sin esto la query no se dispara. */
   activa: boolean;
 }
@@ -248,8 +257,8 @@ interface ContadoPanelProps {
  * Solapa "Contado": facturas de contado impagas (vencidas y a vencer; el backend ya descarta las
  * vencidas de cuentas sin saldo vencido), vendedor → cuenta → factura.
  */
-export function ContadoPanel({ vendNro, minUsd, activa }: ContadoPanelProps) {
-  const consulta = useContado({ vendNro, minUsd }, activa);
+export function ContadoPanel({ vendNro, minUsd, corte, activa }: ContadoPanelProps) {
+  const consulta = useContado({ vendNro, minUsd, corte }, activa);
 
   if (consulta.isError) return <ErrorState error={consulta.error} onRetry={() => void consulta.refetch()} />;
   if (consulta.isPending) return <ContadoSkeleton />;
@@ -292,6 +301,7 @@ export function ContadoPanel({ vendNro, minUsd, activa }: ContadoPanelProps) {
       </div>
 
       <p className="text-xs text-ink-soft">{AVISO}</p>
+      {corte && <p className="text-xs text-ink-soft">{AVISO_RETROACTIVO}</p>}
 
       <div className="space-y-3">
         {datos.vendedores.map((v) => (

@@ -14,6 +14,7 @@ export function useCuentas(filtros: CuentasFiltros) {
           minUsd: filtros.minUsd,
           page: filtros.page,
           pageSize: filtros.pageSize,
+          corte: filtros.corte || undefined,   // sin corte, el backend usa hoy
         },
       });
       return data;

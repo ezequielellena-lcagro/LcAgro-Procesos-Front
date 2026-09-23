@@ -35,6 +35,17 @@ describe("MultiSelect", () => {
     expect(onChange).toHaveBeenCalledWith([201]);
   });
 
+  it("saca el panel del contenedor: con `absolute` lo tapaba el encabezado sticky de la tabla", () => {
+    const { container } = render(
+      <MultiSelect options={OPTS} value={[]} onChange={() => {}} placeholder="Todos" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Todos/ }));
+    const panel = screen.getByRole("listbox").parentElement;
+    expect(container).not.toContainElement(panel);
+    expect(panel).toHaveStyle({ position: "fixed" });
+    expect(panel).toHaveClass("z-50");
+  });
+
   it("'Limpiar' vacía la selección", () => {
     const onChange = vi.fn();
     render(<MultiSelect options={OPTS} value={[200, 201]} onChange={onChange} placeholder="Todos" />);

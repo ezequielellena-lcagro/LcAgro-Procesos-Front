@@ -20,6 +20,15 @@ export const fecha = (iso: string) => {
   return d.toLocaleDateString("es-AR");
 };
 
+/**
+ * Hoy en yyyy-MM-dd LOCAL, el formato que hablan `<input type="date">` y la API. No usar
+ * `toISOString()`: en husos negativos devuelve el día anterior después de las 21 hs.
+ */
+export const hoyIso = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 /** Aplica el formateador, o devuelve "—" si el valor es null/undefined. */
 export function oDash<T>(value: T | null | undefined, fmt: (v: T) => string): string {
   return value == null ? "—" : fmt(value);

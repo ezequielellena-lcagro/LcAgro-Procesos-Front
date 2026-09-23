@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type {
   AdministrarCatalogos,
@@ -28,6 +29,9 @@ interface Props {
  * <p>Cada proveedor nuevo con financiación trae una línea nueva: hasta ahora eso pedía una
  * migración y un deploy, y por eso terminaban cargándose "parecidas" en el Excel.</p>
  *
+ * <p>Las dos listas van en solapas y no una debajo de la otra: son largas (una línea por proveedor
+ * con financiación) y, apiladas, para llegar a los bancos había que scrollear todas las líneas.</p>
+ *
  * <p>La baja de lo que está en uso es <b>desactivar</b>, no borrar: los préstamos que ya lo tienen
  * lo siguen mostrando. Por eso cada fila dice a cuántos préstamos afecta antes de tocar nada.</p>
  */
@@ -42,6 +46,7 @@ export function CatalogosDialog({
   guardando,
 }: Props) {
   const [aBorrar, setABorrar] = useState<{ tipo: CatalogoTipo; item: CatalogoAdminDto } | null>(null);
+  const [solapa, setSolapa] = useState<CatalogoTipo>("lineas");
 
   return (
     <>
@@ -49,34 +54,41 @@ export function CatalogosDialog({
         {cargando || !datos ? (
           <p className="py-8 text-center text-sm text-ink-soft">Cargando…</p>
         ) : (
-          <div className="space-y-7">
-            <Seccion
-              titulo="Líneas de crédito"
-              ayuda="Las que aparecen al cargar un préstamo. Las de financiación de proveedor llevan IVA."
-              tipo="lineas"
-              items={datos.lineas}
-              conFinanciacion
-              etiquetaNuevo="Nueva línea"
-              etiquetaAgregar="Agregar línea"
-              onCrear={onCrear}
-              onActualizar={onActualizar}
-              onPedirBorrar={(item) => setABorrar({ tipo: "lineas", item })}
-              guardando={guardando}
-            />
+          <Tabs value={solapa} onValueChange={setSolapa} className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="lineas">Líneas de crédito ({datos.lineas.length})</TabsTrigger>
+              <TabsTrigger value="bancos">Bancos ({datos.bancos.length})</TabsTrigger>
+            </TabsList>
 
-            <Seccion
-              titulo="Bancos"
-              ayuda="Con quién está tomada la operación."
-              tipo="bancos"
-              items={datos.bancos}
-              etiquetaNuevo="Nuevo banco"
-              etiquetaAgregar="Agregar banco"
-              onCrear={onCrear}
-              onActualizar={onActualizar}
-              onPedirBorrar={(item) => setABorrar({ tipo: "bancos", item })}
-              guardando={guardando}
-            />
-          </div>
+            <TabsContent value="lineas">
+              <Seccion
+                ayuda="Las que aparecen al cargar un préstamo. Las de financiación de proveedor llevan IVA."
+                tipo="lineas"
+                items={datos.lineas}
+                conFinanciacion
+                etiquetaNuevo="Nueva línea"
+                etiquetaAgregar="Agregar línea"
+                onCrear={onCrear}
+                onActualizar={onActualizar}
+                onPedirBorrar={(item) => setABorrar({ tipo: "lineas", item })}
+                guardando={guardando}
+              />
+            </TabsContent>
+
+            <TabsContent value="bancos">
+              <Seccion
+                ayuda="Con quién está tomada la operación."
+                tipo="bancos"
+                items={datos.bancos}
+                etiquetaNuevo="Nuevo banco"
+                etiquetaAgregar="Agregar banco"
+                onCrear={onCrear}
+                onActualizar={onActualizar}
+                onPedirBorrar={(item) => setABorrar({ tipo: "bancos", item })}
+                guardando={guardando}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </Modal>
 
@@ -111,7 +123,6 @@ export function CatalogosDialog({
 }
 
 function Seccion({
-  titulo,
   ayuda,
   tipo,
   items,
@@ -123,7 +134,6 @@ function Seccion({
   onPedirBorrar,
   guardando,
 }: {
-  titulo: string;
   ayuda: string;
   tipo: CatalogoTipo;
   items: CatalogoAdminDto[];
@@ -148,8 +158,8 @@ function Seccion({
 
   return (
     <section>
-      <h3 className="font-display text-base font-semibold text-ink">{titulo}</h3>
-      <p className="mt-0.5 text-xs text-ink-soft">{ayuda}</p>
+      {/* El título lo dice la solapa; acá queda sólo la aclaración de qué va en la lista. */}
+      <p className="text-xs text-ink-soft">{ayuda}</p>
 
       <div className="mt-3 divide-y divide-line-soft rounded-md border border-line-soft">
         {items.map((item, i) => (

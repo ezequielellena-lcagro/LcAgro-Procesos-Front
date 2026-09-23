@@ -38,11 +38,11 @@ describe("SemilleroPage", () => {
   it("arranca en Stock: pide stock/órdenes/catálogos, pero todavía no la copia de clientes (lazy)", async () => {
     const { queryClient } = renderPagina();
 
-    expect(await screen.findByText("BigBags propios")).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Stock" })).toBeInTheDocument();
     expect(await screen.findByText("26S-001")).toBeInTheDocument(); // lote propio de la fixture
 
-    // Sin ningún diálogo abierto y sin pisar la pestaña Órdenes/Catálogos, la copia de clientes
-    // (R2.2/R2.3) no se pide: es cara (puede refrescar contra MacroGest) y esta pestaña no la usa.
+    // Sin ningún diálogo abierto y sin pisar la pestaña Órdenes, la copia de clientes (R2.2/R2.3)
+    // no se pide: es cara (puede refrescar contra MacroGest) y esta pestaña no la usa.
     expect(queryClient.getQueryData(semilleroKeys.clientes())).toBeUndefined();
 
     // Toda query del módulo vive bajo la misma key raíz.
@@ -53,7 +53,7 @@ describe("SemilleroPage", () => {
 
   it("la pestaña Movimientos es lazy: no se pide hasta que se abre esa pestaña", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     expect(queryClient.getQueryData(semilleroKeys.movimientos({}))).toBeUndefined();
 
@@ -71,7 +71,7 @@ describe("SemilleroPage", () => {
    */
   it("si el backend no responde al pedir los movimientos muestra el error y permite reintentar", async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     server.use(
       http.get(`${env.apiUrl}/semillero/movimientos`, () => HttpResponse.json(null, { status: 500 })),
@@ -90,7 +90,7 @@ describe("SemilleroPage", () => {
 
   it("la pestaña Órdenes de carga muestra las órdenes y pide la copia de clientes para su filtro", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
 
@@ -130,7 +130,7 @@ describe("SemilleroPage", () => {
    */
   it("editar una orden cuyo lote quedó fuera del filtro de Stock muestra el renglón y se puede guardar (R1.3)", async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     await filtrarStockSoloPropio();
 
     fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
@@ -154,7 +154,7 @@ describe("SemilleroPage", () => {
 
   it("el diálogo de orden no se abre hasta tener el stock completo (R1.2)", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     await filtrarStockSoloPropio();
 
     // Sin el stock completo en caché y con la respuesta demorada, el diálogo tiene que esperar.
@@ -184,7 +184,7 @@ describe("SemilleroPage", () => {
    */
   it("aunque haya una copia del stock completo en caché, el diálogo espera la que pide al abrir (R1.2)", async () => {
     const { queryClient } = renderPagina({ staleTime: 60_000 });
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     await filtrarStockSoloPropio();
 
     // Copia de hace un segundo (todavía "fresca" para la caché) sin el lote de la orden N° 1: por
@@ -210,7 +210,7 @@ describe("SemilleroPage", () => {
 
   it("volver a pedir el stock completo con el diálogo abierto no lo cierra ni pierde lo cargado (R1.2)", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Nueva orden" }));
     const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
@@ -232,7 +232,7 @@ describe("SemilleroPage", () => {
 
   it("si falla el stock completo al pedir la orden, avisa sin tapar la página y deja reintentar o cancelar (R1.2)", async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     await filtrarStockSoloPropio();
     server.use(
       http.get(`${env.apiUrl}/semillero/stock`, ({ request }) =>
@@ -283,7 +283,7 @@ describe("SemilleroPage", () => {
    */
   it("si falla el stock completo, la orden no se abre sola con una recarga posterior: espera Reintentar (R1.2)", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     fallarStockCompleto();
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
@@ -310,18 +310,18 @@ describe("SemilleroPage", () => {
    */
   it("si falla el stock completo con la pestaña Stock sin filtros, la página no se reemplaza por el error (R1.2)", async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     fallarStockCompleto();
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
     const aviso = await screen.findByRole("alert");
 
-    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
     expect(screen.getAllByRole("button", { name: "Reintentar" })).toHaveLength(1);
 
     fireEvent.click(within(aviso).getByRole("button", { name: "Cancelar" }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getAllByRole("tab")).toHaveLength(3);
     expect(screen.getByRole("button", { name: "Editar lote 26S-001" })).toBeInTheDocument();
   });
 
@@ -331,7 +331,7 @@ describe("SemilleroPage", () => {
    */
   it("abrir otro diálogo mientras se prepara la orden desiste de ella (R1.2)", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     const liberarStock = demorarStockCompleto();
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
@@ -360,7 +360,7 @@ describe("SemilleroPage", () => {
 
   it("Escape desiste de la orden que se está preparando (R1.2)", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     const liberarStock = demorarStockCompleto();
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
@@ -374,13 +374,14 @@ describe("SemilleroPage", () => {
   });
 
   /**
-   * La pestaña "Órdenes de carga (N)" tiene que contar sólo las Pendientes, el mismo dato que el KPI
-   * "Órdenes pendientes" — nunca el total de órdenes (que se queda alto aunque no quede ninguna
-   * accionable, hallazgo de la recorrida manual del 2026-09-16).
+   * La pestaña "Órdenes de carga (N)" tiene que contar sólo las Pendientes — nunca el total de
+   * órdenes (que se queda alto aunque no quede ninguna accionable, hallazgo de la recorrida manual
+   * del 2026-09-16). Desde que no hay tira de KPIs, ese contador es lo único que avisa que quedó
+   * trabajo sin despachar.
    */
   it('la pestaña "Órdenes de carga" cuenta sólo las pendientes, no el total (recorrida 2026-09-16)', async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
     await screen.findByText("VIVERO DEMO SANTA ROSA SA");
 
@@ -398,7 +399,7 @@ describe("SemilleroPage", () => {
 
   it('"Imprimir" en una orden Despachada abre la vista imprimible con la orden completa (R7.1)', async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     fireEvent.click(screen.getByRole("tab", { name: /Órdenes de carga/ }));
     await screen.findByText("SEMILLERO DEMO EL CEIBO SRL");
 
@@ -412,19 +413,26 @@ describe("SemilleroPage", () => {
     expect(screen.queryByText("Orden de carga — Semillero")).not.toBeInTheDocument();
   });
 
-  it("Catálogos muestra variedades/ubicaciones y pide la copia de clientes para Destinos por cliente", async () => {
+  it('"Catálogos" abre el diálogo con variedades y pide la copia de clientes (la necesita Destinos por cliente)', async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Catálogos" }));
+    // Catálogos ya no es una pestaña: es mantenimiento, no se mira todos los días.
+    expect(screen.queryByRole("tab", { name: "Catálogos" })).not.toBeInTheDocument();
 
-    expect(await screen.findByText("DM 53i54")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Catálogos" }));
+
+    const dialogo = await screen.findByRole("dialog", { name: "Catálogos" });
+    expect(within(dialogo).getByText("DM 53i54")).toBeInTheDocument();
     await waitFor(() => expect(queryClient.getQueryData(semilleroKeys.clientes())).toBeDefined());
+
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByRole("dialog", { name: "Catálogos" })).not.toBeInTheDocument();
   });
 
   it('"Nuevo lote" abre el diálogo de alta y pide la copia de clientes (la necesita si el dueño es un Cliente)', async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     fireEvent.click(screen.getByRole("button", { name: "Nuevo lote" }));
 
@@ -435,7 +443,7 @@ describe("SemilleroPage", () => {
 
   it('"Editar" un lote resuelve el LoteDto completo (duenioEditable/envaseYPesoEditables) antes de abrir', async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     // El lote 26S-C01 (cliente) ya tuvo su ingreso inicial únicamente: sigue editable.
     fireEvent.click(screen.getByRole("button", { name: "Editar lote 26S-C01" }));
@@ -446,7 +454,7 @@ describe("SemilleroPage", () => {
 
   it('"Orden" en una fila propia de Stock abre una orden nueva con ese lote y sus filtros (R4.2/R4.4)', async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-001 en G1-1" }));
 
@@ -471,7 +479,7 @@ describe("SemilleroPage", () => {
 
   it('"Orden" en una fila de un cliente activo espera la copia de clientes, lo preselecciona y pide sus destinos (R4.3)', async () => {
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     // La pestaña Stock no pide la copia de clientes: el diálogo tiene que esperarla para saber si
     // el dueño del lote está activo.
@@ -534,7 +542,7 @@ describe("SemilleroPage", () => {
    */
   it('"Orden" en una fila de cliente espera la copia de clientes que se está pidiendo, aunque haya una vieja (R4.3)', async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     // La copia vieja todavía lo trae, pero el 900001 se dio de baja: la nueva ya no.
     copiaDeClientesVencida(queryClient, [VIVERO, CEIBO]);
     const liberarClientes = demorarClientes(copiaDeClientes([CEIBO]));
@@ -558,7 +566,7 @@ describe("SemilleroPage", () => {
 
   it('"Orden" en una fila de un cliente que falta en la copia vieja lo preselecciona con la nueva (R4.3)', async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     // Otro usuario sincronizó la copia (ya trae al 900001) y cargó el lote después.
     copiaDeClientesVencida(queryClient, [CEIBO]);
     const liberarClientes = demorarClientes();
@@ -582,7 +590,7 @@ describe("SemilleroPage", () => {
    */
   it("si la copia de clientes se refresca con la orden abierta y el cliente sale, página y formulario siguen de acuerdo (R4.3)", async () => {
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
     const dialogo = await screen.findByRole("dialog", { name: "Nueva orden de carga" });
     expect(await within(dialogo).findByRole("option", { name: "Campo Norte" })).toBeInTheDocument();
@@ -621,7 +629,7 @@ describe("SemilleroPage", () => {
       http.get(`${env.apiUrl}/semillero/clientes`, () => HttpResponse.json(null, { status: 503 })),
     );
     renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-C01 en PLANTA" }));
 
@@ -666,7 +674,7 @@ describe("SemilleroPage", () => {
       ),
     );
     const { queryClient } = renderPagina();
-    await screen.findByText("BigBags propios");
+    await screen.findByRole("tab", { name: "Stock" });
 
     fireEvent.click(screen.getByRole("button", { name: "Orden con 26S-B01 en G1-2" }));
 

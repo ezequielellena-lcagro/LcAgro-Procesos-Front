@@ -7,12 +7,13 @@ export const planificacionKeys = {
   viajantes: () => [...planificacionKeys.all, "viajantes-macrogest"] as const,
   usuariosAsignables: () => [...planificacionKeys.all, "usuarios-asignables"] as const,
   controlPadron: (campania: string) => [...planificacionKeys.all, "control-padron", campania] as const,
-  consolidado: (campania: string, vendedorId: number | undefined, sucursalId: number | undefined) =>
+  /** Los ids se ordenan: tildar A y luego B tiene que pegar en la misma entrada que B y luego A. */
+  consolidado: (campania: string, vendedorIds: number[], sucursalId: number | undefined) =>
     [
       ...planificacionKeys.all,
       "consolidado",
       campania,
-      vendedorId ?? null,
+      [...vendedorIds].sort((a, b) => a - b),
       sucursalId ?? null,
     ] as const,
   plan: (campania: string, vendedorId: number | undefined, incluirSinMovimiento: boolean) =>

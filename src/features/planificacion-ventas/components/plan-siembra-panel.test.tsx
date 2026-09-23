@@ -119,6 +119,99 @@ beforeEach(() => {
 });
 
 describe("plan de siembra", () => {
+  it("guardar vive en los filtros y se habilita recien con cambios", () => {
+    render(<PlanSiembraPanel contexto={contexto} />);
+    const guardarBoton = screen.getByRole("button", { name: "Guardar cambios" });
+    const descartarBoton = screen.getByRole("button", { name: "Descartar" });
+    expect(screen.getByText("Sin cambios pendientes")).toBeInTheDocument();
+    expect(guardarBoton).toBeDisabled();
+    expect(descartarBoton).toBeDisabled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Hectáreas de soja de Alfa Ficticia" }), {
+      target: { value: "25" },
+    });
+    expect(screen.getByText("1 productor modificado")).toBeInTheDocument();
+    expect(guardarBoton).toBeEnabled();
+    expect(descartarBoton).toBeEnabled();
+
+    fireEvent.click(descartarBoton);
+    expect(screen.getByText("Sin cambios pendientes")).toBeInTheDocument();
+    expect(guardarBoton).toBeDisabled();
+  });
+
+  it("pagina de a 50 productores y conserva el borrador al cambiar de pagina", async () => {
+    const muchas: PlanSiembraGrilla = {
+      ...data,
+      filas: Array.from({ length: 60 }, (_, indice) => ({
+        ...data.filas[1],
+        cuit: String(20100000000 + indice),
+        razonSocial: "Productor " + String(indice + 1).padStart(2, "0"),
+      })),
+    };
+    vi.mocked(usePlanSiembra).mockReturnValue({
+      data: muchas,
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      isFetching: false,
+      refetch: recargar,
+    } as unknown as ReturnType<typeof usePlanSiembra>);
+    render(<PlanSiembraPanel contexto={contexto} />);
+    expect(screen.getByText("60 productores")).toBeInTheDocument();
+    expect(screen.getByText("Página 1 de 2")).toBeInTheDocument();
+    expect(screen.getByText("Productor 50")).toBeInTheDocument();
+    expect(screen.queryByText("Productor 51")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Anterior/ })).toBeDisabled();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Hectáreas de soja de Productor 01" }), {
+      target: { value: "18" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Siguiente/ }));
+    expect(screen.getByText("Página 2 de 2")).toBeInTheDocument();
+    expect(screen.getByText("Productor 51")).toBeInTheDocument();
+    expect(screen.queryByText("Productor 01")).not.toBeInTheDocument();
+    expect(screen.getByText("1 productor modificado")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Siguiente/ })).toBeDisabled();
+
+    // El plan de una página se guarda aunque estemos parados en la otra.
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() =>
+      expect(guardar).toHaveBeenCalledWith({
+        campania: "2026-2027",
+        request: {
+          items: [
+            {
+              cuit: "20100000000",
+              soja: 18,
+              maiz: null,
+              trigo: null,
+              otro: null,
+              revisionEsperada: 0,
+            },
+          ],
+        },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Anterior/ }));
+    expect(screen.getByText("Productor 01")).toBeInTheDocument();
+  });
+
+  it("campania de solo lectura no muestra acciones de guardado", () => {
+    vi.mocked(usePlanSiembra).mockReturnValue({
+      data: { ...data, editable: false },
+      isPending: false,
+      isError: false,
+      isPlaceholderData: false,
+      isFetching: false,
+      refetch: recargar,
+    } as unknown as ReturnType<typeof usePlanSiembra>);
+    render(<PlanSiembraPanel contexto={contexto} />);
+    expect(screen.getByText(/solo lectura/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Guardar cambios" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Sin cambios pendientes")).not.toBeInTheDocument();
+  });
+
   it("buscar por CUIT o cuenta conserva el borrador al ocultar y volver a mostrar", () => {
     render(<PlanSiembraPanel contexto={contexto} />);
     fireEvent.change(screen.getByRole("textbox", { name: "Hectáreas de soja de Alfa Ficticia" }), {

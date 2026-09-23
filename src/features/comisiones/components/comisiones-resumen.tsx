@@ -5,8 +5,9 @@ import type { ComisionResumenDto, ComisionVendedorResumenDto } from "../types";
 import { MesCongeladoBadge } from "./mes-congelado-badge";
 
 /** Panel de resumen por vendedor del período + fila TOTAL GENERAL (molde de CuentasSubtotales).
- *  Al tocar una fila se filtra el detalle de abajo por ese vendedor (drill-down); tocar el vendedor
- *  ya seleccionado vuelve a "todos". */
+ *  Vive en su propia solapa: al tocar una fila se filtra el detalle por ese vendedor y la página
+ *  salta a la solapa Detalle (drill-down); tocar el vendedor ya seleccionado vuelve a "todos".
+ *  El título lo pone la solapa, por eso acá arriba sólo van el badge y la ayuda. */
 export function ComisionesResumen({
   resumen,
   onSeleccionarVendedor,
@@ -63,13 +64,14 @@ export function ComisionesResumen({
 
   return (
     <section className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-soft">Resumen por vendedor</h2>
-        {resumen.generado && <MesCongeladoBadge />}
-        {onSeleccionarVendedor && filas.length > 0 && (
-          <span className="text-xs text-ink-soft">· Tocá un vendedor para ver su detalle</span>
-        )}
-      </div>
+      {(resumen.generado || (onSeleccionarVendedor && filas.length > 0)) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {resumen.generado && <MesCongeladoBadge />}
+          {onSeleccionarVendedor && filas.length > 0 && (
+            <span className="text-xs text-ink-soft">Tocá un vendedor para ver su detalle.</span>
+          )}
+        </div>
+      )}
       <DataTable
         columns={columns}
         rows={filas}

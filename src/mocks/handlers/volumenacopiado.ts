@@ -1,5 +1,6 @@
 import { http, HttpResponse } from "msw";
 import { env } from "@/lib/env";
+import { CONTACTOS_VENDEDORES } from "../contactos-vendedores";
 import type { AnalisisVendedorDto, VendedorResumen, VolumenAcopiadoDto } from "@/features/volumenacopiado/types";
 
 const API = env.apiUrl;
@@ -15,6 +16,18 @@ const BASE: { vendedor: string; tn: number; activos: number; universo: number; e
 ];
 
 const ACORDADOS: Record<string, number> = { "SAN FRANCISCO DEMO": 1900 };
+
+// Código de viajante de cada vendedor: es la clave del contacto (el mismo que usa cuentas corrientes).
+const VEND_NRO: Record<string, number> = {
+  "SOCIEDAD VINCULADA DEMO": 3,
+  "CERINO DEMO": 26,
+  "SAN FRANCISCO DEMO": 12,
+  "BRAVIN DEMO": 18,
+  "MASSETTI DEMO": 31,
+};
+
+/** Emails cargados "en la app": le ganan al de MacroGest y los comparte con cuentas corrientes. */
+const CONTACTOS = CONTACTOS_VENDEDORES;
 
 function resumenDe(v: (typeof BASE)[number]): VendedorResumen {
   const penetracion = v.universo > 0 ? v.activos / v.universo : 0;
@@ -109,11 +122,14 @@ export const volumenAcopiadoHandlers = [
     if (!r) return HttpResponse.json({ title: "Vendedor sin acopio.", status: 404 }, { status: 404 });
 
     const objetivo = r.objetivoAcordado;
+    const vendNro = VEND_NRO[vendedor] ?? 0;
+    const propio = CONTACTOS[vendNro];
     return HttpResponse.json({
       vendedor,
       campania,
-      email: "vendedor.demo@lcagro.local",
-      origenEmail: "macrogest",
+      vendNro,
+      email: propio ?? "oficina.demo@lcagro.local",
+      origenEmail: propio ? "propia" : "macrogest",
       asunto: `Acopio ${campania} — tu seguimiento al 08/08/2026`,
       cuerpoHtml:
         `<div style="font-family:Arial,sans-serif"><p>Hola <b>${vendedor}</b>,</p>` +
@@ -130,7 +146,27 @@ export const volumenAcopiadoHandlers = [
     });
   }),
 
-  http.post(`${API}/volumen-acopiado/seguimiento`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${API}/volumen-acopiado/seguimiento`, async ({ request }) => {
+    // El backend deja el destinatario usado como contacto del vendedor.
+    const body = (await request.json()) as { vendedor?: string; email?: string };
+    const vendNro = VEND_NRO[body.vendedor ?? ""] ?? 0;
+    if (vendNro > 0 && body.email) CONTACTOS[vendNro] = body.email;
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.put(`${API}/volumen-acopiado/vendedores/:vendNro/contacto`, async ({ params, request }) => {
+    const vendNro = Number(params.vendNro);
+    const { email } = (await request.json()) as { email: string };
+    if (!email?.includes("@"))
+      return HttpResponse.json({ title: "El email no es válido.", status: 400 }, { status: 400 });
+
+    const vendedor = Object.keys(VEND_NRO).find((v) => VEND_NRO[v] === vendNro);
+    if (!vendedor)
+      return HttpResponse.json({ title: "No existe el viajante.", status: 404 }, { status: 404 });
+
+    CONTACTOS[vendNro] = email.trim();
+    return HttpResponse.json({ vendNro, vendedor, email: email.trim(), origen: "propia" });
+  }),
 
   http.get(`${API}/volumen-acopiado/vendedor`, ({ request }) => {
     const url = new URL(request.url);

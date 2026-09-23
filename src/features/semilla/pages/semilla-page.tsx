@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type ChangeEvent } from "react";
-import { AlertTriangle, Download, Upload } from "lucide-react";
+import { Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-field";
 import { Select } from "@/components/ui/select";
@@ -11,7 +11,6 @@ import { ExportButtons } from "@/shared/components/export-buttons";
 import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { Pagination } from "@/shared/components/pagination";
-import { numero } from "@/shared/format/format";
 import { SemillaSkeleton } from "../components/semilla-skeleton";
 import { SemillaTable } from "../components/semilla-table";
 import { useArticulosMapeo } from "../queries/use-articulos-mapeo";
@@ -28,16 +27,6 @@ function hoyISO(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-function Stat({ label, value, acento }: { label: string; value: string; acento?: "verde" | "clementina" }) {
-  const color = acento === "verde" ? "text-verde" : acento === "clementina" ? "text-clementina-deep" : "text-ink";
-  return (
-    <div className="rounded-card border border-line bg-panel p-3.5 shadow-card">
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-soft">{label}</p>
-      <p className={`mt-1 font-display text-2xl font-semibold ${color}`}>{value}</p>
-    </div>
-  );
 }
 
 export function SemillaPage() {
@@ -64,13 +53,11 @@ export function SemillaPage() {
 
   const ventasMes = useMemo(() => ventas.data ?? [], [ventas.data]);
   const hayDatosMes = ventasMes.length > 0; // el Excel (mensual) se habilita si el mes tiene ventas
-  // Grilla y KPIs: ventas del mes HASTA la fecha elegida (inclusive). Filtro de cliente sobre el mes traído.
+  // Grilla: ventas del mes HASTA la fecha elegida (inclusive). Filtro de cliente sobre el mes traído.
   const filas = useMemo(
     () => (fecha ? ventasMes.filter((v) => v.fechaComprobante.slice(0, 10) <= fecha) : ventasMes),
     [ventasMes, fecha],
   );
-  const pendientes = filas.filter((v) => v.requiereMapeo).length;
-  const kilosTotales = filas.reduce((acc, v) => acc + v.kilosTotales, 0);
   const hayDatos = filas.length > 0;
 
   // Sugerencias del matcher (por artículo) para pre-llenar el editor inline y mostrar el valor sugerido.
@@ -88,7 +75,7 @@ export function SemillaPage() {
   // "Solo sin mapear" es un filtro de VISTA extra sobre el día; no afecta el Excel (mensual).
   const filasVista = soloSinMapear ? filas.filter((v) => v.requiereMapeo) : filas;
 
-  // Paginación de la grilla (las tarjetas/KPIs se calculan sobre el día, no sobre la página).
+  // Paginación de la grilla.
   const total = filasVista.length;
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
   const pageSafe = Math.min(page, totalPages); // al cambiar de filtro/mes la página puede quedar fuera de rango
@@ -196,39 +183,6 @@ export function SemillaPage() {
         <EmptyState mensaje="No hay ventas de semilla fiscalizada hasta esa fecha, para ese cultivo." />
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
-            <Stat label="Renglones" value={numero(filas.length)} />
-            <Stat label="Kilos totales" value={`${numero(kilosTotales)} kg`} acento="verde" />
-            <Stat
-              label="Sin mapear"
-              value={numero(pendientes)}
-              acento={pendientes > 0 ? "clementina" : "verde"}
-            />
-          </div>
-
-          {pendientes > 0 && (
-            <div className="flex flex-wrap items-center gap-3 rounded-card border border-clementina/40 bg-clementina/10 px-4 py-3">
-              <AlertTriangle className="size-5 shrink-0 text-clementina-deep" />
-              <p className="flex-1 text-sm text-ink">
-                Hay <strong>{pendientes}</strong> renglón(es) sin mapear. Mapealos directo en la grilla (botón{" "}
-                <em>Mapear</em>) o en lote con la plantilla <em>Variedad Semillas</em>.
-              </p>
-              {!soloSinMapear && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSoloSinMapear(true);
-                    setPage(1);
-                  }}
-                >
-                  Ver solo sin mapear
-                </Button>
-              )}
-            </div>
-          )}
-
           {filasVista.length === 0 ? (
             <EmptyState mensaje="No quedan renglones sin mapear hasta esa fecha, para ese cultivo." />
           ) : (

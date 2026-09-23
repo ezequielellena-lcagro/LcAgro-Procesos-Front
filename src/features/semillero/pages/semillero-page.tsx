@@ -1,9 +1,11 @@
+import { Settings2 } from "lucide-react";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { env } from "@/lib/env";
 import { ErrorState } from "@/shared/components/error-state";
 import { PageHeader } from "@/shared/components/page-header";
-import { CatalogosPanel } from "../components/catalogos-panel";
+import { CatalogosDialog } from "../components/catalogos-dialog";
 import { LoteDialog } from "../components/lote-dialog";
 import { MovimientoDialog } from "../components/movimiento-dialog";
 import { MovimientosPanel } from "../components/movimientos-panel";
@@ -11,7 +13,6 @@ import { OrdenDialog } from "../components/orden-dialog";
 import { OrdenImprimible } from "../components/orden-imprimible";
 import { OrdenesPanel } from "../components/ordenes-panel";
 import { PedidoOrdenAviso } from "../components/pedido-orden-aviso";
-import { SemilleroKpis } from "../components/semillero-kpis";
 import type { OperacionStock } from "../components/stock-panel";
 import { StockPanel } from "../components/stock-panel";
 import { useDestinos, useCrearDestino, useGuardarDestino } from "../queries/use-destinos";
@@ -26,7 +27,6 @@ import {
   useDespacharOrden,
   useGuardarUbicacion,
   useGuardarVariedad,
-  useSincronizarEspecies,
   useRegistrarAjuste,
   useRegistrarIngreso,
   useReubicar,
@@ -48,7 +48,7 @@ import type {
 } from "../types";
 import { usePedidoOrden } from "./use-pedido-orden";
 
-type Pestania = "stock" | "ordenes" | "movimientos" | "catalogos";
+type Pestania = "stock" | "ordenes" | "movimientos";
 
 /** Mientras la copia de clientes todavía no se pidió (o sigue en camino), se asume lo más cauto. */
 const COPIA_CLIENTES_CARGANDO: EstadoCopiaClientesDto = {
@@ -69,7 +69,7 @@ const COPIA_CLIENTES_CARGANDO: EstadoCopiaClientesDto = {
  * orden espera antes de abrirse (stock completo al día, copia de clientes) lo coordina
  * `usePedidoOrden`. La copia de clientes de MacroGest (R2.2/R2.3) es cara — puede refrescar contra
  * MacroGest — así que sólo se pide cuando hace falta: al abrir un diálogo que la necesita (lote,
- * orden) o en las pestañas Órdenes/Catálogos, que tienen su propio selector de cliente. La pestaña
+ * orden, catálogos) o en la pestaña Órdenes, que tiene su propio selector de cliente. La pestaña
  * Movimientos nunca la necesita.
  */
 export function SemilleroPage() {
@@ -83,14 +83,15 @@ export function SemilleroPage() {
   const [loteEditandoId, setLoteEditandoId] = useState<number | null>(null);
   const [movimiento, setMovimiento] = useState<{ operacion: OperacionStock; fila: StockFilaDto } | null>(null);
   const [ordenImprimiendo, setOrdenImprimiendo] = useState<OrdenCargaDto | null>(null);
+  const [catalogosAbierto, setCatalogosAbierto] = useState(false);
   const [clienteCatalogoElegido, setClienteCatalogoElegido] = useState<number | null>(null);
   const pedidoOrden = usePedidoOrden();
 
   // La copia de clientes (R2.2/R2.3) se pide sólo cuando algo de lo montado la necesita: un diálogo
-  // de lote abierto, o las pestañas que tienen su propio selector de cliente (filtro de Órdenes,
-  // Destinos por cliente en Catálogos). Movimientos nunca la necesita; el pedido de orden la pide
-  // por su cuenta (`usePedidoOrden`).
-  const clientesHabilitado = loteDialogAbierto || pestania === "ordenes" || pestania === "catalogos";
+  // abierto con selector de cliente (lote, catálogos → Destinos por cliente) o la pestaña Órdenes,
+  // que lo tiene en el filtro. Movimientos nunca la necesita; el pedido de orden la pide por su
+  // cuenta (`usePedidoOrden`).
+  const clientesHabilitado = loteDialogAbierto || catalogosAbierto || pestania === "ordenes";
 
   const stock = useStockSemillero(stockFiltros);
   const ordenes = useOrdenesCarga(ordenesFiltros);
@@ -115,7 +116,6 @@ export function SemilleroPage() {
   const despacharOrden = useDespacharOrden();
   const anularOrden = useAnularOrden();
   const guardarVariedad = useGuardarVariedad();
-  const sincronizarEspecies = useSincronizarEspecies();
   const guardarUbicacion = useGuardarUbicacion();
   const crearDestinoOrden = useCrearDestino(pedidoOrden.cliente ?? 0);
   const crearDestinoCatalogo = useCrearDestino(clienteCatalogoElegido ?? 0);
@@ -151,6 +151,10 @@ export function SemilleroPage() {
     pedidoOrden.desistir();
     setOrdenImprimiendo(orden);
   };
+  const abrirCatalogos = () => {
+    pedidoOrden.desistir();
+    setCatalogosAbierto(true);
+  };
   const cerrarLoteDialog = () => {
     setLoteDialogAbierto(false);
     setLoteEditandoId(null);
@@ -166,12 +170,19 @@ export function SemilleroPage() {
 
   return (
     <>
-      {/* Sin acciones en el header: StockPanel y OrdenesPanel ya traen su propio botón de alta
-          ("Nuevo lote"/"Nueva orden") en el `FilterBar` de cada pestaña; duplicarlo acá confundiría
+      {/* La única acción del header es Catálogos, en `primary` (el slate de la marca): con el botón
+          `outline` el borde solo se perdía contra el fondo crema y no se encontraba dónde se cargan
+          las variedades. No va acá ningún botón de alta: StockPanel y OrdenesPanel ya traen el suyo
+          ("Nuevo lote"/"Nueva orden") en el `FilterBar` de cada pestaña, y duplicarlo confundiría
           más de lo que ayuda (dos botones con el mismo texto a la vez). */}
       <PageHeader
         title="Stock y Órdenes de Carga"
         subtitle="Semilla por lote y ubicación, y lo que se carga a cada cliente."
+        actions={
+          <Button variant="default" size="sm" onClick={abrirCatalogos}>
+            <Settings2 className="size-4" /> Catálogos
+          </Button>
+        }
       />
 
       {env.useMocks && (
@@ -202,18 +213,16 @@ export function SemilleroPage() {
         <p className="py-8 text-center text-ink-soft">Cargando el semillero…</p>
       ) : (
         <div className="space-y-4">
-          <SemilleroKpis totales={stock.data.totales} />
-
           <Tabs value={pestania} onValueChange={setPestania} className="space-y-3">
             <TabsList>
               <TabsTrigger value="stock">Stock</TabsTrigger>
-              {/* Mismo dato que el KPI "Órdenes pendientes" (`SemilleroKpis`): nunca el total de
-                  órdenes, que se queda alto aunque no quede ninguna accionable (recorrida 2026-09-16). */}
+              {/* Cuenta sólo las pendientes: nunca el total de órdenes, que se queda alto aunque no
+                  quede ninguna accionable (recorrida 2026-09-16). Sin la tira de KPIs, este contador
+                  es lo único que avisa que quedó trabajo sin despachar. */}
               <TabsTrigger value="ordenes">
                 Órdenes de carga ({stock.data.totales.ordenesPendientes})
               </TabsTrigger>
               <TabsTrigger value="movimientos">Movimientos</TabsTrigger>
-              <TabsTrigger value="catalogos">Catálogos</TabsTrigger>
             </TabsList>
 
             <TabsContent value="stock">
@@ -265,27 +274,24 @@ export function SemilleroPage() {
               />
             </TabsContent>
 
-            <TabsContent value="catalogos">
-              <CatalogosPanel
-                datos={catalogos.data}
-                onActualizarEspecies={() => sincronizarEspecies.mutateAsync(undefined)}
-                onGuardarVariedad={(input) => guardarVariedad.mutateAsync(input)}
-                onGuardarUbicacion={(input) => guardarUbicacion.mutateAsync(input)}
-                clientes={listaClientes}
-                copiaClientes={copiaClientes}
-                actualizandoClientes={sincronizarClientes.isPending}
-                onActualizarClientes={() => sincronizarClientes.mutate()}
-                clienteElegido={clienteCatalogoElegido}
-                onClienteChange={setClienteCatalogoElegido}
-                destinos={destinosCatalogo.data ?? []}
-                cargandoDestinos={destinosCatalogo.isPending}
-                onAgregarDestino={(nombre) => crearDestinoCatalogo.mutateAsync({ nombre })}
-                onGuardarDestino={(input) => guardarDestinoCatalogo.mutateAsync(input)}
-              />
-            </TabsContent>
           </Tabs>
         </div>
       )}
+
+      <CatalogosDialog
+        open={catalogosAbierto}
+        onClose={() => setCatalogosAbierto(false)}
+        datos={catalogos.data}
+        onGuardarVariedad={(input) => guardarVariedad.mutateAsync(input)}
+        onGuardarUbicacion={(input) => guardarUbicacion.mutateAsync(input)}
+        clientes={listaClientes}
+        clienteElegido={clienteCatalogoElegido}
+        onClienteChange={setClienteCatalogoElegido}
+        destinos={destinosCatalogo.data ?? []}
+        cargandoDestinos={destinosCatalogo.isPending}
+        onAgregarDestino={(nombre) => crearDestinoCatalogo.mutateAsync({ nombre })}
+        onGuardarDestino={(input) => guardarDestinoCatalogo.mutateAsync(input)}
+      />
 
       <LoteDialog
         open={loteDialogListoParaAbrir}
