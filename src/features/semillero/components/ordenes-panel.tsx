@@ -15,6 +15,7 @@ import {
   type EstadoOrdenCarga,
   type OrdenCargaDto,
   type OrdenCargaFiltros,
+  type VariedadDto,
 } from "../types";
 import { ClienteSelect } from "./cliente-select";
 import { TransicionOrdenDialog, type Transicion } from "./transicion-orden-dialog";
@@ -37,6 +38,8 @@ interface Props {
   datos: OrdenCargaDto[] | undefined;
   cargando: boolean;
   clientes: ClienteCopiaDto[];
+  /** Catálogo completo (activas e inactivas): una orden vieja puede tener una variedad ya desactivada. */
+  variedades: VariedadDto[];
   filtros: OrdenCargaFiltros;
   onFiltros: (filtros: OrdenCargaFiltros) => void;
   onNuevaOrden: () => void;
@@ -61,6 +64,7 @@ export function OrdenesPanel({
   datos,
   cargando,
   clientes,
+  variedades,
   filtros,
   onFiltros,
   onNuevaOrden,
@@ -81,7 +85,13 @@ export function OrdenesPanel({
   const clienteFiltroId = useId();
 
   const columns: Column<OrdenCargaDto>[] = [
-    { key: "numero", header: "N°", sortBy: (o) => o.numero, cell: (o) => o.numero, className: "whitespace-nowrap" },
+    {
+      key: "numero",
+      header: "N°",
+      sortBy: (o) => o.numero,
+      cell: (o) => o.numero,
+      className: "whitespace-nowrap",
+    },
     {
       key: "fechaAlta",
       header: "Fecha",
@@ -89,16 +99,41 @@ export function OrdenesPanel({
       cell: (o) => fechaHora(o.fechaAlta),
       className: "whitespace-nowrap",
     },
-    { key: "cliente", header: "Cliente", sortBy: (o) => o.clienteDenominacion, cell: (o) => o.clienteDenominacion },
-    { key: "destino", header: "Destino", sortBy: (o) => o.destinoNombre, cell: (o) => o.destinoNombre },
-    { key: "pedido", header: "Pedido", cell: (o) => o.numeroPedidoVenta ?? "—", className: "whitespace-nowrap" },
-    { key: "remito", header: "Remito", cell: (o) => o.numeroRemito ?? "—", className: "whitespace-nowrap" },
+    {
+      key: "cliente",
+      header: "Cliente",
+      sortBy: (o) => o.clienteDenominacion,
+      cell: (o) => o.clienteDenominacion,
+    },
+    {
+      key: "destino",
+      header: "Destino",
+      sortBy: (o) => o.destinoNombre,
+      cell: (o) => o.destinoNombre,
+    },
+    {
+      key: "pedido",
+      header: "Pedido",
+      cell: (o) => o.numeroPedidoVenta ?? "—",
+      className: "whitespace-nowrap",
+    },
+    {
+      key: "remito",
+      header: "Remito",
+      cell: (o) => o.numeroRemito ?? "—",
+      className: "whitespace-nowrap",
+    },
     {
       key: "estado",
       header: "Estado",
       sortBy: (o) => o.estado,
       cell: (o) => (
-        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", ESTADO_BADGE_CLS[o.estado])}>
+        <span
+          className={cn(
+            "inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+            ESTADO_BADGE_CLS[o.estado],
+          )}
+        >
           {ESTADOS_ORDEN[o.estado]}
         </span>
       ),
@@ -169,7 +204,10 @@ export function OrdenesPanel({
             aria-label="Estado"
             value={filtros.estado ?? ""}
             onChange={(e) =>
-              onFiltros({ ...filtros, estado: (e.target.value || undefined) as EstadoOrdenCarga | undefined })
+              onFiltros({
+                ...filtros,
+                estado: (e.target.value || undefined) as EstadoOrdenCarga | undefined,
+              })
             }
           >
             <option value="">Todos</option>
@@ -188,10 +226,30 @@ export function OrdenesPanel({
             onChange={(numero) => onFiltros({ ...filtros, clienteNumero: numero ?? undefined })}
           />
         </FilterField>
+        {/* Pedido del cliente (2026-09-27): filtrar las O.C. por variedad sin depender del texto libre. */}
+        <FilterField label="Variedad">
+          <Select
+            aria-label="Variedad"
+            value={filtros.variedadId ?? ""}
+            onChange={(e) =>
+              onFiltros({
+                ...filtros,
+                variedadId: e.target.value ? Number(e.target.value) : undefined,
+              })
+            }
+          >
+            <option value="">Todas</option>
+            {variedades.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.nombre}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
         <FilterField label="Buscar">
           <Input
             aria-label="Buscar"
-            placeholder="N° de orden o cliente"
+            placeholder="N° de orden, cliente, lote o variedad"
             value={filtros.texto ?? ""}
             onChange={(e) => onFiltros({ ...filtros, texto: e.target.value || undefined })}
           />

@@ -16,6 +16,7 @@ export type TipoMovimientoSemillero =
   | "ReubicacionEntrada"
   | "Despacho";
 export type EstadoOrdenCarga = "Pendiente" | "Despachada" | "Anulada";
+/** En pantalla e impresos este atributo se muestra como «Proceso» (pedido del cliente, 2026-09-27). */
 export type DuenioLote = "Propio" | "Cliente";
 export type MotivoAjusteSemillero =
   | "RoturaPerdida"
@@ -365,6 +366,8 @@ export interface OrdenCargaFiltros {
   desde?: string;
   hasta?: string;
   clienteNumero?: number;
+  /** Órdenes con al menos un renglón de esa variedad (pedido del cliente, 2026-09-27). */
+  variedadId?: number;
   texto?: string;
 }
 export interface DespacharOrdenInput {

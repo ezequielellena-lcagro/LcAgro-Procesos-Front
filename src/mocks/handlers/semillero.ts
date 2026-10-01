@@ -758,6 +758,7 @@ export const semilleroHandlers = [
     const desde = url.searchParams.get("desde");
     const hasta = url.searchParams.get("hasta");
     const clienteNumero = url.searchParams.get("clienteNumero");
+    const variedadId = url.searchParams.get("variedadId");
     const texto = url.searchParams.get("texto")?.trim().toLowerCase();
 
     let items = [...ORDENES];
@@ -765,10 +766,26 @@ export const semilleroHandlers = [
     if (desde) items = items.filter((o) => o.fechaAlta >= desde);
     if (hasta) items = items.filter((o) => o.fechaAlta <= hasta);
     if (clienteNumero) items = items.filter((o) => o.clienteNumero === Number(clienteNumero));
+    if (variedadId) {
+      const id = Number(variedadId);
+      items = items.filter((o) =>
+        o.items.some((it) => LOTES.find((l) => l.id === it.loteId)?.variedadId === id),
+      );
+    }
     if (texto) {
-      items = items.filter(
-        (o) =>
-          o.clienteDenominacion.toLowerCase().includes(texto) || String(o.numero).includes(texto),
+      // Igual que el backend: número, cliente, destino, pedido, remito, lotes y variedades.
+      items = items.filter((o) =>
+        [
+          String(o.numero),
+          o.clienteDenominacion,
+          o.destinoNombre,
+          o.numeroPedidoVenta ?? "",
+          o.numeroRemito ?? "",
+          ...o.items.flatMap((it) => [it.loteCodigo, it.variedad, it.ubicacion]),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(texto),
       );
     }
     return HttpResponse.json(

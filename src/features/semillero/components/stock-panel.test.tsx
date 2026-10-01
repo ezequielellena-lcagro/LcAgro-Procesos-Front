@@ -210,16 +210,16 @@ describe("StockPanel", () => {
 
   it("filtra por dueño entre Todos, Propio y Clientes", () => {
     const props = renderPanel({ filtros: { duenio: "Propio" } });
-    expect(screen.getByLabelText("Dueño")).toHaveValue("Propio");
+    expect(screen.getByLabelText("Proceso")).toHaveValue("Propio");
 
-    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "Cliente" } });
+    fireEvent.change(screen.getByLabelText("Proceso"), { target: { value: "Cliente" } });
     expect(props.onFiltros).toHaveBeenCalledWith({ duenio: "Cliente" });
 
-    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Proceso"), { target: { value: "" } });
     expect(props.onFiltros).toHaveBeenCalledWith({ duenio: undefined });
   });
 
-  it("la columna Dueño distingue la semilla propia de la de un cliente", () => {
+  it("la columna Proceso distingue la semilla propia de la de un cliente", () => {
     renderPanel({
       datos: datos([
         fila({ loteId: 1, loteCodigo: "26S-001" }),

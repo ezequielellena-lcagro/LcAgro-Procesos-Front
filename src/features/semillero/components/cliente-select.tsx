@@ -11,7 +11,7 @@ interface Props {
   placeholder?: string;
 }
 
-/** "1234 · Juan Pérez": el mismo separador que usa el resto de la app (p. ej. la columna Dueño). */
+/** "1234 · Juan Pérez": el mismo separador que usa el resto de la app (p. ej. la columna Proceso). */
 function etiquetaCliente(cliente: ClienteCopiaDto): string {
   return `${cliente.numero} · ${cliente.denominacion}`;
 }

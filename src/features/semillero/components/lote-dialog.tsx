@@ -276,7 +276,7 @@ function LoteForm({
         <Campo id="pmil" label="PMIL g" error={errors.pmil?.message} ayuda="Peso de mil semillas.">
           <Input id="pmil" type="number" min="0" step="0.1" {...form.register("pmil")} />
         </Campo>
-        <Campo id="duenio" label="Dueño" error={errors.duenio?.message}>
+        <Campo id="duenio" label="Proceso" error={errors.duenio?.message}>
           <Select id="duenio" disabled={!duenioEditable} {...form.register("duenio")}>
             {DUENIOS.map((d) => (
               <option key={d.valor} value={d.valor}>

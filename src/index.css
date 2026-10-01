@@ -146,4 +146,27 @@
   table {
     font-size: 10px;
   }
+  /* La orden de carga del semillero la leen en el galpón: letra grande, aunque el resto de los
+     impresos (reportes anchos) vaya en 10px. */
+  .orden-imprimible {
+    font-size: 12pt;
+  }
+  .orden-imprimible table {
+    font-size: 12pt;
+  }
+  .orden-imprimible .text-lg {
+    font-size: 14pt;
+  }
+  .orden-imprimible .text-2xl {
+    font-size: 20pt;
+  }
+  .orden-imprimible .text-xs {
+    font-size: 9pt;
+  }
+  .orden-imprimible .text-sm {
+    font-size: 11pt;
+  }
+  .orden-imprimible .break-inside-avoid {
+    break-inside: avoid;
+  }
 }

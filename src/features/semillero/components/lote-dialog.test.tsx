@@ -133,7 +133,7 @@ describe("LoteDialog", () => {
     escribir("Variedad", "1");
     escribir("Ubicación", "1");
     escribir("Cantidad", "10");
-    escribir("Dueño", "Cliente");
+    escribir("Proceso", "Cliente");
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
     expect(await screen.findByText("Elegí el cliente.")).toBeInTheDocument();
@@ -146,7 +146,7 @@ describe("LoteDialog", () => {
     escribir("Variedad", "1");
     escribir("Ubicación", "1");
     escribir("Cantidad", "10");
-    escribir("Dueño", "Cliente");
+    escribir("Proceso", "Cliente");
 
     const combo = screen.getByLabelText("Cliente");
     fireEvent.focus(combo);
@@ -177,7 +177,7 @@ describe("LoteDialog", () => {
 
   it("al editar, los campos de dueño se deshabilitan cuando duenioEditable es false", () => {
     renderDialog({ ...LOTE_EDITABLE, duenioEditable: false });
-    expect(screen.getByLabelText("Dueño")).toBeDisabled();
+    expect(screen.getByLabelText("Proceso")).toBeDisabled();
   });
 
   it("al editar, envase y peso se deshabilitan cuando envaseYPesoEditables es false, con leyenda explicativa", () => {

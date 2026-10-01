@@ -4,9 +4,10 @@ import type { OrdenCargaDto, OrdenCargaItemDto } from "../types";
 import { OrdenImprimible } from "./orden-imprimible";
 
 /**
- * Vista imprimible de una orden de carga (R7.1): cliente, destino, columna Dueño por renglón,
- * subtotales de kg propio/cliente cuando la orden mezcla dueños (ADR-13), y la leyenda "Semilla del
- * cliente" cuando ningún renglón es propio.
+ * Vista imprimible de una orden de carga (R7.1), con el formato pedido por el cliente el 2026-09-27
+ * (cuadro por producto + detalle de lotes + firmas, letra grande): cliente, destino, columna Proceso
+ * por renglón, subtotales de kg propio/cliente cuando la orden mezcla procesos (ADR-13), y la leyenda
+ * "Semilla del cliente" cuando ningún renglón es propio.
  */
 function orden(over: Partial<OrdenCargaDto> = {}): OrdenCargaDto {
   const base: OrdenCargaDto = {
@@ -86,7 +87,7 @@ describe("OrdenImprimible", () => {
     expect(screen.getByText("06-00001")).toBeInTheDocument();
   });
 
-  it("la columna Dueño distingue los renglones propios de los del cliente", () => {
+  it("la columna Proceso distingue los renglones propios de los del cliente", () => {
     render(
       <OrdenImprimible
         orden={orden({
@@ -102,6 +103,63 @@ describe("OrdenImprimible", () => {
     const filaCliente = screen.getByText("26S-002").closest("tr") as HTMLElement;
     expect(within(filaPropia).getByText("Propio")).toBeInTheDocument();
     expect(within(filaCliente).getByText("Cliente")).toBeInTheDocument();
+  });
+
+  it("arma un cuadro por producto con especie, variedad, tratamiento, envase, PG y PMIL", () => {
+    render(<OrdenImprimible orden={orden({ items: [item()] })} onClose={vi.fn()} />);
+    expect(screen.getByText("DM 46E25")).toBeInTheDocument();
+    expect(screen.getByText("Tratada")).toBeInTheDocument();
+    expect(screen.getByText("BigBag")).toBeInTheDocument();
+    expect(screen.getByText("5 BB · 4.000 kg")).toBeInTheDocument();
+    expect(screen.getByText("95")).toBeInTheDocument();
+    expect(screen.getByText("152")).toBeInTheDocument();
+    expect(screen.getByText("Detalle de lotes")).toBeInTheDocument();
+  });
+
+  it("con dos productos repite el bloque, pone un subtotal por producto y un solo total general", () => {
+    render(
+      <OrdenImprimible
+        orden={orden({
+          totalUnidades: 15,
+          totalKg: 4400,
+          totalKgPropio: 4400,
+          items: [
+            item({ id: 1, loteCodigo: "26S-001" }),
+            item({ id: 2, loteCodigo: "26S-002", ubicacion: "G1-7" }),
+            item({
+              id: 3,
+              loteCodigo: "26T-001",
+              especie: "Trigo",
+              variedad: "Baguette 620",
+              envase: "Bolsa",
+              pesoUnitarioKg: 40,
+              cantidad: 5,
+              kg: 200,
+            }),
+          ],
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByRole("table")).toHaveLength(2);
+    expect(screen.getAllByText("Subtotal")).toHaveLength(2);
+    expect(screen.getAllByText("Total")).toHaveLength(1);
+    const filaTotal = screen.getByText("Total").closest("tr") as HTMLElement;
+    expect(within(filaTotal).getByText("15")).toBeInTheDocument();
+    expect(within(filaTotal).getByText("4.400 kg")).toBeInTheDocument();
+  });
+
+  it("con un solo producto no hay subtotal, sólo el total", () => {
+    render(<OrdenImprimible orden={orden({ items: [item()] })} onClose={vi.fn()} />);
+    expect(screen.queryByText("Subtotal")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Total")).toHaveLength(1);
+  });
+
+  it("deja las tres firmas del comprobante anterior", () => {
+    render(<OrdenImprimible orden={orden({ items: [item()] })} onClose={vi.fn()} />);
+    expect(screen.getByText("Responsable despacho")).toBeInTheDocument();
+    expect(screen.getByText("Transportista / Receptor")).toBeInTheDocument();
+    expect(screen.getByText("Fecha y hora de despacho")).toBeInTheDocument();
   });
 
   it("muestra el total de unidades y de kg de la orden", () => {
@@ -122,7 +180,10 @@ describe("OrdenImprimible", () => {
         orden={orden({
           totalKgPropio: 4000,
           totalKgCliente: 1200,
-          items: [item(), item({ id: 2, loteCodigo: "26S-002", duenio: "Cliente", clienteNumero: 500 })],
+          items: [
+            item(),
+            item({ id: 2, loteCodigo: "26S-002", duenio: "Cliente", clienteNumero: 500 }),
+          ],
         })}
         onClose={vi.fn()}
       />,

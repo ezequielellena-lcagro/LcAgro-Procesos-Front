@@ -248,6 +248,7 @@ export function SemilleroPage() {
                 datos={ordenes.data}
                 cargando={ordenes.isPending || ordenes.isFetching}
                 clientes={listaClientes}
+                variedades={catalogos.data.variedades}
                 filtros={ordenesFiltros}
                 onFiltros={setOrdenesFiltros}
                 onNuevaOrden={pedidoOrden.abrirNueva}

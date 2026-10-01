@@ -100,7 +100,7 @@ describe("SemilleroPage", () => {
 
   /** Deja afuera de la pestaña Stock el lote 26S-C01, el de la orden Pendiente N° 1 de la fixture. */
   async function filtrarStockSoloPropio() {
-    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "Propio" } });
+    fireEvent.change(screen.getByLabelText("Proceso"), { target: { value: "Propio" } });
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Editar lote 26S-C01" })).not.toBeInTheDocument(),
     );
@@ -148,7 +148,7 @@ describe("SemilleroPage", () => {
 
     // La pestaña Stock conserva su filtro: la orden no lo toca (R1.4).
     fireEvent.click(screen.getByRole("tab", { name: "Stock" }));
-    expect(screen.getByLabelText("Dueño")).toHaveValue("Propio");
+    expect(screen.getByLabelText("Proceso")).toHaveValue("Propio");
     expect(screen.queryByRole("button", { name: "Editar lote 26S-C01" })).not.toBeInTheDocument();
   });
 
@@ -405,12 +405,12 @@ describe("SemilleroPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Imprimir orden N° 2" }));
 
-    expect(await screen.findByText("Orden de carga — Semillero")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Orden de carga" })).toBeInTheDocument();
     // La orden 2 despachó el lote propio 26S-001: no lleva la leyenda "Semilla del cliente".
     expect(screen.queryByText("Semilla del cliente")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Cerrar" }));
-    expect(screen.queryByText("Orden de carga — Semillero")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Orden de carga" })).not.toBeInTheDocument();
   });
 
   it('"Catálogos" abre el diálogo con variedades y pide la copia de clientes (la necesita Destinos por cliente)', async () => {

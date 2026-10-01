@@ -134,9 +134,9 @@ describe("MovimientosPanel", () => {
 
   it("filtra por dueño entre Todos, Propio y Clientes", () => {
     const props = renderPanel({ filtros: { duenio: "Propio" } });
-    expect(screen.getByLabelText("Dueño")).toHaveValue("Propio");
+    expect(screen.getByLabelText("Proceso")).toHaveValue("Propio");
 
-    fireEvent.change(screen.getByLabelText("Dueño"), { target: { value: "Cliente" } });
+    fireEvent.change(screen.getByLabelText("Proceso"), { target: { value: "Cliente" } });
     expect(props.onFiltros).toHaveBeenCalledWith({ duenio: "Cliente" });
   });
 

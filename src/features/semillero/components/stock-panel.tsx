@@ -85,7 +85,7 @@ export function StockPanel({
     { key: "lote", header: "Lote", sortBy: (f) => f.loteCodigo, cell: (f) => f.loteCodigo, className: "whitespace-nowrap" },
     {
       key: "duenio",
-      header: "Dueño",
+      header: "Proceso",
       sortBy: (f) => f.duenio,
       cell: (f) => (
         <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium", DUENIO_BADGE_CLS[f.duenio])}>
@@ -217,9 +217,9 @@ export function StockPanel({
             todasLabel="Todas"
           />
         </FilterField>
-        <FilterField label="Dueño" title="La semilla de un cliente no es stock vendible propio (ADR-13).">
+        <FilterField label="Proceso" title="La semilla de un cliente no es stock vendible propio (ADR-13).">
           <Select
-            aria-label="Dueño"
+            aria-label="Proceso"
             value={filtros.duenio ?? ""}
             onChange={(e) => onFiltros({ ...filtros, duenio: (e.target.value || undefined) as DuenioLote | undefined })}
           >

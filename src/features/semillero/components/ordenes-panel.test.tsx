@@ -1,7 +1,13 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { AxiosError, AxiosHeaders } from "axios";
 import { describe, expect, it, vi } from "vitest";
-import type { ClienteCopiaDto, EstadoCopiaClientesDto, OrdenCargaDto, OrdenCargaFiltros } from "../types";
+import type {
+  ClienteCopiaDto,
+  EstadoCopiaClientesDto,
+  OrdenCargaDto,
+  OrdenCargaFiltros,
+  VariedadDto,
+} from "../types";
 import { OrdenDialog } from "./orden-dialog";
 import { OrdenesPanel } from "./ordenes-panel";
 
@@ -13,6 +19,11 @@ import { OrdenesPanel } from "./ordenes-panel";
 const CLIENTES: ClienteCopiaDto[] = [
   { numero: 500, denominacion: "Cliente Uno", cuit: null },
   { numero: 600, denominacion: "Cliente Dos", cuit: null },
+];
+
+const VARIEDADES: VariedadDto[] = [
+  { id: 1, especie: "Soja", nombre: "DM 46E25", activo: true, enUso: 1 },
+  { id: 2, especie: "Trigo", nombre: "Baguette 620", activo: false, enUso: 0 },
 ];
 
 function orden(over: Partial<OrdenCargaDto> = {}): OrdenCargaDto {
@@ -77,6 +88,7 @@ function renderPanel(opts: RenderOpts = {}) {
       datos={opts.datos ?? [PENDIENTE, DESPACHADA]}
       cargando={false}
       clientes={CLIENTES}
+      variedades={VARIEDADES}
       filtros={opts.filtros ?? {}}
       onFiltros={onFiltros}
       onNuevaOrden={onNuevaOrden}
@@ -156,6 +168,16 @@ describe("OrdenesPanel", () => {
     expect(onFiltros).toHaveBeenCalledWith({ clienteNumero: 600 });
   });
 
+  it("elegir una variedad en el filtro avisa al padre con su id (pedido del cliente 2026-09-27)", () => {
+    const { onFiltros } = renderPanel({ filtros: { estado: "Pendiente" } });
+    // Se ofrecen todas, incluso las desactivadas: una orden vieja puede ser de una variedad que ya no se usa.
+    expect(screen.getByRole("option", { name: "Baguette 620" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Variedad"), { target: { value: "1" } });
+    expect(onFiltros).toHaveBeenCalledWith({ estado: "Pendiente", variedadId: 1 });
+    fireEvent.change(screen.getByLabelText("Variedad"), { target: { value: "" } });
+    expect(onFiltros).toHaveBeenLastCalledWith({ estado: "Pendiente", variedadId: undefined });
+  });
+
   it("tipear en Buscar avisa al padre con el texto", () => {
     const { onFiltros } = renderPanel();
     fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "7" } });
@@ -188,7 +210,10 @@ describe("OrdenesPanel", () => {
     fireEvent.click(within(dialogo).getByRole("button", { name: "Despachar" }));
 
     await waitFor(() =>
-      expect(onDespachar).toHaveBeenCalledWith(1, { numeroRemito: "06-00001", numeroPedidoVenta: null }),
+      expect(onDespachar).toHaveBeenCalledWith(1, {
+        numeroRemito: "06-00001",
+        numeroPedidoVenta: null,
+      }),
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
@@ -200,13 +225,17 @@ describe("OrdenesPanel", () => {
     fireEvent.change(within(dialogo).getByLabelText("Motivo"), { target: { value: "Duplicada" } });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Anular" }));
 
-    await waitFor(() => expect(onAnular).toHaveBeenCalledWith(1, { motivo: "Duplicada", detalle: null }));
+    await waitFor(() =>
+      expect(onAnular).toHaveBeenCalledWith(1, { motivo: "Duplicada", detalle: null }),
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("ante un 409 al despachar, el panel muestra el mensaje e invalida el stock para refrescar los máximos disponibles (R6.4/R6.7)", async () => {
     const { onDespachar, onErrorRefrescarStock } = renderPanel();
-    onDespachar.mockRejectedValueOnce(errorServidor("Lote 26S-001 en G1-1: físico insuficiente para despachar."));
+    onDespachar.mockRejectedValueOnce(
+      errorServidor("Lote 26S-001 en G1-1: físico insuficiente para despachar."),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Despachar orden N° 7" }));
     fireEvent.change(screen.getByLabelText("Remito"), { target: { value: "6-1" } });
     fireEvent.click(screen.getByRole("button", { name: "Despachar" }));

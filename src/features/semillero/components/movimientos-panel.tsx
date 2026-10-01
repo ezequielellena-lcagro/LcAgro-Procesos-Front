@@ -66,7 +66,7 @@ export function MovimientosPanel({
     { key: "variedad", header: "Variedad", sortBy: (m) => m.variedad, cell: (m) => m.variedad },
     { key: "lote", header: "Lote", sortBy: (m) => m.loteCodigo, cell: (m) => m.loteCodigo, className: "whitespace-nowrap" },
     { key: "ubicacion", header: "Ubicación", sortBy: (m) => m.ubicacion, cell: (m) => m.ubicacion },
-    { key: "duenio", header: "Dueño", sortBy: (m) => m.duenio, cell: (m) => duenioEtiqueta(m) },
+    { key: "duenio", header: "Proceso", sortBy: (m) => m.duenio, cell: (m) => duenioEtiqueta(m) },
     {
       key: "cantidad",
       header: "Cantidad",
@@ -110,9 +110,9 @@ export function MovimientosPanel({
             ))}
           </Select>
         </FilterField>
-        <FilterField label="Dueño" title="La semilla de un cliente no es stock vendible propio (ADR-13).">
+        <FilterField label="Proceso" title="La semilla de un cliente no es stock vendible propio (ADR-13).">
           <Select
-            aria-label="Dueño"
+            aria-label="Proceso"
             value={filtros.duenio ?? ""}
             onChange={(e) => onFiltros({ ...filtros, duenio: (e.target.value || undefined) as DuenioLote | undefined })}
           >
