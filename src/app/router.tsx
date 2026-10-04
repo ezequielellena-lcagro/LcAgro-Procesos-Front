@@ -8,24 +8,88 @@ import { InicioPage } from "./inicio-page";
 import { ProtectedRoute } from "./protected-route";
 
 // Code-splitting: cada página se carga en su propio chunk, bajo demanda.
-const LoginPage = lazy(() => import("@/features/auth/pages/login-page").then((m) => ({ default: m.LoginPage })));
-const DevolucionPage = lazy(() => import("@/features/devolucion-publica/pages/devolucion-page").then((m) => ({ default: m.DevolucionPage })));
-const DashboardPage = lazy(() => import("@/features/dashboard/pages/dashboard-page").then((m) => ({ default: m.DashboardPage })));
-const PosicionPage = lazy(() => import("@/features/posicion/pages/posicion-page").then((m) => ({ default: m.PosicionPage })));
-const CuentasPage = lazy(() => import("@/features/cuentas/pages/cuentas-page").then((m) => ({ default: m.CuentasPage })));
-const ProveedoresPage = lazy(() => import("@/features/proveedores/pages/proveedores-page").then((m) => ({ default: m.ProveedoresPage })));
-const SemillaPage = lazy(() => import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })));
-const StockPage = lazy(() => import("@/features/stock/pages/stock-insumos-page").then((m) => ({ default: m.StockInsumosPage })));
-const StockFisicoPage = lazy(() => import("@/features/stockfisico/pages/stockfisico-page").then((m) => ({ default: m.StockFisicoPage })));
-const ProduccionPropiaPage = lazy(() => import("@/features/produccionpropia/pages/produccion-propia-page").then((m) => ({ default: m.ProduccionPropiaPage })));
-const VolumenAcopiadoPage = lazy(() => import("@/features/volumenacopiado/pages/volumen-acopiado-page").then((m) => ({ default: m.VolumenAcopiadoPage })));
-const ComisionesPage = lazy(() => import("@/features/comisiones/pages/comisiones-page").then((m) => ({ default: m.ComisionesPage })));
-const PrestamosPage = lazy(() => import("@/features/prestamos/pages/prestamos-page").then((m) => ({ default: m.PrestamosPage })));
-const SemilleroPage = lazy(() => import("@/features/semillero/pages/semillero-page").then((m) => ({ default: m.SemilleroPage })));
-const PlanificacionVentasPage = lazy(() => import("@/features/planificacion-ventas/pages/planificacion-ventas-page").then((m) => ({ default: m.PlanificacionVentasPage })));
-const UsuariosPage = lazy(() => import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })));
-const ConfigPage = lazy(() => import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })));
-const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/auditoria-page").then((m) => ({ default: m.AuditoriaPage })));
+const LoginPage = lazy(() =>
+  import("@/features/auth/pages/login-page").then((m) => ({ default: m.LoginPage })),
+);
+const DevolucionPage = lazy(() =>
+  import("@/features/devolucion-publica/pages/devolucion-page").then((m) => ({
+    default: m.DevolucionPage,
+  })),
+);
+const DashboardPage = lazy(() =>
+  import("@/features/dashboard/pages/dashboard-page").then((m) => ({ default: m.DashboardPage })),
+);
+const PosicionPage = lazy(() =>
+  import("@/features/posicion/pages/posicion-page").then((m) => ({ default: m.PosicionPage })),
+);
+const CuentasPage = lazy(() =>
+  import("@/features/cuentas/pages/cuentas-page").then((m) => ({ default: m.CuentasPage })),
+);
+const ProveedoresPage = lazy(() =>
+  import("@/features/proveedores/pages/proveedores-page").then((m) => ({
+    default: m.ProveedoresPage,
+  })),
+);
+const SemillaPage = lazy(() =>
+  import("@/features/semilla/pages/semilla-page").then((m) => ({ default: m.SemillaPage })),
+);
+const StockPage = lazy(() =>
+  import("@/features/stock/pages/stock-insumos-page").then((m) => ({
+    default: m.StockInsumosPage,
+  })),
+);
+const StockFisicoPage = lazy(() =>
+  import("@/features/stockfisico/pages/stockfisico-page").then((m) => ({
+    default: m.StockFisicoPage,
+  })),
+);
+const ProduccionPropiaPage = lazy(() =>
+  import("@/features/produccionpropia/pages/produccion-propia-page").then((m) => ({
+    default: m.ProduccionPropiaPage,
+  })),
+);
+const VolumenAcopiadoPage = lazy(() =>
+  import("@/features/volumenacopiado/pages/volumen-acopiado-page").then((m) => ({
+    default: m.VolumenAcopiadoPage,
+  })),
+);
+const ComisionesPage = lazy(() =>
+  import("@/features/comisiones/pages/comisiones-page").then((m) => ({
+    default: m.ComisionesPage,
+  })),
+);
+const PrestamosPage = lazy(() =>
+  import("@/features/prestamos/pages/prestamos-page").then((m) => ({ default: m.PrestamosPage })),
+);
+const SemilleroPage = lazy(() =>
+  import("@/features/semillero/pages/semillero-page").then((m) => ({ default: m.SemilleroPage })),
+);
+const PlanificacionVentasPage = lazy(() =>
+  import("@/features/planificacion-ventas/pages/planificacion-ventas-page").then((m) => ({
+    default: m.PlanificacionVentasPage,
+  })),
+);
+const LogisticaPedidosPage = lazy(() =>
+  import("@/features/logistica/pages/pedidos-page").then((m) => ({ default: m.PedidosPage })),
+);
+const LogisticaCuposPage = lazy(() =>
+  import("@/features/logistica/pages/cupos-page").then((m) => ({ default: m.CuposPage })),
+);
+const LogisticaCargasPage = lazy(() =>
+  import("@/features/logistica/pages/cargas-page").then((m) => ({ default: m.CargasPage })),
+);
+const LogisticaFletePage = lazy(() =>
+  import("@/features/logistica/pages/flete-page").then((m) => ({ default: m.FletePage })),
+);
+const UsuariosPage = lazy(() =>
+  import("@/features/usuarios/pages/usuarios-page").then((m) => ({ default: m.UsuariosPage })),
+);
+const ConfigPage = lazy(() =>
+  import("@/features/config/pages/config-page").then((m) => ({ default: m.ConfigPage })),
+);
+const AuditoriaPage = lazy(() =>
+  import("@/features/auditoria/pages/auditoria-page").then((m) => ({ default: m.AuditoriaPage })),
+);
 
 export const router = createBrowserRouter([
   // Pública
@@ -54,7 +118,40 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
+          {
+            element: (
+              <ProtectedRoute
+                roles={[
+                  "logistica-lectura",
+                  "logistica-pedidos",
+                  "logistica-cupos",
+                  "logistica-cargas",
+                ]}
+              />
+            ),
+            children: [{ path: "logistica/pedidos", element: <LogisticaPedidosPage /> }],
+          },
+          {
+            element: (
+              <ProtectedRoute
+                roles={["logistica-lectura", "logistica-cupos", "logistica-cargas"]}
+              />
+            ),
+            children: [{ path: "logistica/cupos", element: <LogisticaCuposPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["logistica-lectura", "logistica-flete"]} />,
+            children: [{ path: "logistica/flete", element: <LogisticaFletePage /> }],
+          },
           { index: true, element: <InicioPage dashboard={<DashboardPage />} /> },
+          {
+            element: (
+              <ProtectedRoute
+                roles={["logistica-lectura", "logistica-cupos", "logistica-cargas"]}
+              />
+            ),
+            children: [{ path: "logistica/cargas", element: <LogisticaCargasPage /> }],
+          },
           {
             element: <ProtectedRoute roles={["posicion"]} />,
             children: [{ path: "posicion", element: <PosicionPage /> }],
@@ -100,7 +197,9 @@ export const router = createBrowserRouter([
             children: [{ path: "comisiones", element: <ComisionesPage /> }],
           },
           {
-            element: <ProtectedRoute roles={["planificacionventas", "planificacionventasgestion"]} />,
+            element: (
+              <ProtectedRoute roles={["planificacionventas", "planificacionventasgestion"]} />
+            ),
             children: [{ path: "planificacion-ventas", element: <PlanificacionVentasPage /> }],
           },
           {

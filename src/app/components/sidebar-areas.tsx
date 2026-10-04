@@ -2,7 +2,7 @@ import { Menu } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import type { RolNombre } from "@/features/auth/types";
 import { cn } from "@/lib/utils";
-import type { Area } from "../navigation";
+import { procesosPlanos, type Area } from "../navigation";
 import { BrandLogo } from "./brand-logo";
 
 interface Props {
@@ -38,7 +38,12 @@ export function SidebarAreas({
         <BrandLogo collapsed={collapsed} />
       </div>
 
-      <div className={cn("flex items-center justify-between px-3 pb-1.5 pt-3.5", collapsed && "md:justify-center md:px-0")}>
+      <div
+        className={cn(
+          "flex items-center justify-between px-3 pb-1.5 pt-3.5",
+          collapsed && "md:justify-center md:px-0",
+        )}
+      >
         {!collapsed && (
           <span className="text-[10px] uppercase tracking-[0.14em] text-white/40">Áreas</span>
         )}
@@ -56,7 +61,7 @@ export function SidebarAreas({
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 pb-3 pt-0.5">
         {areas.map((a) => {
           const Icon = a.icon;
-          const navegable = a.procesos.find(
+          const navegable = procesosPlanos(a).find(
             (p) => p.kind === "activo" && p.roles.some((r) => roles.includes(r)),
           );
           const active = a.id === areaActivaId;

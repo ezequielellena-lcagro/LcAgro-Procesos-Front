@@ -1,3 +1,5 @@
+import { logisticaFlotaHandlers } from "./logistica-flota";
+import { logisticaHandlers } from "./logistica";
 import { authHandlers } from "./auth";
 import { auditoriaHandlers } from "./auditoria";
 import { comisionesHandlers } from "./comisiones";
@@ -18,6 +20,8 @@ import { usuariosHandlers } from "./usuarios";
 import { volumenAcopiadoHandlers } from "./volumenacopiado";
 
 export const handlers = [
+  ...logisticaFlotaHandlers,
+  ...logisticaHandlers,
   ...authHandlers,
   ...dashboardHandlers,
   ...posicionHandlers,

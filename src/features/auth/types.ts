@@ -17,6 +17,11 @@ export type RolNombre =
   | "semillero"
   | "planificacionventas"
   | "planificacionventasgestion"
+  | "logistica-lectura"
+  | "logistica-pedidos"
+  | "logistica-cupos"
+  | "logistica-cargas"
+  | "logistica-flete"
   | "usuarios"
   | "config"
   | "auditoria";
@@ -37,6 +42,11 @@ export const ETIQUETA_PANTALLA: Record<RolNombre, string> = {
   semillero: "Semillero · Stock y Órdenes de Carga",
   planificacionventas: "Planificación de Ventas · mi cartera",
   planificacionventasgestion: "Planificación de Ventas · gestión",
+  "logistica-lectura": "Logística · lectura",
+  "logistica-pedidos": "Logística · pedidos",
+  "logistica-cupos": "Logística · cupos",
+  "logistica-cargas": "Logística · cargas",
+  "logistica-flete": "Logística · flete",
   usuarios: "Usuarios",
   config: "Configuración",
   auditoria: "Auditoría",

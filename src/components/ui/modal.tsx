@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           "outline-none",
           // text-left explícito: el diálogo puede abrirse desde una celda alineada a la derecha
           // (un botón en la columna de acciones) y heredaría esa alineación.
-          "relative z-10 flex max-h-[85vh] w-full max-w-2xl flex-col rounded-card border border-line bg-panel text-left shadow-float",
+          "relative z-10 flex min-w-0 max-h-[85vh] w-full max-w-2xl flex-col rounded-card border border-line bg-panel text-left shadow-float",
           className,
         )}
       >

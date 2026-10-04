@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, Check, Download, Lock, RefreshCw, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,13 +34,19 @@ const Nota = ({ texto }: { texto: string | null }) =>
 const COLUMNAS: Column<CierreCuenta>[] = [
   { key: "vendedor", header: "Vendedor", cell: (c) => c.vendedor },
   { key: "cuenta", header: "Cuenta", align: "right", cell: (c) => c.cuenta },
-  { key: "cliente", header: "Cliente", cell: (c) => <span className="text-ink">{c.denominacion}</span> },
+  {
+    key: "cliente",
+    header: "Cliente",
+    cell: (c) => <span className="text-ink">{c.denominacion}</span>,
+  },
   {
     key: "vencido",
     header: "Vencido",
     align: "right",
     cell: (c) => (
-      <span className={c.saldoVencido > 0 ? "font-medium text-rojo" : "text-ink"}>{usd(c.saldoVencido)}</span>
+      <span className={c.saldoVencido > 0 ? "font-medium text-rojo" : "text-ink"}>
+        {usd(c.saldoVencido)}
+      </span>
     ),
   },
   { key: "avencer", header: "A vencer", align: "right", cell: (c) => usd(c.saldoAVencer) },
@@ -73,7 +79,8 @@ function filaTotales(detalle: CierreDetalle) {
 function FotoDelMes({ anio, mes, revision }: Seleccion & { revision?: number }) {
   const detalle = useCierrePeriodo(anio, mes, true, revision);
 
-  if (detalle.isError) return <ErrorState error={detalle.error} onRetry={() => void detalle.refetch()} />;
+  if (detalle.isError)
+    return <ErrorState error={detalle.error} onRetry={() => void detalle.refetch()} />;
   if (detalle.isPending) return <Skeleton className="h-64 rounded-card" />;
 
   const datos = detalle.data;
@@ -103,16 +110,33 @@ const ETIQUETA_CAMBIO: Record<TipoCambioCierre, string> = {
 
 const COLUMNAS_DIFF: Column<CierreDiffCuenta>[] = [
   { key: "cuenta", header: "Cuenta", align: "right", cell: (c) => c.cuenta },
-  { key: "cliente", header: "Cliente", cell: (c) => <span className="text-ink">{c.denominacion}</span> },
+  {
+    key: "cliente",
+    header: "Cliente",
+    cell: (c) => <span className="text-ink">{c.denominacion}</span>,
+  },
   { key: "tipo", header: "Qué pasó", cell: (c) => ETIQUETA_CAMBIO[c.tipo] },
-  { key: "fotoSaldo", header: "Saldo en el informe", align: "right", cell: (c) => usd(c.saldoFoto) },
+  {
+    key: "fotoSaldo",
+    header: "Saldo en el informe",
+    align: "right",
+    cell: (c) => usd(c.saldoFoto),
+  },
   { key: "actualSaldo", header: "Saldo hoy", align: "right", cell: (c) => usd(c.saldoActual) },
   {
     key: "delta",
     header: "Diferencia",
     align: "right",
     cell: (c) => (
-      <span className={c.delta === 0 ? "text-ink-soft" : c.delta > 0 ? "font-semibold text-rojo" : "font-semibold text-ink"}>
+      <span
+        className={
+          c.delta === 0
+            ? "text-ink-soft"
+            : c.delta > 0
+              ? "font-semibold text-rojo"
+              : "font-semibold text-ink"
+        }
+      >
         {c.delta > 0 ? "+" : ""}
         {usd(c.delta)}
       </span>
@@ -130,12 +154,15 @@ function VerificarCambios({ anio, mes, puedeGestionar }: Seleccion & { puedeGest
   const diff = useCierreDiff(anio, mes, verificar);
   const recerrar = useRecerrarPeriodo();
 
-  // Al cambiar de mes se vuelve al estado inicial: el resultado de un período no sirve para otro.
-  useEffect(() => setVerificar(false), [anio, mes]);
-
   if (!verificar) {
     return (
-      <Button type="button" variant="outline" size="sm" className="no-print" onClick={() => setVerificar(true)}>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="no-print"
+        onClick={() => setVerificar(true)}
+      >
         <RefreshCw className="size-4" /> Verificar cambios
       </Button>
     );
@@ -183,9 +210,9 @@ function VerificarCambios({ anio, mes, puedeGestionar }: Seleccion & { puedeGest
         )}
       </div>
       <p className="text-xs text-ink-soft">
-        Son comprobantes cargados en MacroGest con fecha dentro del período, después de que se cerró.
-        Guardar una revisión nueva no borra la anterior: el informe que presentaste sigue disponible en
-        el selector de revisiones.
+        Son comprobantes cargados en MacroGest con fecha dentro del período, después de que se
+        cerró. Guardar una revisión nueva no borra la anterior: el informe que presentaste sigue
+        disponible en el selector de revisiones.
       </p>
       <DataTable
         columns={COLUMNAS_DIFF}
@@ -216,7 +243,7 @@ function CierreControls() {
     : undefined;
 
   const abrir = () => {
-    setCorte(hoyIso());   // cada apertura arranca en hoy; si el informe es de antes, se cambia acá
+    setCorte(hoyIso()); // cada apertura arranca en hoy; si el informe es de antes, se cambia acá
     setConfirmar(true);
   };
 
@@ -239,11 +266,16 @@ function CierreControls() {
         <Lock className="size-4" /> {cerrar.isPending ? "Cerrando…" : "Cerrar mes"}
       </Button>
 
-      <Modal open={confirmar} onClose={() => setConfirmar(false)} title="Cerrar mes" className="max-w-md">
+      <Modal
+        open={confirmar}
+        onClose={() => setConfirmar(false)}
+        title="Cerrar mes"
+        className="max-w-md"
+      >
         <div className="space-y-4">
           <p className="text-sm text-ink">
-            Se guarda la foto de <span className="font-semibold">{periodo}</span> (saldos + Devolución +
-            Observaciones) y la carga arranca en blanco para el mes siguiente.
+            Se guarda la foto de <span className="font-semibold">{periodo}</span> (saldos +
+            Devolución + Observaciones) y la carga arranca en blanco para el mes siguiente.
           </p>
 
           <label className="block space-y-1">
@@ -256,16 +288,26 @@ function CierreControls() {
               onChange={(e) => setCorte(e.target.value)}
             />
             <span className="block text-xs text-ink-soft">
-              Los saldos se congelan a este día. Si presentaste el informe el 7 y estás cerrando hoy,
-              poné el 7: la foto va a coincidir con lo que entregaste.
+              Los saldos se congelan a este día. Si presentaste el informe el 7 y estás cerrando
+              hoy, poné el 7: la foto va a coincidir con lo que entregaste.
             </span>
           </label>
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setConfirmar(false)} disabled={cerrar.isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmar(false)}
+              disabled={cerrar.isPending}
+            >
               Cancelar
             </Button>
-            <Button type="button" variant="accent" onClick={onCerrar} disabled={cerrar.isPending || !corte}>
+            <Button
+              type="button"
+              variant="accent"
+              onClick={onCerrar}
+              disabled={cerrar.isPending || !corte}
+            >
               {cerrar.isPending ? "Cerrando…" : "Cerrar mes"}
             </Button>
           </div>
@@ -323,10 +365,12 @@ export function HistoricoPanel({ puedeGestionar }: { puedeGestionar: boolean }) 
 
   const lista = periodos.data ?? [];
   // Selección efectiva: la elegida o, por defecto, el período más reciente (la API los da así ordenados).
-  const seleccion: Seleccion | null = sel ?? (lista[0] ? { anio: lista[0].anio, mes: lista[0].mes } : null);
+  const seleccion: Seleccion | null =
+    sel ?? (lista[0] ? { anio: lista[0].anio, mes: lista[0].mes } : null);
 
   const cuerpo = () => {
-    if (periodos.isError) return <ErrorState error={periodos.error} onRetry={() => void periodos.refetch()} />;
+    if (periodos.isError)
+      return <ErrorState error={periodos.error} onRetry={() => void periodos.refetch()} />;
     if (periodos.isPending) return <Skeleton className="h-64 rounded-card" />;
     if (!seleccion) return <EmptyState mensaje="Todavía no hay meses cerrados." />;
 
@@ -341,7 +385,7 @@ export function HistoricoPanel({ puedeGestionar }: { puedeGestionar: boolean }) 
               onChange={(e) => {
                 const [anio, mes] = e.target.value.split("-").map(Number);
                 setSel({ anio, mes });
-                setRevision(undefined);   // cada mes arranca en su revisión vigente
+                setRevision(undefined); // cada mes arranca en su revisión vigente
               }}
             >
               {lista.map((p) => (
@@ -367,7 +411,11 @@ export function HistoricoPanel({ puedeGestionar }: { puedeGestionar: boolean }) 
           </Button>
         </div>
 
-        <VerificarCambios {...seleccion} puedeGestionar={puedeGestionar} />
+        <VerificarCambios
+          key={`${seleccion.anio}-${seleccion.mes}`}
+          {...seleccion}
+          puedeGestionar={puedeGestionar}
+        />
 
         <FotoDelMes anio={seleccion.anio} mes={seleccion.mes} revision={revision} />
       </div>

@@ -247,8 +247,6 @@ interface CierreSnapshot {
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const diasEnMes = (anio: number, mes: number) => new Date(anio, mes, 0).getDate();
-const corteDe = (anio: number, mes: number) => `${anio}-${pad2(mes)}-${pad2(diasEnMes(anio, mes))}`;
 const periodoActual = () => {
   const hoy = new Date();
   return { anio: hoy.getFullYear(), mes: hoy.getMonth() + 1 };

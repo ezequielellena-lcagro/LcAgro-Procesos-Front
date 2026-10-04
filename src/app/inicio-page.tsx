@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/features/auth/auth-context";
 import { ForbiddenPage } from "@/shared/components/forbidden-page";
-import { NAV } from "./navigation";
+import { NAV, procesosPlanos } from "./navigation";
 
 export function InicioPage({ dashboard }: { dashboard: ReactNode }) {
   const { user } = useAuth();
@@ -10,7 +10,7 @@ export function InicioPage({ dashboard }: { dashboard: ReactNode }) {
 
   if (user.roles.includes("dashboard")) return dashboard;
 
-  const primerProceso = NAV.flatMap((area) => area.procesos).find(
+  const primerProceso = NAV.flatMap(procesosPlanos).find(
     (proceso) =>
       proceso.kind === "activo" &&
       proceso.to !== "/" &&

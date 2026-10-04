@@ -17,7 +17,12 @@ export interface ProcesoFuturo {
   label: string;
 }
 
-export type Proceso = ProcesoActivo | ProcesoFuturo;
+export interface ProcesoGrupo {
+  kind: "grupo";
+  label: string;
+  procesos: (ProcesoActivo | ProcesoFuturo)[];
+}
+export type Proceso = ProcesoActivo | ProcesoFuturo | ProcesoGrupo;
 
 export interface Area {
   id: string;
@@ -78,7 +83,45 @@ export const NAV: Area[] = [
         roles: ["volumenacopiado"],
       },
       { kind: "futuro", label: "Conciliación con corredores/exportadores" },
-      { kind: "futuro", label: "Otorgamiento de cupos" },
+      {
+        kind: "grupo",
+        label: "Logística",
+        procesos: [
+          {
+            kind: "activo",
+            label: "Pedidos",
+            title: "Logística / Pedidos",
+            to: "/logistica/pedidos",
+            roles: [
+              "logistica-lectura",
+              "logistica-pedidos",
+              "logistica-cupos",
+              "logistica-cargas",
+            ],
+          },
+          {
+            kind: "activo",
+            label: "Cupos",
+            title: "Logística / Cupos",
+            to: "/logistica/cupos",
+            roles: ["logistica-lectura", "logistica-cupos", "logistica-cargas"],
+          },
+          {
+            kind: "activo",
+            label: "Cargas a puerto",
+            title: "Logística / Cargas a puerto",
+            to: "/logistica/cargas",
+            roles: ["logistica-lectura", "logistica-cupos", "logistica-cargas"],
+          },
+          {
+            kind: "activo",
+            label: "Flete y camiones",
+            title: "Logística / Flete y camiones",
+            to: "/logistica/flete",
+            roles: ["logistica-lectura", "logistica-flete"],
+          },
+        ],
+      },
     ],
   },
   {
@@ -197,9 +240,27 @@ export const NAV: Area[] = [
     label: "Administración del sistema",
     area: "Administración",
     procesos: [
-      { kind: "activo", label: "Configuración", title: "Configuración", to: "/config", roles: ["config"] },
-      { kind: "activo", label: "Usuarios", title: "Usuarios", to: "/usuarios", roles: ["usuarios"] },
-      { kind: "activo", label: "Auditoría", title: "Auditoría", to: "/auditoria", roles: ["auditoria"] },
+      {
+        kind: "activo",
+        label: "Configuración",
+        title: "Configuración",
+        to: "/config",
+        roles: ["config"],
+      },
+      {
+        kind: "activo",
+        label: "Usuarios",
+        title: "Usuarios",
+        to: "/usuarios",
+        roles: ["usuarios"],
+      },
+      {
+        kind: "activo",
+        label: "Auditoría",
+        title: "Auditoría",
+        to: "/auditoria",
+        roles: ["auditoria"],
+      },
     ],
   },
 ];
@@ -212,19 +273,38 @@ export function esRutaActiva(to: string, pathname: string): boolean {
 /** Área activa según la URL (matchea por la ruta de alguno de sus procesos). */
 export function areaActivaPorPath(pathname: string): Area | undefined {
   return NAV.find((a) =>
-    a.procesos.some((p) => p.kind === "activo" && esRutaActiva(p.to, pathname)),
+    procesosPlanos(a).some((p) => p.kind === "activo" && esRutaActiva(p.to, pathname)),
   );
 }
 
 /** Procesos de un área visibles para el usuario (los "futuro" siempre se muestran). */
 export function procesosVisibles(area: Area, roles: RolNombre[]): Proceso[] {
-  return area.procesos.filter(
-    (p) => p.kind === "futuro" || p.roles.some((r) => roles.includes(r)),
-  );
+  return area.procesos.flatMap((p): Proceso[] => {
+    if (p.kind === "grupo") {
+      const activos = p.procesos.filter(
+        (x) => x.kind === "activo" && x.roles.some((r) => roles.includes(r)),
+      );
+      return activos.length
+        ? [
+            {
+              ...p,
+              procesos: p.procesos.filter(
+                (x) => x.kind === "futuro" || x.roles.some((r) => roles.includes(r)),
+              ),
+            },
+          ]
+        : [];
+    }
+    return p.kind === "futuro" || p.roles.some((r) => roles.includes(r)) ? [p] : [];
+  });
 }
 
 /** Título del proceso activo (para el crumb del topbar). */
 export function tituloProcesoPorPath(area: Area, pathname: string): string | undefined {
-  const p = area.procesos.find((x) => x.kind === "activo" && esRutaActiva(x.to, pathname));
+  const p = procesosPlanos(area).find((x) => x.kind === "activo" && esRutaActiva(x.to, pathname));
   return p?.kind === "activo" ? p.title : undefined;
+}
+
+export function procesosPlanos(area: Area): (ProcesoActivo | ProcesoFuturo)[] {
+  return area.procesos.flatMap((p) => (p.kind === "grupo" ? p.procesos : [p]));
 }
