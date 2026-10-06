@@ -9,7 +9,7 @@ import { env } from "@/lib/env";
 import { apiClient, setTokenBridge } from "@/lib/api-client";
 import { logisticaHandlers, resetLogisticaDemo } from "@/mocks/handlers/logistica";
 import { erpLogisticaDemo } from "@/mocks/handlers/logistica-conciliacion";
-import { hoy, periodoInicial, sumarDias } from "../format";
+import { fecha, hoy, periodoInicial, sumarDias } from "../format";
 import type { Pedido, Recepcion } from "../types";
 import { CuposPage } from "./cupos-page";
 import { CargasPage } from "./cargas-page";
@@ -91,6 +91,39 @@ async function pedir(clienteNumero = 9000000001) {
   });
 }
 const periodoParams = () => new URLSearchParams(periodoInicial());
+/**
+ * Elige una fecha desde el calendario del campo. Sirve también para REELEGIR la vigente, que es
+ * como se fuerza una consulta nueva sin cambiar criterios: escribir el mismo texto no dispara
+ * nada (React descarta el evento si el valor no cambió), un clic en el día sí.
+ */
+function elegirFecha(etiqueta: string, iso: string) {
+  const [anio, mes, dia] = iso.split("-").map(Number);
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.click(within(campo.closest("label")!).getByRole("button", { name: /calendario/i }));
+  fireEvent.change(screen.getByLabelText("Año"), { target: { value: String(anio) } });
+  fireEvent.change(screen.getByLabelText("Mes"), { target: { value: String(mes - 1) } });
+  fireEvent.click(screen.getByRole("button", { name: String(dia) }));
+}
+
+/**
+ * Escribe una fecha en un campo del filtro de período. El `DateField` muestra y acepta
+ * dd/mm/aaaa, y avisa recién cuando la fecha está completa: por eso se escribe entera de una.
+ */
+const ponerFecha = (etiqueta: string, iso: string) =>
+  fireEvent.change(screen.getByLabelText(etiqueta), { target: { value: fecha(iso) } });
+
+/**
+ * Elige una opción del combo de catálogo (Productor / Cereal / Destino). Es un campo único: se
+ * tipea y se elige de la lista que se abre, en vez del viejo buscador + `<select>`.
+ */
+async function elegirCatalogo(etiqueta: string, buscado: string, opcion: string) {
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.focus(campo);
+  if (buscado) fireEvent.change(campo, { target: { value: buscado } });
+  const lista = await screen.findByRole("listbox");
+  fireEvent.mouseDown(await within(lista).findByRole("button", { name: opcion }));
+}
+
 describe("Filtros aplicados de Cupos", () => {
   it("recibidos envía filtros al servidor al aplicar y limpia páginas al volver al mismo filtro", async () => {
     const recepcion = await recibir(52);
@@ -106,8 +139,9 @@ describe("Filtros aplicados de Cupos", () => {
     mostrar(<CuposPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Cupos recibidos" }));
     await screen.findByText(primero);
-    fireEvent.click(screen.getByRole("button", { name: "Cargar más filas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     await screen.findByText(ultimo);
+    expect(screen.queryByText(primero)).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Contrato"), { target: { value: "NO-EXISTE" } });
     expect(pedidos.at(-1)?.searchParams.get("contrato")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
@@ -118,15 +152,16 @@ describe("Filtros aplicados de Cupos", () => {
     expect(pedidos.at(-1)?.searchParams.has("despuesId")).toBe(false);
     fireEvent.change(screen.getByLabelText("Circuito"), { target: { value: "propia" } });
     fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025-2026" } });
-    fireEvent.change(screen.getByLabelText("Cereal"), { target: { value: "10" } });
-    fireEvent.change(screen.getByLabelText("Destino"), { target: { value: "102" } });
+    await elegirCatalogo("Cereal", "10", "Soja (10)");
+    await elegirCatalogo("Destino", "102", "Otra terminal de ejemplo (102)");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(pedidos.at(-1)?.searchParams.get("destinoCodigo")).toBe("102"));
     expect(pedidos.at(-1)?.searchParams.get("producto")).toBe("10");
     expect(pedidos.at(-1)?.searchParams.get("campania")).toBe("2025-2026");
     expect(pedidos.at(-1)?.searchParams.get("circuito")).toBe("propia");
     expect(screen.queryByText("F-0")).not.toBeInTheDocument();
-  });
+    // Son 52 cupos y dos tandas de catálogo: con la máquina cargada roza los 5 s por defecto.
+  }, 15000);
   it("MacroGest filtra producto/contrato/destino antes del límite y muestra números de cabecera separados", async () => {
     const fixtures = erpLogisticaDemo.filas();
     const spy = vi
@@ -159,8 +194,10 @@ describe("Filtros aplicados de Cupos", () => {
       within(table).getByRole("columnheader", { name: "Cargador del plan ERP" }),
     ).toBeInTheDocument();
     await waitFor(() => expect(within(table).getByText("0")).toBeInTheDocument());
-    expect(within(table).getAllByText("Sin cabecera")).toHaveLength(2);
-    expect(within(table).getAllByText("Sin dato").length).toBeGreaterThan(0);
+    // Cabecera ausente o dato vacío se muestran igual: con un guion, no con una frase.
+    expect(within(table).queryByText("Sin cabecera")).not.toBeInTheDocument();
+    expect(within(table).queryByText("Sin dato")).not.toBeInTheDocument();
+    expect(within(table).getAllByText("—").length).toBeGreaterThan(0);
   });
   it("productor filtra únicamente pedidos y descarta selección anterior al aplicar o limpiar", async () => {
     await recibir();
@@ -181,11 +218,11 @@ describe("Filtros aplicados de Cupos", () => {
     const radio = await screen.findByRole("radio", { name: "Elegir pedido de Productor ficticio" });
     fireEvent.click(radio);
     fireEvent.click(await screen.findByRole("checkbox", { name: "Elegir cupo V-DEMO/1 fila 1" }));
-    fireEvent.change(screen.getByLabelText("Buscar productor de los pedidos"), {
-      target: { value: "Cliente de prueba" },
-    });
-    await screen.findByRole("option", { name: "Cliente de prueba uno (1)" });
-    fireEvent.change(screen.getByLabelText("Productor de los pedidos"), { target: { value: "1" } });
+    await elegirCatalogo(
+      "Productor de los pedidos",
+      "Cliente de prueba",
+      "Cliente de prueba uno (1)",
+    );
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(pedidos.at(-1)?.searchParams.get("clienteNumero")).toBe("1"));
     expect(cupos.at(-1)?.searchParams.has("clienteNumero")).toBe(false);
@@ -210,9 +247,10 @@ describe("Filtros aplicados de Cupos", () => {
     mostrar(<CuposPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Cupos recibidos" }));
     await screen.findByText(filas[0].codigoTerminal!);
-    fireEvent.click(screen.getByRole("button", { name: "Cargar más filas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     await screen.findByText(filas[51].codigoTerminal!);
-    fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
+    // Volver a elegir la MISMA fecha reinicia el cursor: es lo que antes hacía "Consultar".
+    elegirFecha("Hasta inclusive", sumarDias(periodoInicial().hastaExclusivo, -1));
     await waitFor(() =>
       expect(screen.queryByText(filas[51].codigoTerminal!)).not.toBeInTheDocument(),
     );
@@ -243,12 +281,13 @@ describe("Filtros aplicados de Cupos", () => {
     mostrar(<CuposPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Cupos MacroGest" }));
     await screen.findByText("ERP-PRIMERA");
-    fireEvent.click(screen.getByRole("button", { name: "Cargar más filas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     await screen.findByText("ERP-SEGUNDA");
+    expect(screen.queryByText("ERP-PRIMERA")).not.toBeInTheDocument();
     expect(consultas.at(-1)?.searchParams.get("despuesGrupo")).toBe("701");
     fireEvent.change(screen.getByLabelText("Contrato"), { target: { value: "V-DEMO/1" } });
-    fireEvent.change(screen.getByLabelText("Cereal"), { target: { value: "10" } });
-    fireEvent.change(screen.getByLabelText("Destino"), { target: { value: "101" } });
+    await elegirCatalogo("Cereal", "10", "Soja (10)");
+    await elegirCatalogo("Destino", "101", "Terminal de ejemplo (101)");
     expect(consultas.at(-1)?.searchParams.has("contrato")).toBe(false);
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(consultas.at(-1)?.searchParams.get("destinoCodigo")).toBe("101"));
@@ -256,7 +295,8 @@ describe("Filtros aplicados de Cupos", () => {
     expect(consultas.at(-1)?.searchParams.get("contrato")).toBe("V-DEMO/1");
     expect(consultas.at(-1)?.searchParams.has("circuito")).toBe(false);
     expect(screen.queryByText("ERP-SEGUNDA")).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole("button", { name: "Cargar más filas" }));
+    await screen.findByText("ERP-PRIMERA");
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     await screen.findByText("ERP-SEGUNDA");
     fireEvent.click(screen.getByRole("button", { name: "Limpiar filtros" }));
     await waitFor(() => expect(consultas.at(-1)?.searchParams.has("producto")).toBe(false));
@@ -268,14 +308,16 @@ describe("Filtros aplicados de Cupos", () => {
         consultas.at(-1)?.searchParams.has(k),
       ),
     ).toBe(false);
-    fireEvent.click(await screen.findByRole("button", { name: "Cargar más filas" }));
+    await screen.findByText("ERP-PRIMERA");
+    fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     await screen.findByText("ERP-SEGUNDA");
-    fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
+    elegirFecha("Hasta inclusive", sumarDias(periodoInicial().hastaExclusivo, -1));
     await waitFor(() => expect(screen.queryByText("ERP-SEGUNDA")).not.toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText("Hasta inclusive"), {
-      target: { value: sumarDias(periodoInicial().desde, 31) },
-    });
-    expect(screen.getByRole("button", { name: "Consultar" })).toBeDisabled();
+    // Un rango más largo que el máximo no se consulta: avisa y deja vigente el anterior.
+    const consultadas = consultas.length;
+    ponerFecha("Hasta inclusive", sumarDias(periodoInicial().desde, 31));
+    expect(screen.getByText(/hasta 31 días/)).toBeInTheDocument();
+    expect(consultas).toHaveLength(consultadas);
   });
   it("el productor de pedidos se congela durante revisión y resultado incierto", async () => {
     await recibir(1);
@@ -296,7 +338,7 @@ describe("Filtros aplicados de Cupos", () => {
     expect(screen.getByRole("button", { name: "Limpiar filtros" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Confirmar otorgamiento" }));
     await screen.findByRole("button", { name: "Reintentar operación" });
-    expect(screen.getByLabelText("Buscar productor de los pedidos")).toBeDisabled();
+    expect(screen.getByLabelText("Productor de los pedidos")).toBeDisabled();
     expect(screen.getByRole("button", { name: "Cancelar" })).toBeDisabled();
   });
 });
@@ -376,6 +418,31 @@ describe("Cursor real del handler MacroGest", () => {
       expect((await r.json()).detail).toBeTruthy();
     },
   );
+});
+describe("Filtros aplicados de Cargas", () => {
+  it("no consulta con una campaña a medio escribir y avisa en castellano", async () => {
+    const pedidos: URL[] = [];
+    server.use(
+      http.get(`${API}/seguimientos`, ({ request }) => {
+        pedidos.push(new URL(request.url));
+      }),
+    );
+    mostrar(<CargasPage />);
+    await waitFor(() => expect(pedidos).not.toHaveLength(0));
+    const aplicar = () => screen.getByRole("button", { name: "Aplicar filtros" });
+    fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025" } });
+    expect(aplicar()).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("Ingresá una campaña como 2025-2026.");
+    // Años no consecutivos pasan el formato pero no son una campaña.
+    fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025-2030" } });
+    expect(aplicar()).toBeDisabled();
+    fireEvent.click(aplicar());
+    expect(pedidos.at(-1)?.searchParams.has("campania")).toBe(false);
+    fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025-2026" } });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.click(aplicar());
+    await waitFor(() => expect(pedidos.at(-1)?.searchParams.get("campania")).toBe("2025-2026"));
+  });
 });
 describe("Exportación de Cargas", () => {
   it.each(["Día", "Período", "Anuladas", "Desfasajes"])(

@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { FilterField } from "@/shared/components/filter-bar";
 import { fecha, hoy, kg, periodoInicial, sumarDias } from "../format";
 import { cursorPropio, useListado } from "../queries/use-logistica";
 import type { Cupo, OtorgarBody, Pedido, Preventa } from "../types";
 import { CatalogoSelect } from "./catalogo-select";
 import { PreventaPicker } from "./contrato-picker";
-import { Campo } from "./form-operacion";
 import { OtorgamientoDialog, type RevisionOtorgamiento } from "./otorgamiento-dialog";
 import { PeriodoFiltro } from "./periodo-filtro";
 import { TablaLogistica } from "./tabla-logistica";
@@ -134,6 +135,7 @@ export function OtorgarPanel({
         orden de las filas es por fecha; no indica prioridad comercial.
       </p>
       <fieldset disabled={revision != null} className="min-w-0">
+        {/* Fechas y filtros en la MISMA barra: acotan las dos tablas de abajo a la vez. */}
         <PeriodoFiltro
           value={periodo}
           etiqueta="Rango de fechas de ambas tablas"
@@ -141,9 +143,6 @@ export function OtorgarPanel({
             setPeriodo(p);
             limpiar();
           }}
-        />
-        <form
-          className="mb-4 grid min-w-0 items-end gap-3 sm:grid-cols-2 xl:grid-cols-5"
           onSubmit={(e) => {
             e.preventDefault();
             if (campaniaValida) {
@@ -153,6 +152,7 @@ export function OtorgarPanel({
           }}
         >
           <CatalogoSelect
+            className="w-56"
             tipo="clientes"
             titulo="Productor de los pedidos"
             value={borrador.clienteNumero}
@@ -161,57 +161,64 @@ export function OtorgarPanel({
             onChange={(clienteNumero) => setBorrador({ ...borrador, clienteNumero })}
           />
           <CatalogoSelect
+            className="w-56"
             tipo="productos"
             titulo="Cereal"
             value={borrador.producto}
             required={false}
+            modoFiltro
             onChange={(producto) => setBorrador({ ...borrador, producto })}
           />
-          <Campo titulo="Campaña">
+          <FilterField label="Campaña">
             <Input
+              className="w-32"
               value={borrador.campania}
               placeholder="2025-2026"
               onChange={(e) => setBorrador({ ...borrador, campania: e.target.value })}
             />
-          </Campo>
+          </FilterField>
           <CatalogoSelect
+            className="w-56"
             tipo="destinos"
             titulo="Destino de los cupos"
             value={borrador.destinoCodigo}
             required={false}
+            modoFiltro
             onChange={(destinoCodigo) => setBorrador({ ...borrador, destinoCodigo })}
           />
-          <Campo titulo="Circuito de los cupos">
-            <select
-              className="h-10 w-full rounded-md border border-line bg-panel px-3 text-sm"
+          <FilterField label="Circuito de los cupos">
+            <Select
+              className="w-40"
               value={borrador.circuito}
               onChange={(e) => setBorrador({ ...borrador, circuito: e.target.value })}
             >
               <option value="">Todos</option>
               <option value="directa">Directa</option>
               <option value="propia">Propia</option>
-            </select>
-          </Campo>
-          <Button type="submit" variant="outline" disabled={!campaniaValida}>
-            Aplicar filtros
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setBorrador(filtrosVacios);
-              setFiltros(filtrosVacios);
-              limpiar();
-            }}
-          >
-            Limpiar filtros
-          </Button>
+            </Select>
+          </FilterField>
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" variant="outline" disabled={!campaniaValida}>
+              Aplicar filtros
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setBorrador(filtrosVacios);
+                setFiltros(filtrosVacios);
+                limpiar();
+              }}
+            >
+              Limpiar filtros
+            </Button>
+          </div>
           {!campaniaValida && (
-            <p role="alert" className="text-sm text-rojo">
+            <p role="alert" className="basis-full text-sm text-rojo">
               Ingresá una campaña como 2025-2026.
             </p>
           )}
-        </form>
+        </PeriodoFiltro>
       </fieldset>
       {gestionar && (
         <fieldset
@@ -226,9 +233,10 @@ export function OtorgarPanel({
               ["propio", "Propio"],
             ] as const
           ).map(([valor, texto]) => (
-            <label key={valor} className="text-sm">
+            <label key={valor} className="flex items-center gap-2 text-sm text-ink">
               <input
                 type="radio"
+                className="size-4 accent-primary"
                 name="destinatario"
                 checked={modo === valor}
                 onChange={() => {
@@ -241,7 +249,7 @@ export function OtorgarPanel({
                   setConPreventa(false);
                   setMensaje("");
                 }}
-              />{" "}
+              />
               {texto}
             </label>
           ))}

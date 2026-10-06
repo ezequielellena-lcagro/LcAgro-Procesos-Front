@@ -1,3 +1,5 @@
+import { ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { env } from "@/lib/env";
 import { NavLink, useLocation } from "react-router-dom";
 import type { RolNombre } from "@/features/auth/types";
@@ -22,23 +24,18 @@ export function SidebarProcesos({ area, roles, hidden }: Props) {
       )}
       aria-hidden={hidden}
     >
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 pb-2.5 pt-4">
-        <div className="px-3 pb-2 text-[10px] uppercase tracking-[0.14em] text-white/40">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 pb-2.5 pt-4">
+        <div className="px-3 pb-1.5 text-[10px] uppercase tracking-[0.14em] text-white/40">
           Procesos
         </div>
 
         {procesos.map((p, i) =>
           p.kind === "grupo" ? (
-            <details key={p.label} open className="mb-3 rounded-lg border border-white/10 p-2">
-              <summary className="cursor-pointer px-1 pb-2 text-sm font-semibold text-white">
-                {p.label}
-              </summary>
-              <div className="pl-2">
-                {p.procesos.map((h, j) => (
-                  <ProcesoItem key={h.label} p={h} indice={j} pathname={pathname} />
-                ))}
-              </div>
-            </details>
+            <Grupo key={p.label} label={p.label}>
+              {p.procesos.map((h, j) => (
+                <ProcesoItem key={h.label} p={h} indice={j} pathname={pathname} />
+              ))}
+            </Grupo>
           ) : (
             <ProcesoItem key={p.label} p={p} indice={i} pathname={pathname} />
           ),
@@ -60,6 +57,28 @@ export function SidebarProcesos({ area, roles, hidden }: Props) {
   );
 }
 
+/**
+ * Subconjunto de procesos de un área (p. ej. Logística).
+ *
+ * Sigue siendo un `<details>` para poder plegarlo, pero sin recuadro propio: el encabezado se lee
+ * como el rótulo "Procesos" de arriba y las hijas cuelgan de una guía vertical. El marco anterior
+ * lo dibujaba como una tarjeta dentro del menú y competía con el proceso activo.
+ */
+function Grupo({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details open className="group/grupo mt-3">
+      <summary className="flex cursor-pointer list-none items-center gap-1 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-white/40 transition-colors hover:text-white/70 [&::-webkit-details-marker]:hidden">
+        <ChevronRight
+          aria-hidden
+          className="size-3 transition-transform group-open/grupo:rotate-90"
+        />
+        {label}
+      </summary>
+      <div className="ml-[18px] border-l border-white/10 pl-2">{children}</div>
+    </details>
+  );
+}
+
 function ProcesoItem({
   p,
   indice,
@@ -73,10 +92,13 @@ function ProcesoItem({
     <NavLink
       to={p.to}
       className={cn(
-        "mb-[7px] flex rounded-[10px] border px-3 py-2.5 text-[13px] leading-tight transition-colors",
+        // Mismo lenguaje que el rail de Áreas: fila plana, sin borde ni fondo propio hasta que
+        // está activa o se la pasa por encima. Antes cada proceso era una píldora con marco y
+        // fondo, y nueve píldoras seguidas tapaban cuál estaba abierta.
+        "mb-0.5 flex items-center rounded-[10px] px-3 py-2 text-[13px] leading-tight transition-colors",
         esRutaActiva(p.to, pathname)
-          ? "border-transparent bg-clementina font-semibold text-slate-brand"
-          : "border-white/10 bg-white/5 text-[#cdd9e0] hover:bg-white/10 hover:text-white",
+          ? "bg-gradient-to-r from-clementina to-clementina-deep font-semibold text-slate-brand"
+          : "text-[#cdd9e0] hover:bg-white/10 hover:text-white",
       )}
     >
       {p.label}
@@ -84,10 +106,12 @@ function ProcesoItem({
   ) : (
     <div
       data-index={indice}
-      className="mb-[7px] flex justify-between gap-2 px-3 py-2 text-[13px] text-white/35"
+      className="mb-0.5 flex items-center justify-between gap-2 px-3 py-2 text-[13px] text-white/35"
     >
       <span>{p.label}</span>
-      <span className="text-[9px]">Próx.</span>
+      <span className="rounded-full border border-white/10 px-1.5 py-px text-[9px] uppercase tracking-wide">
+        Próx.
+      </span>
     </div>
   );
 }

@@ -1,8 +1,10 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorState } from "@/shared/components/error-state";
-import { fecha, fechaHoraArgentina, periodoInicial } from "../format";
+import { FilterField } from "@/shared/components/filter-bar";
+import { fecha, periodoInicial } from "../format";
 import {
   claveResumen,
   cursorResumen,
@@ -90,13 +92,7 @@ const columnasGrupos: Columna<GrupoResumen>[] = [
   { titulo: "Cereal / campaña", celda: (f) => `${f.productoNombre ?? f.producto} / ${f.campania}` },
   ...columnasMetricas.map((c) => ({ ...c, celda: (f: GrupoResumen) => c.celda(f.metricas) })),
 ];
-export function ResumenPanel({
-  activo,
-  verRecibidos,
-}: {
-  activo: boolean;
-  verRecibidos: () => void;
-}) {
+export function ResumenPanel({ activo }: { activo: boolean }) {
   const [periodo, setPeriodo] = useState(() => periodoInicial());
   const [borrador, setBorrador] = useState(filtrosResumenVacios);
   const [aplicados, setAplicados] = useState(filtrosResumenVacios);
@@ -116,6 +112,7 @@ export function ResumenPanel({
   const anteriores = !!q.data && !nuevaLectura;
   return (
     <div className="min-w-0 space-y-4">
+      {/* Fechas y filtros en la MISMA barra: son los filtros de la misma consulta. */}
       <PeriodoFiltro
         value={periodo}
         etiqueta="Fecha para la que se pidieron los cupos"
@@ -123,9 +120,6 @@ export function ResumenPanel({
           setPeriodo(p);
           reiniciar();
         }}
-      />
-      <form
-        className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-4"
         onSubmit={(e) => {
           e.preventDefault();
           if (filtrosResumenValidos(borrador)) {
@@ -134,15 +128,16 @@ export function ResumenPanel({
           }
         }}
       >
-        <label className="text-xs text-ink-soft">
-          Contrato
+        <FilterField label="Contrato">
           <Input
+            className="w-40"
             value={borrador.contrato}
             maxLength={15}
             onChange={(e) => setBorrador({ ...borrador, contrato: e.target.value })}
           />
-        </label>
+        </FilterField>
         <CatalogoSelect
+          className="w-56"
           tipo="productos"
           titulo="Cereal"
           required={false}
@@ -150,16 +145,17 @@ export function ResumenPanel({
           value={borrador.producto}
           onChange={(producto) => setBorrador({ ...borrador, producto })}
         />
-        <label className="text-xs text-ink-soft">
-          Campaña
+        <FilterField label="Campaña">
           <Input
+            className="w-32"
             value={borrador.campania}
             maxLength={9}
             placeholder="2025-2026"
             onChange={(e) => setBorrador({ ...borrador, campania: e.target.value })}
           />
-        </label>
+        </FilterField>
         <CatalogoSelect
+          className="w-56"
           tipo="destinos"
           titulo="Terminal solicitada"
           required={false}
@@ -184,86 +180,76 @@ export function ResumenPanel({
           </Button>
         </div>
         {!filtrosResumenValidos(borrador) && (
-          <p role="alert" className="text-sm text-rojo">
+          <p role="alert" className="basis-full text-sm text-rojo">
             Revisá contrato, cereal, campaña y terminal solicitada.
           </p>
         )}
-      </form>
-      <p className="text-sm text-ink-soft">
-        Cantidades de cupos. Incluye solicitudes abiertas y cerradas para estas fechas y todas sus
-        recepciones, aun con otra fecha o terminal.
-      </p>
-      <p className="text-xs text-ink-soft">
-        Las recepciones sin solicitud quedan fuera del resumen.{" "}
-        <Button size="sm" variant="ghost" onClick={verRecibidos}>
-          Ver cupos recibidos
-        </Button>
-      </p>
-      {q.isFetching && (
-        <p role="status" className="text-sm text-ink-soft">
-          Consultando resumen…
-        </p>
-      )}
+      </PeriodoFiltro>
       {q.isError && !q.data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
       {anteriores && (
         <p role="status" className="text-sm text-ink-soft">
           Datos anteriores. Esperá una consulta exitosa para navegar.
         </p>
       )}
-      {q.data && (
+      {/* Mientras se consulta las tablas ya están, vacías: el "Consultando…" vive DENTRO de la
+          tarjeta, como en el resto de la app. Suelto arriba empujaba todo para abajo y al llegar la
+          respuesta lo devolvía de un salto. Sin lectura NI consulta en curso no se dibujan: el
+          mensaje de tabla vacía diría "no hay solicitudes" cuando lo que hubo fue un error. */}
+      {(q.data || q.isFetching) && (
         <>
-          <p className="text-xs text-ink-soft">
-            Fuente: Logística propia. Corte propio: {fechaHoraArgentina(q.data.propiosAl)} (UTC-3).
-            Nombres preparados al: {fechaHoraArgentina(q.data.datosAl)} (UTC-3).
-          </p>
           <h2 className="font-medium">Totales de la selección completa</h2>
           <TablaLogistica
             titulo="Totales del resumen"
-            filas={[q.data.totales]}
+            filas={q.data ? [q.data.totales] : []}
             clave={() => "totales"}
             columnas={columnasMetricas}
+            cargando={q.isFetching}
+            vacio="Todavía no se consultó el resumen."
           />
-          <p className="text-xs text-ink-soft">
-            Anulados, otra fecha y otra terminal son datos de los cupos recibidos; pueden coincidir
-            entre sí.
-          </p>
           <h2 className="font-medium">Grupos por fecha, terminal, contrato y cereal / campaña</h2>
           <TablaLogistica
             titulo="Grupos del resumen"
-            filas={q.data.filas}
+            filas={q.data?.filas ?? []}
             clave={claveResumen}
             columnas={columnasGrupos}
             cargando={q.isFetching}
             error={q.isError ? q.error : undefined}
             reintentar={() => void q.refetch()}
             vacio={
-              q.data.totales.solicitudes > 0
+              q.data && q.data.totales.solicitudes > 0
                 ? "No hay más grupos en esta página. Volvé a la página anterior."
                 : "No hay solicitudes para estas fechas y filtros."
+            }
+            // Las páginas son de los grupos, no de los totales: la navegación va al pie de ESA
+            // tabla, como en el resto de la app. Suelta al final de la pantalla parecía navegar
+            // todo el resumen, incluidos unos totales que no cambian de página.
+            pie={
+              <div className="no-print flex flex-wrap items-center justify-end gap-3 px-4 py-3 text-sm text-ink-soft">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!nuevaLectura || cursores.length === 1}
+                  onClick={() => setCursores((c) => c.slice(0, -1))}
+                >
+                  <ChevronLeft className="size-4" aria-hidden /> Anterior
+                </Button>
+                <span className="tabular">Página {cursores.length}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!nuevaLectura || !q.data?.hayMas || !q.data.filas.length}
+                  onClick={() => {
+                    const ultima = q.data?.filas.at(-1);
+                    if (ultima) setCursores((c) => [...c, cursorResumen(ultima)]);
+                  }}
+                >
+                  Siguiente <ChevronRight className="size-4" aria-hidden />
+                </Button>
+              </div>
             }
           />
         </>
       )}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <Button
-          variant="outline"
-          disabled={!nuevaLectura || cursores.length === 1}
-          onClick={() => setCursores((c) => c.slice(0, -1))}
-        >
-          Anterior
-        </Button>
-        <span className="text-xs text-ink-soft">Página {cursores.length}</span>
-        <Button
-          variant="outline"
-          disabled={!nuevaLectura || !q.data?.hayMas || !q.data.filas.length}
-          onClick={() => {
-            const ultima = q.data?.filas.at(-1);
-            if (ultima) setCursores((c) => [...c, cursorResumen(ultima)]);
-          }}
-        >
-          Siguiente
-        </Button>
-      </div>
     </div>
   );
 }

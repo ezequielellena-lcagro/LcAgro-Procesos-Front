@@ -1,18 +1,19 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { ErrorState } from "@/shared/components/error-state";
 import { PageHeader } from "@/shared/components/page-header";
+import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { fecha } from "../format";
 import { referenciaFlota, textoFlotaValido, trimFlota } from "../lib/flota";
 import { useFichaFlota, useFlota } from "../queries/use-logistica-flota";
 import type { FichaFlotaDto, FiltrosFlota } from "../types";
-import { Campo } from "../components/form-operacion";
 import { FichaFlotaDialog, type ModoFichaFlota } from "../components/ficha-flota-dialog";
 import { HistorialDialog } from "../components/historial-dialog";
-import { LogisticaNav } from "../components/logistica-nav";
+import { AvisoDemo } from "../components/aviso-demo";
 import { TablaLogistica } from "../components/tabla-logistica";
 
 function LecturaFicha({
@@ -114,9 +115,8 @@ export function FletePage() {
           )
         }
       />
-      <LogisticaNav />
-      <form
-        className="mb-5 flex flex-wrap items-end gap-3 rounded-card border border-line bg-panel p-4"
+      <AvisoDemo />
+      <FilterBar
         onSubmit={(e) => {
           e.preventDefault();
           if (buscar !== "" && !textoFlotaValido(buscar, 200)) {
@@ -131,36 +131,35 @@ export function FletePage() {
           });
         }}
       >
-        <div className="min-w-0 flex-1 basis-64">
-          <Campo titulo="Buscar flota">
-            <Input
-              value={buscar}
-              maxLength={200}
-              placeholder="Patente, conductor o transportista"
-              onChange={(e) => setBuscar(e.target.value)}
-            />
-          </Campo>
-        </div>
-        <Campo titulo="Estado de la ficha">
-          <select
-            className="h-10 rounded-md border border-line bg-panel px-3 text-sm text-ink"
+        <FilterField label="Buscar flota">
+          <Input
+            className="w-72"
+            value={buscar}
+            maxLength={200}
+            placeholder="Patente, conductor o transportista"
+            onChange={(e) => setBuscar(e.target.value)}
+          />
+        </FilterField>
+        <FilterField label="Estado de la ficha">
+          <Select
+            className="w-40"
             value={estado}
             onChange={(e) => setEstado(e.target.value)}
           >
             <option value="">Todas</option>
             <option value="true">Activas</option>
             <option value="false">Inactivas</option>
-          </select>
-        </Campo>
+          </Select>
+        </FilterField>
         <Button type="submit" variant="outline">
           Aplicar filtros
         </Button>
         {filtroInvalido && (
-          <p role="alert" className="w-full text-sm text-rojo">
+          <p role="alert" className="basis-full text-sm text-rojo">
             Revisá el texto de búsqueda.
           </p>
         )}
-      </form>
+      </FilterBar>
       {conflicto && (
         <p role="alert" className="mb-4 text-sm text-rojo">
           La ficha cambió. Leímos la versión actual; cerrá el detalle y elegí una nueva operación.

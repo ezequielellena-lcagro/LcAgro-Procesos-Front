@@ -150,6 +150,18 @@ async function confirmar() {
   await screen.findByText(/Se otorgaron \d cupos/);
 }
 
+/**
+ * Elige una opción del combo de catálogo (Productor / Cereal / Destino). Es un campo único: se
+ * tipea y se elige de la lista que se abre, en vez del viejo buscador + `<select>`.
+ */
+async function elegirCatalogo(etiqueta: string, buscado: string, opcion: string) {
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.focus(campo);
+  if (buscado) fireEvent.change(campo, { target: { value: buscado } });
+  const lista = await screen.findByRole("listbox");
+  fireEvent.mouseDown(await within(lista).findByRole("button", { name: opcion }));
+}
+
 describe("Primera asignación de Logística", () => {
   it.each([0, 1])(
     "avisa antes de confirmar sólo si la fecha del cupo difiere del pedido (diferencia=%s días)",
@@ -364,9 +376,7 @@ describe("Primera asignación de Logística", () => {
       await abrir();
       fireEvent.click(screen.getByRole("radio", { name: "Cliente sin pedido" }));
       await elegirCupo();
-      fireEvent.change(await screen.findByLabelText("Productor destinatario"), {
-        target: { value: "9000000001" },
-      });
+      await elegirCatalogo("Productor destinatario", "9000000001", "Productor ficticio (9000000001)");
       if (conPreventa) {
         fireEvent.click(screen.getByRole("checkbox", { name: "Asociar una preventa (opcional)" }));
         fireEvent.click(await screen.findByRole("radio", { name: "Elegir preventa PF-DEMO/1" }));
@@ -653,9 +663,9 @@ describe("Primera asignación de Logística", () => {
       consultas.find((u) => u.searchParams.has("despuesId"))?.searchParams.get("despuesId"),
     ).toBe(recepcion.cupos[0].id);
     await elegirCupo();
-    fireEvent.change(screen.getByLabelText("Cereal"), { target: { value: "10" } });
+    await elegirCatalogo("Cereal", "10", "Soja (10)");
     fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025-2026" } });
-    fireEvent.change(screen.getByLabelText("Destino de los cupos"), { target: { value: "101" } });
+    await elegirCatalogo("Destino de los cupos", "101", "Terminal de ejemplo (101)");
     fireEvent.change(screen.getByLabelText("Circuito de los cupos"), {
       target: { value: "directa" },
     });
@@ -676,14 +686,7 @@ describe("Primera asignación de Logística", () => {
     expect(pedidos.searchParams.has("circuito")).toBe(false);
     expect(screen.getByText("0 cupos seleccionados")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("radio", { name: "Cliente sin pedido" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Buscar productor destinatario" }), {
-      target: { value: "1" },
-    });
-    const destinatario = screen.getByLabelText("Productor destinatario");
-    expect(
-      await within(destinatario).findByRole("option", { name: "Cliente de prueba uno (1)" }),
-    ).toBeInTheDocument();
-    fireEvent.change(destinatario, { target: { value: "1" } });
+    await elegirCatalogo("Productor destinatario", "1", "Cliente de prueba uno (1)");
     await elegirCupo();
     await confirmar();
     expect(
@@ -748,7 +751,8 @@ describe("Primera asignación de Logística", () => {
     expect(opciones[200]).toBeDisabled();
     expect(screen.getByText("200 cupos seleccionados")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Revisar otorgamiento" })).toBeEnabled();
-  }, 30000); // 200 interacciones de tabla en jsdom; timeout acotado sólo a este caso de volumen.
+  }, 60000); // 200 interacciones de tabla en jsdom; timeout acotado sólo a este caso de volumen.
+  // 60 s y no 30: con la suite entera en paralelo este caso tardó 39 s y se cortaba solo.
   it("el demo filtra destinos antes del límite de página y admite códigos numéricos", async () => {
     await post<Recepcion>("cupos/recepciones", {
       contratoVenta: "V-DEMO/1",
@@ -879,10 +883,10 @@ describe("Primera asignación de Logística", () => {
         ).toBe(false);
     };
     await cargarSegundas();
-    fireEvent.change(screen.getByLabelText("Cereal"), { target: { value: "1" } });
+    await elegirCatalogo("Cereal", "1", "Maíz (1)");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await screen.findByText("No hay cupos disponibles para estas fechas y filtros.");
-    fireEvent.change(screen.getByLabelText("Cereal"), { target: { value: "" } });
+    await elegirCatalogo("Cereal", "", "Todos");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await soloPrimeras();
     await cargarSegundas();
@@ -894,9 +898,7 @@ describe("Primera asignación de Logística", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Cliente sin pedido" }));
     await soloPrimeras();
     await cargarSegundas();
-    fireEvent.change(await screen.findByLabelText("Productor destinatario"), {
-      target: { value: "1" },
-    });
+    await elegirCatalogo("Productor destinatario", "1", "Cliente de prueba uno (1)");
     await soloPrimeras();
     expect(screen.getByText("1 cupos seleccionados")).toBeInTheDocument();
     await cargarSegundas();

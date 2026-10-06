@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronsUpDown } from "lucide-react";
@@ -12,10 +13,7 @@ import { cn } from "@/lib/utils";
 
 /** Normaliza para buscar sin distinguir mayúsculas ni tildes. */
 function normalizar(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
 interface ComboboxProps {
@@ -27,6 +25,22 @@ interface ComboboxProps {
   disabled?: boolean;
   /** Tope de opciones renderizadas a la vez (la búsqueda angosta el resto). */
   maxVisible?: number;
+  required?: boolean;
+  /**
+   * Avisa lo que se va tipeando. Lo usan las listas que NO están en memoria: el padre consulta al
+   * servidor con ese texto y devuelve otras `options`.
+   */
+  onQueryChange?: (query: string) => void;
+  /**
+   * `false` cuando las `options` ya vienen filtradas por el servidor: volver a filtrarlas acá
+   * escondería resultados válidos (el servidor busca por nombre O por código, y con más manga
+   * ancha que un `includes` del texto crudo).
+   */
+  filtrarLocal?: boolean;
+  /** Pie del panel: estado de la consulta, traer la página siguiente, aclaraciones. */
+  pie?: ReactNode;
+  /** Qué decir cuando no hay ninguna opción para mostrar. */
+  vacio?: string;
 }
 
 /**
@@ -43,15 +57,23 @@ export function Combobox({
   id,
   disabled,
   maxVisible = 50,
+  required,
+  onQueryChange,
+  filtrarLocal = true,
+  pie,
+  vacio = "Sin coincidencias.",
 }: ComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number; arriba: boolean } | null>(
-    null,
-  );
+  const [pos, setPos] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    arriba: boolean;
+  } | null>(null);
 
   // Mide el trigger y ubica el panel (fixed); decide abrir hacia arriba si no entra abajo. Se llama
   // desde el handler de apertura y desde los listeners (nunca en el cuerpo de un effect).
@@ -91,8 +113,8 @@ export function Combobox({
 
   const q = normalizar(query.trim());
   const coincidencias = useMemo(
-    () => (q === "" ? options : options.filter((o) => normalizar(o).includes(q))),
-    [q, options],
+    () => (q === "" || !filtrarLocal ? options : options.filter((o) => normalizar(o).includes(q))),
+    [q, options, filtrarLocal],
   );
   const visibles = coincidencias.slice(0, maxVisible);
   const active = Math.min(activeIndex, Math.max(visibles.length - 1, 0));
@@ -100,6 +122,7 @@ export function Combobox({
   const abrir = () => {
     if (disabled) return;
     setQuery("");
+    onQueryChange?.("");
     setActiveIndex(0);
     medir();
     setOpen(true);
@@ -143,11 +166,13 @@ export function Combobox({
           aria-expanded={open}
           autoComplete="off"
           disabled={disabled}
+          required={required}
           value={open ? query : value}
           placeholder={value && !open ? value : (placeholder ?? "Buscar…")}
           onFocus={abrir}
           onChange={(e) => {
             setQuery(e.target.value);
+            onQueryChange?.(e.target.value);
             setActiveIndex(0);
             if (!open) {
               medir();
@@ -180,7 +205,7 @@ export function Combobox({
           >
             <ul role="listbox" className="max-h-60 overflow-y-auto py-1">
               {visibles.length === 0 ? (
-                <li className="px-3 py-2 text-sm text-ink-soft">Sin coincidencias.</li>
+                <li className="px-3 py-2 text-sm text-ink-soft">{vacio}</li>
               ) : (
                 visibles.map((opt, i) => (
                   <li key={opt} role="option" aria-selected={opt === value}>
@@ -204,11 +229,12 @@ export function Combobox({
                 ))
               )}
             </ul>
-            {coincidencias.length > maxVisible && (
+            {filtrarLocal && coincidencias.length > maxVisible && (
               <div className="border-t border-line-soft px-3 py-1.5 text-xs text-ink-soft">
                 Mostrando {maxVisible} de {coincidencias.length}. Seguí escribiendo para afinar.
               </div>
             )}
+            {pie && <div className="border-t border-line-soft px-3 py-1.5 text-xs">{pie}</div>}
           </div>,
           document.body,
         )}

@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { toAppError } from "@/lib/api-error";
 import { useLogisticaExcel } from "../queries/use-logistica-excel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { DateField } from "@/components/ui/date-field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
 import { PageHeader } from "@/shared/components/page-header";
+import { FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { HistorialDialog } from "../components/historial-dialog";
 import { CatalogoSelect } from "../components/catalogo-select";
-import { LogisticaNav } from "../components/logistica-nav";
+import { AvisoDemo } from "../components/aviso-demo";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { ConciliacionTabla } from "../components/conciliacion-tabla";
 import { RetirarVinculoErpDialog } from "../components/retirar-vinculo-erp-dialog";
@@ -27,6 +30,7 @@ import {
   ESTADO_LABEL,
   FUENTE_LABEL,
 } from "../lib/seguimiento";
+import { campaniaValida } from "../lib/filtros-cupos";
 import { useListado } from "../queries/use-logistica";
 import { ESTADOS_SEGUIMIENTO } from "../types";
 import type { ConciliacionFila, Periodo, Seguimiento, TipoDatoOperativo } from "../types";
@@ -51,7 +55,6 @@ export function CargasPage() {
   } | null>(null);
   const [tab, setTab] = useState("dia");
   const [dia, setDia] = useState(hoy);
-  const [diaBorrador, setDiaBorrador] = useState(dia);
   const [periodo, setPeriodo] = useState<Periodo>(periodoInicial);
   const [borrador, setBorrador] = useState(filtrosVacios);
   const [filtros, setFiltros] = useState<Filtros>(filtrosVacios);
@@ -110,6 +113,98 @@ export function CargasPage() {
       </>
     );
   };
+  const campaniaOk = campaniaValida(borrador);
+  const aplicarFiltros = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!campaniaOk) return;
+    setFiltros({ ...borrador });
+    reiniciar();
+  };
+  /** Los filtros de la tabla, para meterlos en la barra que corresponda a la solapa. */
+  const camposFiltro = (
+    <>
+      {(
+        [
+          ["contrato", "Contrato", 15],
+          ["campania", "Campaña", 9],
+        ] as const
+      ).map(([campo, titulo, max]) => (
+        <FilterField key={campo} label={titulo}>
+          <Input
+            className={campo === "campania" ? "w-32" : "w-40"}
+            value={borrador[campo]}
+            maxLength={max}
+            placeholder={campo === "campania" ? "2025-2026" : undefined}
+            onChange={(e) => setBorrador({ ...borrador, [campo]: e.target.value })}
+          />
+        </FilterField>
+      ))}
+      {(
+        [
+          ["clientes", "clienteNumero", "Productor"],
+          ["productos", "producto", "Cereal"],
+          ["destinos", "destinoCodigo", "Destino"],
+        ] as const
+      ).map(([tipo, campo, titulo]) => (
+        <CatalogoSelect
+          key={campo}
+          className="w-56"
+          tipo={tipo}
+          titulo={titulo}
+          value={Number(borrador[campo])}
+          required={false}
+          modoFiltro
+          onChange={(v) => setBorrador({ ...borrador, [campo]: v ? String(v) : "" })}
+        />
+      ))}
+      <FilterField label="Circuito">
+        <Select
+          className="w-40"
+          value={borrador.circuito}
+          onChange={(e) => setBorrador({ ...borrador, circuito: e.target.value })}
+        >
+          <option value="">Todos</option>
+          <option value="directa">Directa</option>
+          <option value="propia">Propia</option>
+        </Select>
+      </FilterField>
+      <FilterField label="Estado observado">
+        <Select
+          className="w-52"
+          value={borrador.estadoObservado}
+          onChange={(e) => setBorrador({ ...borrador, estadoObservado: e.target.value })}
+        >
+          <option value="">Todos</option>
+          {ESTADOS_SEGUIMIENTO.map((v) => (
+            <option key={v} value={v}>
+              {ESTADO_LABEL[v]}
+            </option>
+          ))}
+        </Select>
+      </FilterField>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" type="submit" disabled={!campaniaOk}>
+          Aplicar filtros
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            setBorrador(filtrosVacios);
+            setFiltros(filtrosVacios);
+            reiniciar();
+          }}
+        >
+          Limpiar filtros
+        </Button>
+      </div>
+      {!campaniaOk && (
+        <p role="alert" className="basis-full text-sm text-rojo">
+          Ingresá una campaña como 2025-2026.
+        </p>
+      )}
+    </>
+  );
   return (
     <>
       <PageHeader
@@ -126,7 +221,7 @@ export function CargasPage() {
         }
       />
       <div inert={!!flota}>
-        <LogisticaNav />
+        <AvisoDemo />
       </div>
       {excel.isPending && (
         <p role="status" className="mb-4 text-sm text-ink-soft">
@@ -153,7 +248,7 @@ export function CargasPage() {
         }}
       >
         <fieldset disabled={bloqueada} className="min-w-0">
-          <TabsList className="overflow-x-auto">
+          <TabsList className="mb-4 max-w-full overflow-x-auto">
             <TabsTrigger value="dia">Día</TabsTrigger>
             <TabsTrigger value="periodo">Período</TabsTrigger>
             <TabsTrigger value="anuladas">Anuladas</TabsTrigger>
@@ -161,116 +256,36 @@ export function CargasPage() {
           </TabsList>
         </fieldset>
         <fieldset disabled={bloqueada}>
+          {/* Fecha y filtros en la MISMA barra, como en Cupos: son los filtros de la misma tabla.
+              Sueltos, sin la barra que los agrupa, se estiraban a lo ancho de la pantalla. */}
           {tab === "dia" ? (
-            <form
-              className="my-4 flex items-end gap-3"
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (diaBorrador) {
-                  setDia(diaBorrador);
-                  reiniciar();
-                }
-              }}
-            >
-              <label className="text-xs text-ink-soft">
-                Fecha prevista de carga
-                <Input
-                  type="date"
-                  required
-                  value={diaBorrador}
-                  onChange={(e) => setDiaBorrador(e.target.value)}
-                />
-              </label>
-              <Button type="submit" variant="outline">
-                Consultar día
-              </Button>
-            </form>
+            <FilterBar onSubmit={aplicarFiltros}>
+              <FilterField label="Fecha prevista de carga">
+                <div className="w-40">
+                  <DateField
+                    value={dia}
+                    onChange={(v) => {
+                      setDia(v);
+                      reiniciar();
+                    }}
+                  />
+                </div>
+              </FilterField>
+              {camposFiltro}
+            </FilterBar>
           ) : (
-            <div className="mt-4">
-              <PeriodoFiltro
-                value={periodo}
-                etiqueta="Fecha prevista de carga"
-                onChange={(v) => {
-                  setPeriodo(v);
-                  reiniciar();
-                }}
-              />
-            </div>
+            <PeriodoFiltro
+              value={periodo}
+              etiqueta="Fecha prevista de carga"
+              onChange={(v) => {
+                setPeriodo(v);
+                reiniciar();
+              }}
+              onSubmit={aplicarFiltros}
+            >
+              {camposFiltro}
+            </PeriodoFiltro>
           )}
-          <form
-            className="mb-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setFiltros({ ...borrador });
-              reiniciar();
-            }}
-          >
-            {(
-              [
-                ["contrato", "Contrato", 15],
-                ["campania", "Campaña", 9],
-              ] as const
-            ).map(([campo, titulo, max]) => (
-              <label key={campo} className="text-xs text-ink-soft">
-                {titulo}
-                <Input
-                  value={borrador[campo]}
-                  maxLength={max}
-                  pattern={campo === "campania" ? "[0-9]{4}-[0-9]{4}" : undefined}
-                  onChange={(e) => setBorrador({ ...borrador, [campo]: e.target.value })}
-                />
-              </label>
-            ))}
-            {(
-              [
-                ["clientes", "clienteNumero", "Productor"],
-                ["productos", "producto", "Cereal"],
-                ["destinos", "destinoCodigo", "Destino"],
-              ] as const
-            ).map(([tipo, campo, titulo]) => (
-              <CatalogoSelect
-                key={campo}
-                tipo={tipo}
-                titulo={titulo}
-                value={Number(borrador[campo])}
-                required={false}
-                modoFiltro
-                onChange={(v) => setBorrador({ ...borrador, [campo]: v ? String(v) : "" })}
-              />
-            ))}
-            <label className="text-xs text-ink-soft">
-              Circuito
-              <select
-                className="h-9 w-full rounded-md border border-line bg-panel px-3 text-sm text-ink"
-                value={borrador.circuito}
-                onChange={(e) => setBorrador({ ...borrador, circuito: e.target.value })}
-              >
-                <option value="">Todos</option>
-                <option value="directa">Directa</option>
-                <option value="propia">Propia</option>
-              </select>
-            </label>
-            <label className="text-xs text-ink-soft">
-              Estado observado
-              <select
-                className="h-9 w-full rounded-md border border-line bg-panel px-3 text-sm text-ink"
-                value={borrador.estadoObservado}
-                onChange={(e) => setBorrador({ ...borrador, estadoObservado: e.target.value })}
-              >
-                <option value="">Todos</option>
-                {ESTADOS_SEGUIMIENTO.map((v) => (
-                  <option key={v} value={v}>
-                    {ESTADO_LABEL[v]}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="self-end">
-              <Button variant="outline" type="submit">
-                Aplicar filtros
-              </Button>
-            </div>
-          </form>
         </fieldset>
         {["dia", "periodo", "anuladas"].map((v) => (
           <TabsContent key={v} value={v}>

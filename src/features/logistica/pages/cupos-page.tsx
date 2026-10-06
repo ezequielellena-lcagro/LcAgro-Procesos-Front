@@ -7,16 +7,29 @@ import { fecha, fechaInstanteArgentina, kg, periodoInicial } from "../format";
 import { cursorPropio, useListado } from "../queries/use-logistica";
 import type { Cupo, CupoErp, Solicitud } from "../types";
 import { HistorialDialog } from "../components/historial-dialog";
-import { LogisticaNav } from "../components/logistica-nav";
+import { AvisoDemo } from "../components/aviso-demo";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { RecepcionDialog } from "../components/recepcion-dialog";
 import { RespuestaDialog, SolicitudDialog } from "../components/solicitud-dialog";
 import { TablaLogistica } from "../components/tabla-logistica";
 import { OtorgarPanel } from "../components/otorgar-panel";
+import { Paginacion } from "../components/paginacion";
+import { usePaginacion } from "../lib/paginacion";
 import { kgErp } from "../lib/seguimiento";
 import { CuposFiltros } from "../components/cupos-filtros";
-import { filtrosCuposVacios, paramsCupos } from "../lib/filtros-cupos";
+import { campaniaValida, filtrosCuposVacios, paramsCupos } from "../lib/filtros-cupos";
 import { ResumenPanel } from "../components/resumen-panel";
+
+/** Celda sin valor: el guion del resto de la app, no una frase. */
+const SIN_DATO = "—";
+/**
+ * Valor de celda, o guion si no hay.
+ *
+ * El texto en blanco cuenta como vacío: MacroGest devuelve `''` y no `NULL` en varias columnas
+ * de la carta de porte (patente, CTG), y un `?? SIN_DATO` suelto dejaba la celda en blanco.
+ */
+const oDash = (valor: string | number | null | undefined) =>
+  typeof valor === "string" && !valor.trim() ? SIN_DATO : (valor ?? SIN_DATO);
 export function CuposPage() {
   const { user } = useAuth();
   const gestionar = user?.roles.includes("logistica-cupos") ?? false;
@@ -64,6 +77,11 @@ export function CuposPage() {
     tab === "erp",
     { version: erpVersion },
   );
+  // Cada grilla muestra UN tramo de 50 por vez, como el resto de la app. El scroll infinito
+  // dejaba cientos de filas colgando abajo de los filtros y sin forma de volver atrás.
+  const paginaSolicitudes = usePaginacion(solicitudes);
+  const paginaCupos = usePaginacion(cupos);
+  const paginaErp = usePaginacion(erp);
   return (
     <>
       <PageHeader
@@ -82,7 +100,7 @@ export function CuposPage() {
           )
         }
       />
-      <LogisticaNav />
+      <AvisoDemo />
       <Tabs
         value={tab}
         onValueChange={(v) => {
@@ -92,7 +110,7 @@ export function CuposPage() {
           }
         }}
       >
-        <TabsList className="max-w-full overflow-x-auto">
+        <TabsList className="mb-4 max-w-full overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="solicitudes">Solicitudes a terminal</TabsTrigger>
           <TabsTrigger value="recibidos">Cupos recibidos</TabsTrigger>
@@ -100,25 +118,23 @@ export function CuposPage() {
           <TabsTrigger value="otorgar">Otorgar</TabsTrigger>
         </TabsList>
         <TabsContent value="resumen">
-          <ResumenPanel
-            activo={tab === "resumen"}
-            verRecibidos={() => {
-              if (!otorgarLocked) setTab("recibidos");
-            }}
-          />
+          <ResumenPanel activo={tab === "resumen"} />
         </TabsContent>
         <TabsContent value="solicitudes">
           <PeriodoFiltro value={periodo} onChange={setPeriodo} />
           <TablaLogistica
             titulo="Solicitudes a terminal"
-            filas={solicitudes.data?.pages.flatMap((p) => p.filas) ?? []}
+            filas={paginaSolicitudes.filas}
             clave={(f) => f.id}
             cargando={solicitudes.isLoading}
             error={solicitudes.error}
             reintentar={() => void solicitudes.refetch()}
-            hayMas={solicitudes.hasNextPage}
-            mas={() => void solicitudes.fetchNextPage()}
-            cargandoMas={solicitudes.isFetchingNextPage}
+            pie={
+              <Paginacion
+                {...paginaSolicitudes}
+                unidad={{ singular: "solicitud", plural: "solicitudes" }}
+              />
+            }
             vacio="Todavía no hay solicitudes para estas fechas. Elegí un contrato de venta para registrar la primera."
             columnas={[
               { titulo: "Contrato", celda: (f) => f.contratoVenta },
@@ -189,31 +205,33 @@ export function CuposPage() {
                 reiniciarCupos();
               }}
               etiqueta="Fecha de carga"
-            />
-            <CuposFiltros
-              value={cuposBorrador}
-              onChange={setCuposBorrador}
-              onApply={() => {
-                setCuposFiltros({ ...cuposBorrador });
-                reiniciarCupos();
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (campaniaValida(cuposBorrador)) {
+                  setCuposFiltros({ ...cuposBorrador });
+                  reiniciarCupos();
+                }
               }}
-              onClear={() => {
-                setCuposBorrador(filtrosCuposVacios);
-                setCuposFiltros(filtrosCuposVacios);
-                reiniciarCupos();
-              }}
-            />
+            >
+              <CuposFiltros
+                value={cuposBorrador}
+                onChange={setCuposBorrador}
+                onClear={() => {
+                  setCuposBorrador(filtrosCuposVacios);
+                  setCuposFiltros(filtrosCuposVacios);
+                  reiniciarCupos();
+                }}
+              />
+            </PeriodoFiltro>
           </fieldset>
           <TablaLogistica
             titulo="Cupos recibidos"
-            filas={cupos.data?.pages.flatMap((p) => p.filas) ?? []}
+            filas={paginaCupos.filas}
             clave={(f) => f.id}
             cargando={cupos.isLoading}
             error={cupos.error}
             reintentar={() => void cupos.refetch()}
-            hayMas={cupos.hasNextPage}
-            mas={() => void cupos.fetchNextPage()}
-            cargandoMas={cupos.isFetchingNextPage}
+            pie={<Paginacion {...paginaCupos} unidad={{ singular: "cupo", plural: "cupos" }} />}
             columnas={[
               { titulo: "Contrato", celda: (f) => f.contratoVenta },
               { titulo: "Fila de tanda", numero: true, celda: (f) => f.ordinal },
@@ -287,13 +305,6 @@ export function CuposPage() {
           />
         </TabsContent>
         <TabsContent value="erp">
-          <p className="mb-3 text-sm text-ink-soft">
-            MacroGest · sólo lectura. La aparición de un cupo aquí no crea una recepción propia ni
-            lo otorga a un productor.
-          </p>
-          <p className="mb-3 text-xs text-ink-soft">
-            Productor y cargador son los números informados en la cabecera del plan ERP.
-          </p>
           <fieldset disabled={otorgarLocked}>
             <PeriodoFiltro
               value={erpPeriodo}
@@ -303,56 +314,56 @@ export function CuposPage() {
               }}
               etiqueta="Fecha de carga ERP"
               maxDias={31}
-            />
-            <CuposFiltros
-              erp
-              value={erpBorrador}
-              onChange={setErpBorrador}
-              onApply={() => {
+              onSubmit={(e) => {
+                e.preventDefault();
                 setErpFiltros({ ...erpBorrador });
                 reiniciarErp();
               }}
-              onClear={() => {
-                setErpBorrador(filtrosCuposVacios);
-                setErpFiltros(filtrosCuposVacios);
-                reiniciarErp();
-              }}
-            />
+            >
+              <CuposFiltros
+                erp
+                value={erpBorrador}
+                onChange={setErpBorrador}
+                onClear={() => {
+                  setErpBorrador(filtrosCuposVacios);
+                  setErpFiltros(filtrosCuposVacios);
+                  reiniciarErp();
+                }}
+              />
+            </PeriodoFiltro>
           </fieldset>
           <TablaLogistica
             titulo="Cupos de MacroGest"
-            filas={erp.data?.pages.flatMap((p) => p.filas) ?? []}
+            filas={paginaErp.filas}
             clave={(f) => `${f.contrato}/${f.grupo}/${f.cupo}`}
             cargando={erp.isLoading}
             error={erp.error}
             reintentar={() => void erp.refetch()}
-            hayMas={erp.hasNextPage}
-            mas={() => void erp.fetchNextPage()}
-            cargandoMas={erp.isFetchingNextPage}
+            pie={<Paginacion {...paginaErp} unidad={{ singular: "cupo", plural: "cupos" }} />}
             columnas={[
               { titulo: "Contrato", celda: (f) => f.contrato },
               { titulo: "Grupo / cupo", celda: (f) => `${f.grupo} / ${f.cupo}` },
-              { titulo: "Código", celda: (f) => f.codigoTerminal ?? "Sin código" },
-              { titulo: "Carga", celda: (f) => fecha(f.fechaCarga) },
-              { titulo: "Alta ERP", celda: (f) => fecha(f.fechaAltaErp) },
+              { titulo: "Código", celda: (f) => oDash(f.codigoTerminal) },
+              { titulo: "Carga", celda: (f) => (f.fechaCarga ? fecha(f.fechaCarga) : SIN_DATO) },
+              {
+                titulo: "Alta ERP",
+                celda: (f) => (f.fechaAltaErp ? fecha(f.fechaAltaErp) : SIN_DATO),
+              },
               {
                 titulo: "Destino",
-                celda: (f) => f.destinoNombre ?? f.destinoCodigo ?? "Sin cabecera",
+                // Denominación en blanco con código cargado: vale más el código que el guion.
+                celda: (f) => oDash(f.destinoNombre?.trim() || f.destinoCodigo),
               },
-              {
-                titulo: "Productor del plan ERP",
-                celda: (f) => (f.tieneCabecera ? (f.productorPlan ?? "Sin dato") : "Sin cabecera"),
-              },
-              {
-                titulo: "Cargador del plan ERP",
-                celda: (f) => (f.tieneCabecera ? (f.cargadorPlan ?? "Sin dato") : "Sin cabecera"),
-              },
+              // Productor, cargador y destino salen de la cabecera del plan: sin cabecera los tres
+              // vienen nulos del ERP, así que el guion ya dice todo lo que había para decir.
+              { titulo: "Productor del plan ERP", celda: (f) => oDash(f.productorPlan) },
+              { titulo: "Cargador del plan ERP", celda: (f) => oDash(f.cargadorPlan) },
               {
                 titulo: "Carta de Porte",
                 celda: (f) => (f.tieneCartaPorte ? "Presente" : "Pendiente"),
               },
-              { titulo: "CTG", celda: (f) => f.ctg ?? "Sin dato" },
-              { titulo: "Patente", celda: (f) => f.patenteChasis ?? "Sin dato" },
+              { titulo: "CTG", celda: (f) => oDash(f.ctg) },
+              { titulo: "Patente", celda: (f) => oDash(f.patenteChasis) },
               { titulo: "Carga ERP", numero: true, celda: (f) => kgErp(f.kgCargaErp) },
               { titulo: "Descarga ERP", numero: true, celda: (f) => kgErp(f.kgDescargaErp) },
             ]}

@@ -1,3 +1,4 @@
+import { History, Pencil, Plus, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,12 +7,15 @@ import { PageHeader } from "@/shared/components/page-header";
 import { fecha, periodoInicial } from "../format";
 import { cursorPropio, useListado } from "../queries/use-logistica";
 import type { Pedido, Preventa } from "../types";
+import { AvisoDemo } from "../components/aviso-demo";
 import { PreventaPicker } from "../components/contrato-picker";
 import { HistorialDialog } from "../components/historial-dialog";
-import { LogisticaNav } from "../components/logistica-nav";
+import { usePaginacion } from "../lib/paginacion";
+import { Paginacion } from "../components/paginacion";
 import { PedidoDialog } from "../components/pedido-dialog";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { TablaLogistica } from "../components/tabla-logistica";
+
 export function PedidosPage() {
   const { user } = useAuth();
   const gestionar = user?.roles.includes("logistica-pedidos") ?? false;
@@ -21,16 +25,37 @@ export function PedidosPage() {
   const [dialogo, setDialogo] = useState<{ pedido?: Pedido; preventa?: Preventa } | null>(null);
   const [preventa, setPreventa] = useState<Preventa | null>(null);
   const q = useListado<Pedido>("pedidos", periodo, cursorPropio);
+  const paginacion = usePaginacion(q);
   return (
     <>
       <PageHeader
         title="Pedidos"
         subtitle="Demanda de productores y preventas de referencia."
-        actions={gestionar && <Button onClick={() => setDialogo({})}>Nuevo pedido</Button>}
+        actions={
+          gestionar &&
+          // Con una preventa elegida en la solapa del ERP, el alta de arriba pasa a ser la de esa
+          // preventa: el botón al pie de la grilla quedaba fuera de la vista al scrollear. Al lado
+          // va cómo soltarla, porque si no el alta libre queda tapada hasta recargar la página.
+          (tab === "erp" && preventa ? (
+            <>
+              <Button variant="outline" onClick={() => setPreventa(null)}>
+                <X className="size-4" aria-hidden /> Quitar selección
+              </Button>
+              <Button onClick={() => setDialogo({ preventa })}>
+                <Plus className="size-4" aria-hidden /> Crear pedido con {preventa.operacion}{" "}
+                {preventa.numero}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => setDialogo({})}>
+              <Plus className="size-4" aria-hidden /> Nuevo pedido
+            </Button>
+          ))
+        }
       />
-      <LogisticaNav />
+      <AvisoDemo />
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList>
+        <TabsList className="mb-4">
           <TabsTrigger value="agenda">Pedidos de Logística</TabsTrigger>
           <TabsTrigger value="erp">Preventas MacroGest</TabsTrigger>
         </TabsList>
@@ -38,15 +63,13 @@ export function PedidosPage() {
           <PeriodoFiltro value={periodo} onChange={setPeriodo} />
           <TablaLogistica
             titulo="Pedidos de Logística"
-            filas={q.data?.pages.flatMap((p) => p.filas) ?? []}
+            filas={paginacion.filas}
             clave={(f) => f.id}
             cargando={q.isLoading}
             error={q.error}
             reintentar={() => void q.refetch()}
-            hayMas={q.hasNextPage}
-            mas={() => void q.fetchNextPage()}
-            cargandoMas={q.isFetchingNextPage}
             vacio="Todavía no hay pedidos para estas fechas. Registrá el primer pedido del productor."
+            pie={<Paginacion {...paginacion} unidad={{ singular: "pedido", plural: "pedidos" }} />}
             columnas={[
               {
                 titulo: "Productor",
@@ -77,11 +100,11 @@ export function PedidosPage() {
                   <div className="flex gap-1">
                     {gestionar && (
                       <Button size="sm" variant="outline" onClick={() => setDialogo({ pedido: f })}>
-                        Corregir
+                        <Pencil className="size-4" aria-hidden /> Corregir
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => setHistoria(f.id)}>
-                      Historial
+                      <History className="size-4" aria-hidden /> Historial
                     </Button>
                   </div>
                 ),
@@ -90,15 +113,7 @@ export function PedidosPage() {
           />
         </TabsContent>
         <TabsContent value="erp">
-          <p className="mb-3 text-sm text-ink-soft">
-            MacroGest · sólo lectura. Seleccioná una preventa para ver sus campos en tabla.
-          </p>
           <PreventaPicker selected={preventa} onSelect={setPreventa} />
-          {gestionar && preventa && (
-            <Button className="mt-4" onClick={() => setDialogo({ preventa })}>
-              Crear pedido con esta preventa
-            </Button>
-          )}
         </TabsContent>
       </Tabs>
       {dialogo && (

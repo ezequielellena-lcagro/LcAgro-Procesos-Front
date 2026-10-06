@@ -16,6 +16,12 @@ import {
   sumarDias,
 } from "../format";
 import { camposHistorial } from "../lib/historial";
+/**
+ * Escribe una fecha en un campo del filtro de período. El `DateField` muestra y acepta
+ * dd/mm/aaaa, y avisa recién cuando la fecha está completa: por eso se escribe entera de una.
+ */
+const ponerFecha = (etiqueta: string, iso: string) =>
+  fireEvent.change(screen.getByLabelText(etiqueta), { target: { value: fecha(iso) } });
 import { diferenciaPeso, kgErp, kgOperativos } from "../lib/seguimiento";
 import type {
   Cupo,
@@ -168,6 +174,18 @@ function completarPeso() {
   fireEvent.change(screen.getByLabelText("Referencia de la observación"), {
     target: { value: "Ticket ficticio 1" },
   });
+}
+
+/**
+ * Elige una opción del combo de catálogo (Productor / Cereal / Destino). Es un campo único: se
+ * tipea y se elige de la lista que se abre, en vez del viejo buscador + `<select>`.
+ */
+async function elegirCatalogo(etiqueta: string, buscado: string, opcion: string) {
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.focus(campo);
+  if (buscado) fireEvent.change(campo, { target: { value: buscado } });
+  const lista = await screen.findByRole("listbox");
+  fireEvent.mouseDown(await within(lista).findByRole("button", { name: opcion }));
 }
 
 describe("Seguimiento MSW C6", () => {
@@ -856,13 +874,15 @@ describe("Cargas React D4", () => {
       }),
     );
     mostrar();
-    await screen.findByRole("option", { name: "Productor inactivo ficticio (1)" });
-    expect(screen.getByRole("option", { name: "Productor inactivo ficticio (1)" })).toBeEnabled();
+    // En modo filtro el catálogo no esconde a los inactivos: el productor inactivo se puede elegir.
+    fireEvent.focus(screen.getByLabelText("Productor"));
+    expect(
+      await screen.findByRole("button", { name: "Productor inactivo ficticio (1)" }),
+    ).toBeEnabled();
+    fireEvent.keyDown(screen.getByLabelText("Productor"), { key: "Escape" });
     const count = urls.length;
-    fireEvent.change(screen.getByRole("textbox", { name: "Buscar cereal" }), {
-      target: { value: "Soja" },
-    });
-    await screen.findByRole("option", { name: "Soja (10)" });
+    // Buscar en el catálogo no vuelve a consultar el listado: eso recién pasa al aplicar.
+    await elegirCatalogo("Cereal", "Soja", "Soja (10)");
     expect(urls).toHaveLength(count);
     const cargar = async () => {
       fireEvent.click(await screen.findByRole("button", { name: "Cargar más filas" }));
@@ -876,21 +896,12 @@ describe("Cargas React D4", () => {
       expect(urls.at(-1)!.searchParams.has("despuesId")).toBe(false);
     };
     await cargar();
-    fireEvent.change(screen.getByRole("textbox", { name: "Buscar cereal" }), {
-      target: { value: "Maíz" },
-    });
-    await screen.findByRole("option", { name: "Maíz (1)" });
-    fireEvent.change(screen.getByLabelText("Cereal", { selector: "select" }), {
-      target: { value: "1" },
-    });
+    await elegirCatalogo("Cereal", "Maíz", "Maíz (1)");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await screen.findByText(/No hay cargas para estas fechas/);
-    fireEvent.change(screen.getByLabelText("Cereal", { selector: "select" }), {
-      target: { value: "" },
-    });
-    fireEvent.change(screen.getByLabelText("Productor", { selector: "select" }), {
-      target: { value: "1" },
-    });
+    await elegirCatalogo("Cereal", "", "Todos");
+    fireEvent.keyDown(screen.getByLabelText("Cereal"), { key: "Escape" });
+    await elegirCatalogo("Productor", "1", "Productor inactivo ficticio (1)");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await soloPrimera();
     expect(urls.at(-1)!.searchParams.get("clienteNumero")).toBe("1");
@@ -898,11 +909,8 @@ describe("Cargas React D4", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Período" }));
     await soloPrimera();
     await cargar();
-    fireEvent.change(screen.getByLabelText("Fecha prevista de carga: desde"), {
-      target: { value: hoy() },
-    });
-    fireEvent.change(screen.getByLabelText("Hasta inclusive"), { target: { value: hoy() } });
-    fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
+    ponerFecha("Fecha prevista de carga: desde", hoy());
+    ponerFecha("Hasta inclusive", hoy());
     await soloPrimera();
     expect(urls.at(-1)!.searchParams.get("desde")).toBe(hoy());
     expect(urls.at(-1)!.searchParams.get("hastaExclusivo")).toBe(sumarDias(hoy(), 1));
@@ -920,9 +928,8 @@ describe("Cargas React D4", () => {
     );
     mostrar();
     await screen.findByText("Catálogo no disponible");
-    fireEvent.change(screen.getByLabelText("Código de productor (opcional)"), {
-      target: { value: "1" },
-    });
+    // Sin catálogo no hay lista que mostrar, pero el código tipeado se puede elegir igual.
+    await elegirCatalogo("Productor", "1", "Código 1");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(urls.at(-1)?.searchParams.get("clienteNumero")).toBe("1"));
   });
@@ -1295,7 +1302,7 @@ describe("Historia y fechas de seguimiento", () => {
     expect(kgErp("30000.12345")).toBe("30.000,12345 kg");
     expect(kgErp("0.0000000000000000000000000001")).toBe("0,0000000000000000000000000001 kg");
     expect(kgErp("0")).toBe("0 kg");
-    expect(kgErp(null)).toBe("Sin dato");
+    expect(kgErp(null)).toBe("—");
     expect(diferenciaPeso("30000.1234", "30000.12345")).toBe("-0,00005 kg");
     expect(diferenciaPeso("999999999999.9997", "999999999999.9996")).toBe("+0,0001 kg");
     expect(diferenciaPeso(null, "0")).toBe("Sin comparación");

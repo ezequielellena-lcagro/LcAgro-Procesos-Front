@@ -17,9 +17,9 @@ import type { ReactNode } from "react";
 import { setTokenBridge } from "@/lib/api-client";
 import { env } from "@/lib/env";
 import { logisticaHandlers, resetLogisticaDemo } from "@/mocks/handlers/logistica";
-import { fechaHoraArgentina, hoy, sumarDias } from "../format";
+import { fecha, hoy, periodoInicial, sumarDias } from "../format";
 import { useOperacion } from "../queries/use-logistica";
-import type { Recepcion, ResumenLogistica, Seguimiento, Solicitud, Detalle } from "../types";
+import type { Recepcion, Seguimiento, Solicitud, Detalle } from "../types";
 import { CuposPage } from "./cupos-page";
 const sesion = vi.hoisted(() => ({ roles: ["logistica-cupos"] }));
 vi.mock("@/features/auth/auth-context", () => ({
@@ -124,10 +124,14 @@ function mostrar() {
   );
   return client;
 }
+/** El "Consultando…" vive dentro de cada tarjeta, así que son dos: Totales y Grupos. */
+async function sinConsultar() {
+  await waitFor(() => expect(screen.queryAllByText("Consultando…")).toHaveLength(0));
+}
 async function abrirResumen() {
   fireEvent.click(screen.getByRole("tab", { name: "Resumen" }));
   await screen.findByRole("table", { name: "Totales del resumen" });
-  await waitFor(() => expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument());
+  await sinConsultar();
 }
 function tabla() {
   return screen.getByRole("table", { name: "Totales del resumen" });
@@ -140,11 +144,43 @@ function celda(titulo: string, table = tabla()) {
 async function grupos(n = 51) {
   for (let i = 0; i < n; i++) await solicitar(i + 1, 101 + i);
 }
+/**
+ * Elige una fecha desde el calendario del campo. Sirve también para REELEGIR la vigente, que es
+ * como se fuerza una consulta nueva sin cambiar criterios: escribir el mismo texto no dispara
+ * nada (React descarta el evento si el valor no cambió), un clic en el día sí.
+ */
+function elegirFecha(etiqueta: string, iso: string) {
+  const [anio, mes, dia] = iso.split("-").map(Number);
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.click(within(campo.closest("label")!).getByRole("button", { name: /calendario/i }));
+  fireEvent.change(screen.getByLabelText("Año"), { target: { value: String(anio) } });
+  fireEvent.change(screen.getByLabelText("Mes"), { target: { value: String(mes - 1) } });
+  fireEvent.click(screen.getByRole("button", { name: String(dia) }));
+}
+
+/**
+ * Escribe una fecha en un campo del filtro de período. El `DateField` muestra y acepta
+ * dd/mm/aaaa, y avisa recién cuando la fecha está completa: por eso se escribe entera de una.
+ */
+const ponerFecha = (etiqueta: string, iso: string) =>
+  fireEvent.change(screen.getByLabelText(etiqueta), { target: { value: fecha(iso) } });
 async function siguiente() {
   await waitFor(() => expect(screen.getByRole("button", { name: "Siguiente" })).toBeEnabled());
   fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-  await waitFor(() => expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument());
+  await sinConsultar();
 }
+/**
+ * Elige una opción del combo de catálogo (Productor / Cereal / Destino). Es un campo único: se
+ * tipea y se elige de la lista que se abre, en vez del viejo buscador + `<select>`.
+ */
+async function elegirCatalogo(etiqueta: string, buscado: string, opcion: string) {
+  const campo = screen.getByLabelText(etiqueta);
+  fireEvent.focus(campo);
+  if (buscado) fireEvent.change(campo, { target: { value: buscado } });
+  const lista = await screen.findByRole("listbox");
+  fireEvent.mouseDown(await within(lista).findByRole("button", { name: opcion }));
+}
+
 describe("Resumen de Cupos", () => {
   it("aparece primero, conserva entrada por Solicitudes y consulta sólo al activar Resumen", async () => {
     mostrar();
@@ -170,14 +206,7 @@ describe("Resumen de Cupos", () => {
     expect(celda("Respuesta vigente")).toHaveTextContent("Sin respuesta");
     expect(celda("Por recibir")).toHaveTextContent("Sin respuesta");
     expect(screen.getByText("No hay solicitudes para estas fechas y filtros.")).toBeInTheDocument();
-    expect(screen.getByText(/Cantidades de cupos/)).toBeInTheDocument();
-    expect(screen.getByText(/Las recepciones sin solicitud/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", { name: "Ver cupos recibidos" }));
-    expect(screen.getByRole("tab", { name: "Cupos recibidos" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
   });
   it("distingue parcial conocido, cero, sin respuesta, cerradas y subsets recibidos con códigos de fallback", async () => {
     const a = await responder(await solicitar(5), 3);
@@ -211,7 +240,6 @@ describe("Resumen de Cupos", () => {
     expect(celda("Anulados")).toHaveTextContent("1");
     expect(celda("Carga con otra fecha")).toHaveTextContent("2");
     expect(celda("Recepción en otra terminal")).toHaveTextContent("2");
-    expect(screen.getByText(/pueden coincidir entre sí/)).toBeInTheDocument();
     const table = screen.getByRole("table", { name: "Grupos del resumen" });
     expect(within(table).getByText("999")).toBeInTheDocument();
     expect(within(table).getAllByText("Soja / 2025-2026")).toHaveLength(2);
@@ -232,11 +260,11 @@ describe("Resumen de Cupos", () => {
     const cantidad = consultas.length;
     fireEvent.change(screen.getByLabelText("Contrato"), { target: { value: "V-DEMO/1" } });
     fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2025-2026" } });
-    fireEvent.change(screen.getByLabelText("Cereal"), { target: { value: "10" } });
+    await elegirCatalogo("Cereal", "10", "Soja (10)");
     expect(consultas).toHaveLength(cantidad);
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(consultas).toHaveLength(cantidad + 1));
-    await waitFor(() => expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument());
+    await sinConsultar();
     fireEvent.change(screen.getByLabelText("Contrato"), { target: { value: "BORRADOR" } });
     await siguiente();
     expect(consultas.at(-1)?.searchParams.get("contrato")).toBe("V-DEMO/1");
@@ -249,51 +277,49 @@ describe("Resumen de Cupos", () => {
     await solicitar(11);
     mostrar();
     await abrirResumen();
-    fireEvent.change(screen.getByLabelText("Código de terminal solicitada (opcional)"), {
-      target: { value: "999" },
-    });
+    await elegirCatalogo("Terminal solicitada", "999", "Código 999");
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(celda("Solicitados")).toHaveTextContent("7"));
     expect(celda("Recibidos")).toHaveTextContent("1");
     expect(consultas.at(-1)?.searchParams.get("destinoCodigo")).toBe("999");
   });
-  it("Aplicar, Consultar y Limpiar reinician cursores y consultan incluso criterios idénticos; limpiar conserva período", async () => {
+  it("Aplicar, reelegir la fecha y Limpiar reinician cursores y consultan incluso criterios idénticos; limpiar conserva período", async () => {
     await grupos();
     mostrar();
     await abrirResumen();
     const desde = sumarDias(hoy(), -1),
       hasta = sumarDias(hoy(), 2);
-    fireEvent.change(screen.getByLabelText("Fecha para la que se pidieron los cupos: desde"), {
-      target: { value: desde },
-    });
-    fireEvent.change(screen.getByLabelText("Hasta inclusive"), { target: { value: hasta } });
-    fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
+    ponerFecha("Fecha para la que se pidieron los cupos: desde", desde);
+    ponerFecha("Hasta inclusive", hasta);
     await waitFor(() => expect(consultas.at(-1)?.searchParams.get("desde")).toBe(desde));
-    await waitFor(() => expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument());
+    await sinConsultar();
+    // "misma fecha" ocupa el lugar del viejo botón Consultar: reelegir la fecha vigente tiene que
+    // volver a consultar igual, aunque los criterios no hayan cambiado.
     for (const accion of [
       "Aplicar filtros",
       "Aplicar filtros",
-      "Consultar",
+      "misma fecha",
       "Limpiar filtros",
       "Limpiar filtros",
     ]) {
       await siguiente();
       expect(screen.getByText("Página 2")).toBeInTheDocument();
       const antes = consultas.length;
-      fireEvent.click(screen.getByRole("button", { name: accion }));
+      if (accion === "misma fecha") elegirFecha("Hasta inclusive", hasta);
+      else fireEvent.click(screen.getByRole("button", { name: accion }));
       await waitFor(() => expect(consultas).toHaveLength(antes + 1));
-      await waitFor(() =>
-        expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument(),
-      );
+      await sinConsultar();
       expect(screen.getByText("Página 1")).toBeInTheDocument();
       expect(consultas.at(-1)?.searchParams.has("despuesFecha")).toBe(false);
       expect(consultas.at(-1)?.searchParams.get("desde")).toBe(desde);
       expect(consultas.at(-1)?.searchParams.get("hastaExclusivo")).toBe(sumarDias(hasta, 1));
     }
-  });
-  it("muestra sólo una página y totales completos del servidor; Anterior vuelve con cursor completo y corte propio de la página", async () => {
+    // Cinco idas y vueltas al servidor más la apertura del calendario no entran en los 5 s por
+    // defecto; el presupuesto ampliado es sólo para este caso de volumen.
+  }, 15000);
+  it("muestra sólo una página y totales completos del servidor; Anterior vuelve con el cursor completo", async () => {
     await grupos();
-    const client = mostrar();
+    mostrar();
     await abrirResumen();
     expect(
       within(screen.getByRole("table", { name: "Grupos del resumen" })).getAllByRole("row"),
@@ -310,15 +336,8 @@ describe("Resumen de Cupos", () => {
     expect(consultas.at(-1)?.searchParams.get("despuesContrato")).toBe("V-DEMO/1");
     expect(consultas.at(-1)?.searchParams.get("despuesProducto")).toBe("10");
     expect(consultas.at(-1)?.searchParams.get("despuesCampania")).toBe("2025-2026");
-    const current = client
-      .getQueryCache()
-      .findAll({ queryKey: ["logistica", "resumen"] })
-      .find((q) => q.queryKey[3] !== undefined)!.state.data as ResumenLogistica;
-    expect(screen.getByText(/Fuente: Logística propia/)).toHaveTextContent(
-      fechaHoraArgentina(current.propiosAl),
-    );
     fireEvent.click(screen.getByRole("button", { name: "Anterior" }));
-    await waitFor(() => expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument());
+    await sinConsultar();
     expect(consultas.at(-1)?.searchParams.has("despuesFecha")).toBe(false);
     expect(
       within(screen.getByRole("table", { name: "Grupos del resumen" })).getAllByRole("row"),
@@ -363,7 +382,7 @@ describe("Resumen de Cupos", () => {
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
     await screen.findByRole("table", { name: "Totales del resumen" });
   });
-  it("recarga y fallo con caché muestran Datos anteriores, bloquean navegación y conservan corte/totales hasta éxito", async () => {
+  it("recarga y fallo con caché muestran Datos anteriores, bloquean navegación y conservan los totales hasta éxito", async () => {
     await grupos();
     let fallo = false,
       liberar: (() => void) | undefined,
@@ -382,7 +401,6 @@ describe("Resumen de Cupos", () => {
     );
     const client = mostrar();
     await abrirResumen();
-    const corte = screen.getByText(/Fuente: Logística propia/).textContent;
     esperar = true;
     fallo = true;
     act(() => {
@@ -394,7 +412,6 @@ describe("Resumen de Cupos", () => {
     await act(async () => liberar!());
     await screen.findByText("Resumen no disponible");
     expect(celda("Solicitados")).toHaveTextContent("1.326");
-    expect(screen.getByText(/Fuente: Logística propia/).textContent).toBe(corte);
     expect(screen.getByText(/Datos anteriores/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
     fallo = false;
@@ -423,7 +440,6 @@ describe("Resumen de Cupos", () => {
     );
     mostrar();
     await abrirResumen();
-    const corte = screen.getByText(/Fuente: Logística propia/).textContent;
     esperar = true;
     fallo = true;
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
@@ -437,7 +453,6 @@ describe("Resumen de Cupos", () => {
     await act(async () => liberar!());
     await screen.findByText("Página no disponible");
     expect(screen.getByText(/Datos anteriores/)).toBeInTheDocument();
-    expect(screen.getByText(/Fuente: Logística propia/).textContent).toBe(corte);
     expect(screen.getByRole("button", { name: "Anterior" })).toBeDisabled();
     esperar = false;
     fallo = false;
@@ -465,7 +480,7 @@ describe("Resumen de Cupos", () => {
     mostrar();
     await abrirResumen();
     fallo = true;
-    fireEvent.click(screen.getByRole("button", { name: "Consultar" }));
+    elegirFecha("Hasta inclusive", sumarDias(periodoInicial().hastaExclusivo, -1));
     await screen.findByText("Recarga no disponible");
     expect(celda("Solicitados")).toHaveTextContent("11");
     expect(screen.getByText(/Datos anteriores/)).toBeInTheDocument();
@@ -531,9 +546,7 @@ describe("Resumen de Cupos", () => {
         await hook.result.current.mutateAsync(body);
       });
       await waitFor(() => expect(consultas.length).toBe(n + 1));
-      await waitFor(() =>
-        expect(screen.queryByText("Consultando resumen…")).not.toBeInTheDocument(),
-      );
+      await sinConsultar();
       const titulo =
         operacion === "respuesta"
           ? "Respuesta vigente"

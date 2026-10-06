@@ -70,7 +70,8 @@ export function kgOperativos(valor: string | null): string {
   return formatoKg(canonico);
 }
 function formatoKg(canonico: string | null): string {
-  if (canonico === null) return "Sin dato";
+  // Celda vacía de una grilla: guion, como en el resto de la app.
+  if (canonico === null) return "—";
   const [entera, decimal] = canonico.split(".");
   const miles = entera.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   return `${miles}${decimal ? `,${decimal}` : ""} kg`;

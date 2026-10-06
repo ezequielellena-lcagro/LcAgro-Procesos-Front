@@ -1,42 +1,42 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { FilterField } from "@/shared/components/filter-bar";
 import { CatalogoSelect } from "./catalogo-select";
 
-import type { FiltrosCupos } from "../lib/filtros-cupos";
+import { campaniaValida, type FiltrosCupos } from "../lib/filtros-cupos";
+
+/**
+ * Filtros de un listado de cupos.
+ *
+ * NO es un `<form>` propio: va DENTRO de la barra del `PeriodoFiltro`, que es la que arma el form
+ * y recibe el `onSubmit`. Como bloque aparte quedaba una grilla de columnas tan anchas como la
+ * pantalla, con los campos desparramados y sin nada que los agrupara como filtros.
+ */
 export function CuposFiltros({
   value,
   onChange,
-  onApply,
   onClear,
   erp = false,
 }: {
   value: FiltrosCupos;
   onChange: (v: FiltrosCupos) => void;
-  onApply: () => void;
   onClear: () => void;
   erp?: boolean;
 }) {
-  const campaniaValida =
-    !value.campania ||
-    (/^[0-9]{4}-[0-9]{4}$/.test(value.campania) &&
-      Number(value.campania.slice(5)) === Number(value.campania.slice(0, 4)) + 1);
+  const campaniaOk = campaniaValida(value);
   return (
-    <form
-      className="mb-4 grid items-end gap-3 sm:grid-cols-3 xl:grid-cols-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (erp || campaniaValida) onApply();
-      }}
-    >
-      <label className="text-xs text-ink-soft">
-        Contrato
+    <>
+      <FilterField label="Contrato">
         <Input
+          className="w-40"
           value={value.contrato}
           maxLength={15}
           onChange={(e) => onChange({ ...value, contrato: e.target.value })}
         />
-      </label>
+      </FilterField>
       <CatalogoSelect
+        className="w-56"
         tipo="productos"
         titulo="Cereal"
         value={Number(value.producto)}
@@ -45,6 +45,7 @@ export function CuposFiltros({
         onChange={(v) => onChange({ ...value, producto: v ? String(v) : "" })}
       />
       <CatalogoSelect
+        className="w-56"
         tipo="destinos"
         titulo="Destino"
         value={Number(value.destinoCodigo)}
@@ -54,43 +55,42 @@ export function CuposFiltros({
       />
       {!erp && (
         <>
-          <label className="text-xs text-ink-soft">
-            Campaña
+          <FilterField label="Campaña">
             <Input
+              className="w-32"
               value={value.campania}
               maxLength={9}
               pattern="[0-9]{4}-[0-9]{4}"
               placeholder="2025-2026"
               onChange={(e) => onChange({ ...value, campania: e.target.value })}
             />
-          </label>
-          <label className="text-xs text-ink-soft">
-            Circuito
-            <select
-              className="h-10 w-full rounded-md border border-line bg-panel px-3 text-sm text-ink"
+          </FilterField>
+          <FilterField label="Circuito">
+            <Select
+              className="w-40"
               value={value.circuito}
               onChange={(e) => onChange({ ...value, circuito: e.target.value })}
             >
               <option value="">Todos</option>
               <option value="directa">Directa</option>
               <option value="propia">Propia</option>
-            </select>
-          </label>
+            </Select>
+          </FilterField>
         </>
       )}
-      <div className="flex flex-wrap gap-2 self-end">
-        <Button type="submit" variant="outline" disabled={!erp && !campaniaValida}>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="outline" disabled={!erp && !campaniaOk}>
           Aplicar filtros
         </Button>
         <Button type="button" variant="ghost" onClick={onClear}>
           Limpiar filtros
         </Button>
       </div>
-      {!erp && !campaniaValida && (
-        <p role="alert" className="text-sm text-rojo">
+      {!erp && !campaniaOk && (
+        <p role="alert" className="basis-full text-sm text-rojo">
           Ingresá una campaña como 2025-2026.
         </p>
       )}
-    </form>
+    </>
   );
 }

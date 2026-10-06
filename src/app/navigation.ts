@@ -82,7 +82,6 @@ export const NAV: Area[] = [
         to: "/volumen-acopiado",
         roles: ["volumenacopiado"],
       },
-      { kind: "futuro", label: "Conciliación con corredores/exportadores" },
       {
         kind: "grupo",
         label: "Logística",

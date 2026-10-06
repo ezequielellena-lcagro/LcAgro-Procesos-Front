@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { FormEventHandler, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -8,17 +8,30 @@ import { cn } from "@/lib/utils";
  * `space-y-*` del contenedor. Tailwind v4 genera `space-y` como `:where(& > :not(:last-child))`,
  * y el `:where()` deja la especificidad en 0 → cualquier `mb-*` del hijo lo pisa y la barra queda
  * pegada a la tabla.
+ *
+ * Con `onSubmit` la barra se renderiza como `<form>`: los filtros que no se aplican al tipear sino
+ * con un botón (un período que dispara una consulta) necesitan que Enter dentro de un campo valga
+ * lo mismo que apretar ese botón.
  */
-export function FilterBar({ children, className }: { children: ReactNode; className?: string }) {
-  return (
-    <div
-      className={cn(
-        "no-print mb-4 flex flex-wrap items-end gap-3 rounded-card border border-line bg-panel p-3.5 shadow-card",
-        className,
-      )}
-    >
+export function FilterBar({
+  children,
+  className,
+  onSubmit,
+}: {
+  children: ReactNode;
+  className?: string;
+  onSubmit?: FormEventHandler<HTMLFormElement>;
+}) {
+  const clases = cn(
+    "no-print mb-4 flex flex-wrap items-end gap-3 rounded-card border border-line bg-panel p-3.5 shadow-card",
+    className,
+  );
+  return onSubmit ? (
+    <form className={clases} onSubmit={onSubmit}>
       {children}
-    </div>
+    </form>
+  ) : (
+    <div className={clases}>{children}</div>
   );
 }
 

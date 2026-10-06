@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FilterField } from "@/shared/components/filter-bar";
 import { periodoInicial, campania, fecha, kg } from "../format";
 import { useListado } from "../queries/use-logistica";
 import type { Preventa, Venta } from "../types";
+import { usePaginacion } from "../lib/paginacion";
+import { Paginacion } from "./paginacion";
 import { TablaLogistica } from "./tabla-logistica";
 import { PeriodoFiltro } from "./periodo-filtro";
 export function PreventaPicker({
@@ -11,14 +14,24 @@ export function PreventaPicker({
   onSelect,
   filtros,
   paginaContexto,
+  busquedaInicial = "",
+  bajoFiltros,
+  tamano,
 }: {
   selected: Preventa | null;
-  onSelect: (p: Preventa) => void;
+  /** `null` cuando se suelta la preventa elegida. */
+  onSelect: (p: Preventa | null) => void;
   filtros?: { clienteNumero: number; producto: number; campania: number };
   paginaContexto?: object;
+  /** Búsqueda con la que arranca el listado: abrir con una preventa ya elegida la muestra sola. */
+  busquedaInicial?: string;
+  /** Bloque propio ENTRE la barra de filtros y la tabla, para no cruzar la grilla antes de él. */
+  bajoFiltros?: ReactNode;
+  /** Filas por página. En un diálogo conviene chico: la tabla comparte alto con el formulario. */
+  tamano?: number;
 }) {
   const [periodo, setPeriodo] = useState(() => periodoInicial(true));
-  const [buscar, setBuscar] = useState("");
+  const [buscar, setBuscar] = useState(busquedaInicial);
   const [versionFiltros, setVersionFiltros] = useState(0);
   const q = useListado<Preventa>(
     "preventas",
@@ -26,9 +39,12 @@ export function PreventaPicker({
     (p) => ({ despuesOperacion: p.operacion, despuesNumero: p.numero }),
     buscar.trim().length !== 1,
     paginaContexto ? { ...paginaContexto, versionFiltros } : undefined,
+    tamano,
   );
+  const paginacion = usePaginacion(q);
   return (
-    <div className="space-y-3">
+    <div>
+      {/* El período y la búsqueda en la MISMA barra: son los dos filtros del mismo listado. */}
       <PeriodoFiltro
         value={periodo}
         onChange={(nuevo) => {
@@ -36,47 +52,60 @@ export function PreventaPicker({
           if (paginaContexto) setVersionFiltros((v) => v + 1);
         }}
         etiqueta="Operación de la preventa"
-      />
-      <Input
-        aria-label="Buscar preventa"
-        placeholder="Número o nombre del productor"
-        value={buscar}
-        onChange={(e) => {
-          setBuscar(e.target.value);
-          if (paginaContexto) setVersionFiltros((v) => v + 1);
-        }}
-      />
+      >
+        <FilterField label="Buscar preventa">
+          <Input
+            className="min-w-[240px]"
+            placeholder="Número o nombre del productor"
+            value={buscar}
+            onChange={(e) => {
+              setBuscar(e.target.value);
+              if (paginaContexto) setVersionFiltros((v) => v + 1);
+            }}
+          />
+        </FilterField>
+      </PeriodoFiltro>
+      {bajoFiltros}
       <TablaLogistica
         titulo="Elegir preventa"
-        filas={q.data?.pages.flatMap((p) => p.filas) ?? []}
+        filas={paginacion.filas}
         clave={(p) => `${p.operacion}/${p.numero}`}
         cargando={q.isLoading}
         error={q.error}
         reintentar={() => void q.refetch()}
-        hayMas={q.hasNextPage}
-        mas={() => void q.fetchNextPage()}
-        cargandoMas={q.isFetchingNextPage}
+        pie={<Paginacion {...paginacion} unidad={{ singular: "preventa", plural: "preventas" }} />}
         columnas={[
           {
             titulo: "Elegir",
-            celda: (p) => (
-              <input
-                type="radio"
-                aria-label={`Elegir preventa ${p.numero}`}
-                checked={selected?.numero === p.numero && selected.operacion === p.operacion}
-                disabled={
-                  !p.clienteNumero ||
-                  !p.producto ||
-                  !p.campania ||
-                  p.estado === "A" ||
-                  (filtros != null &&
-                    (p.clienteNumero !== filtros.clienteNumero ||
-                      p.producto !== filtros.producto ||
-                      p.campania !== filtros.campania))
-                }
-                onChange={() => onSelect(p)}
-              />
-            ),
+            celda: (p) => {
+              const elegida = selected?.numero === p.numero && selected.operacion === p.operacion;
+              return (
+                <input
+                  type="radio"
+                  className="size-4 accent-primary"
+                  aria-label={`Elegir preventa ${p.numero}`}
+                  title={elegida ? "Tocalo de nuevo para soltar la preventa" : undefined}
+                  checked={elegida}
+                  disabled={
+                    !p.clienteNumero ||
+                    !p.producto ||
+                    !p.campania ||
+                    p.estado === "A" ||
+                    (filtros != null &&
+                      (p.clienteNumero !== filtros.clienteNumero ||
+                        p.producto !== filtros.producto ||
+                        p.campania !== filtros.campania))
+                  }
+                  // Un radio no se destilda solo. El clic corre ANTES del change, así que acá se
+                  // suelta la que ya estaba elegida; sin esto, una vez tocada una preventa no
+                  // había cómo volver a un pedido sin preventa salvo recargando.
+                  onClick={() => {
+                    if (elegida) onSelect(null);
+                  }}
+                  onChange={() => onSelect(p)}
+                />
+              );
+            },
           },
           {
             titulo: "Preventa",

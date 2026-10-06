@@ -1,10 +1,11 @@
 import { confirmacionPendiente } from "../lib/comandos";
+import { RotateCcw, Save } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { toAppError } from "@/lib/api-error";
 export function Campo({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
-    <label className="block space-y-1 text-xs text-ink-soft">
+    <label className="block space-y-1 text-xs font-medium text-ink-soft">
       {titulo}
       {children}
     </label>
@@ -45,6 +46,11 @@ export function FormOperacionFooter({
           Cancelar
         </Button>
         <Button type="submit" disabled={pending}>
+          {incierto ? (
+            <RotateCcw className="size-4" aria-hidden />
+          ) : (
+            <Save className="size-4" aria-hidden />
+          )}{" "}
           {pending ? "Guardando…" : incierto ? "Reintentar operación" : texto}
         </Button>
       </div>
