@@ -135,6 +135,22 @@ export const useGuardarVariedad = () =>
     (variedad) => (variedad.activo ? `${variedad.nombre} guardada.` : `${variedad.nombre} quedó desactivada.`),
   );
 
+/**
+ * Alta rápida de ubicación desde el alta de lote y la reubicación, donde el lugar se escribe a mano:
+ * el POST es idempotente (200 si ya existía —reactivándola si estaba inactiva— / 201 si la crea) y
+ * siempre devuelve la ubicación. Sin toast propio: el del lote o la reubicación ya avisa qué pasó;
+ * acá sólo hace falta refrescar el catálogo para que aparezca entre las sugerencias.
+ */
+export function useAsegurarUbicacion() {
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silentError: true },
+    mutationFn: async (codigo: string) =>
+      (await apiClient.post<UbicacionDto>("/semillero/catalogos/ubicaciones/asegurar", { codigo })).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: semilleroKeys.catalogos() }),
+  });
+}
+
 export const useGuardarUbicacion = () =>
   useEscritura(
     async ({ id, ...input }: UbicacionInput & { id?: number }) =>

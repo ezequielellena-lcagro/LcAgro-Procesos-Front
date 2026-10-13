@@ -982,6 +982,29 @@ export const semilleroHandlers = [
     return HttpResponse.json(nueva, { status: 201 });
   }),
 
+  // Alta rápida desde el alta de lote y la reubicación, donde la ubicación se escribe a mano:
+  // idempotente — 201 si la crea, 200 si ya existía (reactivándola si estaba inactiva).
+  http.post(`${API}/semillero/catalogos/ubicaciones/asegurar`, async ({ request }) => {
+    const input = (await request.json()) as { codigo: string };
+    const codigo = input.codigo.trim().split(/\s+/).filter(Boolean).join(" ").toUpperCase();
+    if (codigo === "")
+      return errorResponse({ status: 400, detail: "Escribí el código de la ubicación." });
+    const existente = UBICACIONES.find((u) => u.codigo.trim().toUpperCase() === codigo);
+    if (existente) {
+      existente.activo = true;
+      return HttpResponse.json({ ...existente, enUso: enUsoUbicacion(existente.id) });
+    }
+    const nueva: UbicacionDto = {
+      id: ++seqUbicacion,
+      codigo,
+      descripcion: null,
+      activo: true,
+      enUso: 0,
+    };
+    UBICACIONES.push(nueva);
+    return HttpResponse.json(nueva, { status: 201 });
+  }),
+
   http.put(`${API}/semillero/catalogos/ubicaciones/:id`, async ({ params, request }) => {
     const ubicacion = UBICACIONES.find((u) => u.id === Number(params.id));
     if (!ubicacion) return errorResponse({ status: 404, detail: "Ubicación no encontrada." });

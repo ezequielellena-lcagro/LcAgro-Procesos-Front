@@ -8,7 +8,11 @@ const VARIEDADES: VariedadDto[] = [
   { id: 1, especie: "Soja", nombre: "DM 46E25", activo: true, enUso: 0 },
   { id: 9, especie: "Soja", nombre: "DM VIEJA", activo: false, enUso: 3 },
 ];
-const UBICACIONES: UbicacionDto[] = [{ id: 1, codigo: "G1-6", descripcion: null, activo: true, enUso: 0 }];
+const UBICACIONES: UbicacionDto[] = [
+  { id: 1, codigo: "G1-6", descripcion: null, activo: true, enUso: 0 },
+  { id: 3, codigo: "G9-9", descripcion: null, activo: false, enUso: 0 },
+];
+const UBICACION_NUEVA: UbicacionDto = { id: 7, codigo: "G4-22", descripcion: null, activo: true, enUso: 0 };
 const CAMPANIAS = ["2025-2026", "2026-2027", "2027-2028"];
 const CLIENTES: ClienteCopiaDto[] = [
   { numero: 1234, denominacion: "Juan Pérez", cuit: "20-12345678-9" },
@@ -18,6 +22,7 @@ const CLIENTES: ClienteCopiaDto[] = [
 function renderDialog(lote: LoteDto | null = null) {
   const onCrear = vi.fn().mockResolvedValue(undefined);
   const onActualizar = vi.fn().mockResolvedValue(undefined);
+  const onAsegurarUbicacion = vi.fn().mockResolvedValue(UBICACION_NUEVA);
   const onClose = vi.fn();
   render(
     <LoteDialog
@@ -29,12 +34,13 @@ function renderDialog(lote: LoteDto | null = null) {
       campanias={CAMPANIAS}
       campaniaSugerida="2026-2027"
       clientes={CLIENTES}
+      onAsegurarUbicacion={onAsegurarUbicacion}
       onCrear={onCrear}
       onActualizar={onActualizar}
       onClose={onClose}
     />,
   );
-  return { onCrear, onActualizar, onClose };
+  return { onCrear, onActualizar, onAsegurarUbicacion, onClose };
 }
 
 const escribir = (label: string, value: string) =>
@@ -75,7 +81,7 @@ describe("LoteDialog", () => {
     const { onCrear, onClose } = renderDialog();
     escribir("Código de lote", "26s-001");
     escribir("Variedad", "1");
-    escribir("Ubicación", "1");
+    escribir("Ubicación", "G1-6");
     escribir("Cantidad", "30");
     escribir("PG %", "95");
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
@@ -98,6 +104,51 @@ describe("LoteDialog", () => {
       }),
     );
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("la ubicación se escribe a mano: si el lugar ya existe no da de alta nada", async () => {
+    const { onCrear, onAsegurarUbicacion } = renderDialog();
+    escribir("Código de lote", "26S-003");
+    escribir("Variedad", "1");
+    escribir("Ubicación", " g1-6 ");
+    escribir("Cantidad", "5");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(onCrear).toHaveBeenCalledWith(expect.objectContaining({ ubicacionId: 1 })));
+    expect(onAsegurarUbicacion).not.toHaveBeenCalled();
+  });
+
+  it("una ubicación que todavía no existe se da de alta sola y el lote va con ese id", async () => {
+    const { onCrear, onAsegurarUbicacion } = renderDialog();
+    escribir("Código de lote", "26S-004");
+    escribir("Variedad", "1");
+    escribir("Ubicación", "G4-22");
+    escribir("Cantidad", "5");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    await waitFor(() => expect(onAsegurarUbicacion).toHaveBeenCalledWith("G4-22"));
+    expect(onCrear).toHaveBeenCalledWith(expect.objectContaining({ ubicacionId: 7 }));
+  });
+
+  it("el campo de ubicación es de texto y sugiere las activas sin obligar a elegirlas", () => {
+    renderDialog();
+    const campo = screen.getByLabelText("Ubicación");
+    expect(campo.tagName).toBe("INPUT");
+    const sugeridas = [...document.querySelectorAll<HTMLOptionElement>("#ubicacion-sugerencias option")].map(
+      (o) => o.value,
+    );
+    expect(sugeridas).toEqual(["G1-6"]);
+  });
+
+  it("el alta exige escribir la ubicación", async () => {
+    const { onCrear } = renderDialog();
+    escribir("Código de lote", "26S-005");
+    escribir("Variedad", "1");
+    escribir("Cantidad", "5");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+
+    expect(await screen.findByText("Escribí la ubicación.")).toBeInTheDocument();
+    expect(onCrear).not.toHaveBeenCalled();
   });
 
   it("al elegir bolsa propone 40 kg", () => {
@@ -131,7 +182,7 @@ describe("LoteDialog", () => {
     const { onCrear } = renderDialog();
     escribir("Código de lote", "26S-002");
     escribir("Variedad", "1");
-    escribir("Ubicación", "1");
+    escribir("Ubicación", "G1-6");
     escribir("Cantidad", "10");
     escribir("Proceso", "Cliente");
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
@@ -144,7 +195,7 @@ describe("LoteDialog", () => {
     const { onCrear, onClose } = renderDialog();
     escribir("Código de lote", "26S-002");
     escribir("Variedad", "1");
-    escribir("Ubicación", "1");
+    escribir("Ubicación", "G1-6");
     escribir("Cantidad", "10");
     escribir("Proceso", "Cliente");
 
@@ -197,7 +248,7 @@ describe("LoteDialog", () => {
     onCrear.mockRejectedValueOnce(errorServidor("Ya existe el lote 26S-001 en la campaña 2026-2027."));
     escribir("Código de lote", "26S-001");
     escribir("Variedad", "1");
-    escribir("Ubicación", "1");
+    escribir("Ubicación", "G1-6");
     escribir("Cantidad", "1");
     fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 

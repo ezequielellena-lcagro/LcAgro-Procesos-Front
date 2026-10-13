@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
-import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
 import { unidades } from "../format";
+import { claveUbicacion, resolverUbicacionId } from "../lib/ubicaciones";
 import {
   MOTIVOS_AJUSTE,
   type AjusteInput,
@@ -21,6 +21,7 @@ import {
 } from "../types";
 import { MotivoSelect } from "./motivo-select";
 import type { OperacionStock } from "./stock-panel";
+import { UbicacionInput } from "./ubicacion-input";
 
 const TITULOS: Record<OperacionStock, string> = {
   ingreso: "Ingreso de stock",
@@ -41,7 +42,7 @@ const MOTIVOS_SOLO_NEGATIVO = new Set<MotivoAjusteSemillero>([
 const campos = z.object({
   cantidad: z.string(),
   motivo: z.string(),
-  ubicacionDestinoId: z.string(),
+  ubicacionDestino: z.string(),
   observacion: z.string().max(200, "La observación no puede superar 200 caracteres."),
 });
 type Values = z.infer<typeof campos>;
@@ -49,10 +50,11 @@ type Values = z.infer<typeof campos>;
 /**
  * Las tres operaciones comparten cantidad y observación, pero cada una valida distinto: el ajuste
  * exige motivo (y detalle si es "Otro", más el signo permitido según ese motivo); la reubicación
- * exige destino y no deja superar el disponible mostrado (R5.3); el ingreso sólo pide una cantidad
- * positiva. Todo en un único `superRefine` para que el usuario vea de una todo lo que falta.
+ * exige un destino escrito —distinto del lugar donde la semilla ya está— y no deja superar el
+ * disponible mostrado (R5.3); el ingreso sólo pide una cantidad positiva. Todo en un único
+ * `superRefine` para que el usuario vea de una todo lo que falta.
  */
-function esquema(operacion: OperacionStock, disponible: number) {
+function esquema(operacion: OperacionStock, disponible: number, ubicacionOrigen: string) {
   return campos.superRefine((v, ctx) => {
     const cantidad = Number(v.cantidad);
     const numeroInvalido = v.cantidad.trim() === "" || Number.isNaN(cantidad);
@@ -92,8 +94,23 @@ function esquema(operacion: OperacionStock, disponible: number) {
         path: ["cantidad"],
       });
     }
-    if (operacion === "reubicacion" && v.ubicacionDestinoId === "") {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Elegí a dónde va.", path: ["ubicacionDestinoId"] });
+    if (operacion === "reubicacion") {
+      const destino = claveUbicacion(v.ubicacionDestino);
+      if (destino === "") {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Escribí a dónde va.", path: ["ubicacionDestino"] });
+      } else if (destino.length > 30) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "La ubicación no puede superar 30 caracteres.",
+          path: ["ubicacionDestino"],
+        });
+      } else if (destino === claveUbicacion(ubicacionOrigen)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Ahí es donde ya está: escribí otro lugar.",
+          path: ["ubicacionDestino"],
+        });
+      }
     }
   });
 }
@@ -103,6 +120,8 @@ interface Props {
   /** El lote × ubicación de origen: viene de la fila desde la que se abrió el diálogo. */
   fila: StockFilaDto | null;
   ubicaciones: UbicacionDto[];
+  /** Alta rápida (texto libre): el POST es idempotente y siempre devuelve la ubicación. */
+  onAsegurarUbicacion: (codigo: string) => Promise<UbicacionDto>;
   onIngreso: (input: IngresoInput) => Promise<unknown>;
   onAjuste: (input: AjusteInput) => Promise<unknown>;
   onReubicar: (input: ReubicacionInput) => Promise<unknown>;
@@ -138,6 +157,7 @@ function MovimientoForm({
   operacion,
   fila,
   ubicaciones,
+  onAsegurarUbicacion,
   onIngreso,
   onAjuste,
   onReubicar,
@@ -145,14 +165,10 @@ function MovimientoForm({
 }: Omit<Props, "operacion" | "fila"> & { operacion: OperacionStock; fila: StockFilaDto }) {
   const [errorServidor, setErrorServidor] = useState<string | null>(null);
   const form = useForm<Values>({
-    resolver: zodResolver(esquema(operacion, fila.disponible)),
-    defaultValues: { cantidad: "", motivo: "", ubicacionDestinoId: "", observacion: "" },
+    resolver: zodResolver(esquema(operacion, fila.disponible, fila.ubicacion)),
+    defaultValues: { cantidad: "", motivo: "", ubicacionDestino: "", observacion: "" },
   });
   const { errors, isSubmitting } = form.formState;
-
-  // Excluye la propia ubicación de origen y las desactivadas: no se reubica a donde ya está ni a
-  // un lugar que dejó de usarse.
-  const destinos = ubicaciones.filter((u) => u.activo && u.id !== fila.ubicacionId);
 
   // `useWatch` y no `form.watch()`: el compilador de React no puede memoizar `watch`, y acá hace
   // falta releer "observacion" en cada tecla para que el detalle de `MotivoSelect` no quede viejo.
@@ -174,10 +190,12 @@ function MovimientoForm({
           observacion: nota,
         });
       } else {
+        const ubicacionDestinoId = await resolverUbicacionId(
+          v.ubicacionDestino, ubicaciones, onAsegurarUbicacion);
         await onReubicar({
           loteId: fila.loteId,
           ubicacionOrigenId: fila.ubicacionId,
-          ubicacionDestinoId: Number(v.ubicacionDestinoId),
+          ubicacionDestinoId,
           cantidad,
           observacion: nota,
         });
@@ -232,15 +250,14 @@ function MovimientoForm({
       )}
 
       {operacion === "reubicacion" && (
-        <Campo id="ubicacionDestinoId" label="Destino" error={errors.ubicacionDestinoId?.message}>
-          <Select id="ubicacionDestinoId" {...form.register("ubicacionDestinoId")}>
-            <option value="">Elegí…</option>
-            {destinos.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.codigo}
-              </option>
-            ))}
-          </Select>
+        <Campo id="ubicacionDestino" label="Destino" error={errors.ubicacionDestino?.message}>
+          <UbicacionInput
+            id="ubicacionDestino"
+            ubicaciones={ubicaciones}
+            excluir={fila.ubicacion}
+            placeholder="G1-18/16"
+            {...form.register("ubicacionDestino")}
+          />
         </Campo>
       )}
 

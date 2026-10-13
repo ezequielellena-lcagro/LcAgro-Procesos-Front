@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
 import { CampaniaSelect } from "@/shared/components/campania-select";
+import { resolverUbicacionId } from "../lib/ubicaciones";
 import {
   DUENIOS,
   ENVASES,
@@ -23,6 +24,7 @@ import {
   type VariedadDto,
 } from "../types";
 import { ClienteSelect } from "./cliente-select";
+import { UbicacionInput } from "./ubicacion-input";
 
 const pesoPorDefecto = (envase: EnvaseSemillero) =>
   ENVASES.find((e) => e.valor === envase)!.pesoPorDefecto;
@@ -45,7 +47,7 @@ const campos = z.object({
   observaciones: z.string().max(500, "Las observaciones no pueden superar 500 caracteres."),
   duenio: z.enum(["Propio", "Cliente"]),
   clienteNumero: z.number().nullable(),
-  ubicacionId: z.string(),
+  ubicacion: z.string(),
   cantidad: z.string(),
 });
 type Values = z.infer<typeof campos>;
@@ -58,7 +60,11 @@ type Values = z.infer<typeof campos>;
 function esquema(esAlta: boolean) {
   const base = esAlta
     ? campos.extend({
-        ubicacionId: z.string().min(1, "Elegí la ubicación."),
+        ubicacion: z
+          .string()
+          .trim()
+          .min(1, "Escribí la ubicación.")
+          .max(30, "La ubicación no puede superar 30 caracteres."),
         cantidad: z.string().refine((v) => Number(v) > 0, "La cantidad tiene que ser mayor a 0."),
       })
     : campos;
@@ -85,7 +91,7 @@ function aValues(lote: LoteDto | null, campaniaSugerida: string): Values {
       observaciones: "",
       duenio: "Propio",
       clienteNumero: null,
-      ubicacionId: "",
+      ubicacion: "",
       cantidad: "",
     };
   }
@@ -101,7 +107,7 @@ function aValues(lote: LoteDto | null, campaniaSugerida: string): Values {
     observaciones: lote.observaciones ?? "",
     duenio: lote.duenio,
     clienteNumero: lote.clienteNumero,
-    ubicacionId: "",
+    ubicacion: "",
     cantidad: "",
   };
 }
@@ -116,6 +122,8 @@ interface Props {
   campanias: string[];
   campaniaSugerida: string;
   clientes: ClienteCopiaDto[];
+  /** Alta rápida (texto libre): el POST es idempotente y siempre devuelve la ubicación. */
+  onAsegurarUbicacion: (codigo: string) => Promise<UbicacionDto>;
   onCrear: (input: LoteAltaInput) => Promise<unknown>;
   onActualizar: (id: number, input: LoteDatosInput) => Promise<unknown>;
   onClose: () => void;
@@ -151,6 +159,7 @@ function LoteForm({
   campanias,
   campaniaSugerida,
   clientes,
+  onAsegurarUbicacion,
   onCrear,
   onActualizar,
   onClose,
@@ -184,8 +193,10 @@ function LoteForm({
       clienteNumero: v.duenio === "Cliente" ? v.clienteNumero : null,
     };
     try {
-      if (esAlta) await onCrear({ ...datos, ubicacionId: Number(v.ubicacionId), cantidad: Number(v.cantidad) });
-      else await onActualizar(lote.id, datos);
+      if (esAlta) {
+        const ubicacionId = await resolverUbicacionId(v.ubicacion, ubicaciones, onAsegurarUbicacion);
+        await onCrear({ ...datos, ubicacionId, cantidad: Number(v.cantidad) });
+      } else await onActualizar(lote.id, datos);
       onClose();
     } catch (err) {
       setErrorServidor(toAppError(err).message);
@@ -304,17 +315,18 @@ function LoteForm({
         )}
         {esAlta && (
           <>
-            <Campo id="ubicacionId" label="Ubicación" error={errors.ubicacionId?.message}>
-              <Select id="ubicacionId" {...form.register("ubicacionId")}>
-                <option value="">Elegí…</option>
-                {ubicaciones
-                  .filter((u) => u.activo)
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.codigo}
-                    </option>
-                  ))}
-              </Select>
+            <Campo
+              id="ubicacion"
+              label="Ubicación"
+              error={errors.ubicacion?.message}
+              ayuda="Escribila como la nombran en el galpón; si todavía no existe, se da de alta sola."
+            >
+              <UbicacionInput
+                id="ubicacion"
+                ubicaciones={ubicaciones}
+                placeholder="G1-18/16"
+                {...form.register("ubicacion")}
+              />
             </Campo>
             <Campo id="cantidad" label="Cantidad" error={errors.cantidad?.message} ayuda="Envases que entran al galpón.">
               <Input id="cantidad" type="number" min="0" step="0.01" {...form.register("cantidad")} />

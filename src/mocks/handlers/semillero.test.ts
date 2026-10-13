@@ -19,6 +19,7 @@ import type {
   OrdenCargaInput,
   ReubicacionInput,
   StockSemilleroDto,
+  UbicacionDto,
   UbicacionInput,
   VariedadInput,
 } from "@/features/semillero/types";
@@ -400,6 +401,26 @@ describe("mocks de demo: semillero", () => {
     const campoNorte = destinosA.data.find((d) => d.nombre === "Campo Norte")!;
     expect(campoNorte).toBeDefined();
     expect(campoNorte.enUso).toBeGreaterThan(0);
+  });
+
+  it("el alta rápida de ubicación es idempotente: crea la nueva y reusa la que ya existe", async () => {
+    const { data: antes } = await apiClient.get<CatalogosSemilleroDto>("/semillero/catalogos");
+    const yaExistente = antes.ubicaciones[0];
+
+    const nueva = await apiClient.post<UbicacionDto>("/semillero/catalogos/ubicaciones/asegurar", {
+      codigo: " g7-33 ",
+    });
+    expect(nueva.status).toBe(201);
+    expect(nueva.data.codigo).toBe("G7-33");
+
+    const repetida = await apiClient.post<UbicacionDto>("/semillero/catalogos/ubicaciones/asegurar", {
+      codigo: yaExistente.codigo.toLowerCase(),
+    });
+    expect(repetida.status).toBe(200);
+    expect(repetida.data.id).toBe(yaExistente.id);
+
+    const { data: despues } = await apiClient.get<CatalogosSemilleroDto>("/semillero/catalogos");
+    expect(despues.ubicaciones.filter((u) => u.codigo === "G7-33")).toHaveLength(1);
   });
 
   describe("paridad de contrato: 404 por id inexistente, no 400 (el backend usa Error.NotFound acá)", () => {

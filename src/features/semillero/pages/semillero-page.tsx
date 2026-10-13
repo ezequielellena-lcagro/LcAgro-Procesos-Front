@@ -25,6 +25,7 @@ import {
   useCrearLote,
   useCrearOrden,
   useDespacharOrden,
+  useAsegurarUbicacion,
   useGuardarUbicacion,
   useGuardarVariedad,
   useRegistrarAjuste,
@@ -117,6 +118,7 @@ export function SemilleroPage() {
   const anularOrden = useAnularOrden();
   const guardarVariedad = useGuardarVariedad();
   const guardarUbicacion = useGuardarUbicacion();
+  const asegurarUbicacion = useAsegurarUbicacion();
   const crearDestinoOrden = useCrearDestino(pedidoOrden.cliente ?? 0);
   const crearDestinoCatalogo = useCrearDestino(clienteCatalogoElegido ?? 0);
   const guardarDestinoCatalogo = useGuardarDestino(clienteCatalogoElegido ?? 0);
@@ -303,6 +305,7 @@ export function SemilleroPage() {
         campanias={catalogos.data?.campanias ?? []}
         campaniaSugerida={catalogos.data?.campaniaSugerida ?? ""}
         clientes={listaClientes}
+        onAsegurarUbicacion={(codigo) => asegurarUbicacion.mutateAsync(codigo)}
         onCrear={(input) => crearLote.mutateAsync(input)}
         onActualizar={(id, input) => actualizarLote.mutateAsync({ id, ...input })}
         onClose={cerrarLoteDialog}
@@ -312,6 +315,7 @@ export function SemilleroPage() {
         operacion={movimiento?.operacion ?? null}
         fila={movimiento?.fila ?? null}
         ubicaciones={catalogos.data?.ubicaciones ?? []}
+        onAsegurarUbicacion={(codigo) => asegurarUbicacion.mutateAsync(codigo)}
         onIngreso={(input) => registrarIngreso.mutateAsync(input)}
         onAjuste={(input) => registrarAjuste.mutateAsync(input)}
         onReubicar={(input) => reubicar.mutateAsync(input)}

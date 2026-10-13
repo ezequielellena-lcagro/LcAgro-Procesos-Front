@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AxiosError, AxiosHeaders } from "axios";
 import { describe, expect, it, vi } from "vitest";
 import type { StockFilaDto, UbicacionDto } from "../types";
@@ -38,24 +38,27 @@ const UBICACIONES: UbicacionDto[] = [
   { id: 2, codigo: "G5-18", descripcion: null, activo: true, enUso: 0 },
   { id: 3, codigo: "G9-9", descripcion: null, activo: false, enUso: 0 },
 ];
+const UBICACION_NUEVA: UbicacionDto = { id: 7, codigo: "G4-22", descripcion: null, activo: true, enUso: 0 };
 
 function renderDialog(operacion: OperacionStock, filaOverride: Partial<StockFilaDto> = {}) {
   const onIngreso = vi.fn().mockResolvedValue(undefined);
   const onAjuste = vi.fn().mockResolvedValue(undefined);
   const onReubicar = vi.fn().mockResolvedValue(undefined);
+  const onAsegurarUbicacion = vi.fn().mockResolvedValue(UBICACION_NUEVA);
   const onClose = vi.fn();
   render(
     <MovimientoDialog
       operacion={operacion}
       fila={{ ...FILA, ...filaOverride }}
       ubicaciones={UBICACIONES}
+      onAsegurarUbicacion={onAsegurarUbicacion}
       onIngreso={onIngreso}
       onAjuste={onAjuste}
       onReubicar={onReubicar}
       onClose={onClose}
     />,
   );
-  return { onIngreso, onAjuste, onReubicar, onClose };
+  return { onIngreso, onAjuste, onReubicar, onAsegurarUbicacion, onClose };
 }
 
 const escribir = (label: string, value: string) =>
@@ -186,25 +189,47 @@ describe("MovimientoDialog", () => {
     );
   });
 
-  it("reubicar no ofrece la misma ubicación ni las desactivadas como destino", () => {
+  it("el destino se escribe a mano y sugiere los lugares activos, sin la ubicación de origen", () => {
     renderDialog("reubicacion");
-    const opciones = within(screen.getByLabelText("Destino"))
-      .getAllByRole("option")
-      .map((o) => o.textContent);
-    expect(opciones).toEqual(["Elegí…", "G5-18"]);
+    expect(screen.getByLabelText("Destino").tagName).toBe("INPUT");
+    const sugeridas = [
+      ...document.querySelectorAll<HTMLOptionElement>("#ubicacionDestino-sugerencias option"),
+    ].map((o) => o.value);
+    expect(sugeridas).toEqual(["G5-18"]);
   });
 
-  it("reubicar exige elegir a dónde va", async () => {
+  it("reubicar exige escribir a dónde va", async () => {
     const { onReubicar } = renderDialog("reubicacion");
     escribir("Cantidad", "2");
     confirmar();
-    expect(await screen.findByText("Elegí a dónde va.")).toBeInTheDocument();
+    expect(await screen.findByText("Escribí a dónde va.")).toBeInTheDocument();
     expect(onReubicar).not.toHaveBeenCalled();
+  });
+
+  it("reubicar al mismo lugar donde ya está no se manda", async () => {
+    const { onReubicar } = renderDialog("reubicacion");
+    escribir("Destino", "g1-6");
+    escribir("Cantidad", "2");
+    confirmar();
+    expect(await screen.findByText("Ahí es donde ya está: escribí otro lugar.")).toBeInTheDocument();
+    expect(onReubicar).not.toHaveBeenCalled();
+  });
+
+  it("reubicar a un lugar que todavía no existe lo da de alta solo", async () => {
+    const { onReubicar, onAsegurarUbicacion } = renderDialog("reubicacion");
+    escribir("Destino", "G4-22");
+    escribir("Cantidad", "2");
+    confirmar();
+
+    await waitFor(() => expect(onAsegurarUbicacion).toHaveBeenCalledWith("G4-22"));
+    expect(onReubicar).toHaveBeenCalledWith(
+      expect.objectContaining({ ubicacionOrigenId: 1, ubicacionDestinoId: 7 }),
+    );
   });
 
   it("reubicar más que lo disponible avisa antes de mandar (R5.3)", async () => {
     const { onReubicar } = renderDialog("reubicacion");
-    escribir("Destino", "2");
+    escribir("Destino", "G5-18");
     escribir("Cantidad", "8");
     confirmar();
     expect(await screen.findByText(/Hay 7 disponibles/)).toBeInTheDocument();
@@ -212,8 +237,8 @@ describe("MovimientoDialog", () => {
   });
 
   it("reubicar dentro del disponible manda origen y destino correctos", async () => {
-    const { onReubicar, onClose } = renderDialog("reubicacion");
-    escribir("Destino", "2");
+    const { onReubicar, onAsegurarUbicacion, onClose } = renderDialog("reubicacion");
+    escribir("Destino", "G5-18");
     escribir("Cantidad", "7");
     escribir("Observación", "Reordenamiento de galpón");
     confirmar();
@@ -227,6 +252,8 @@ describe("MovimientoDialog", () => {
         observacion: "Reordenamiento de galpón",
       }),
     );
+    // El lugar ya estaba en el catálogo: no hace falta darlo de alta de nuevo.
+    expect(onAsegurarUbicacion).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
 
