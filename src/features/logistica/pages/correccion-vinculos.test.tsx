@@ -495,7 +495,7 @@ describe("C7.2 UI", () => {
     const radio = screen.getByRole("radio", { name: "Seleccionar V-DEMO/1 / grupo 702 / cupo 1" });
     expect(radio).not.toBeChecked();
     fireEvent.click(radio);
-    fireEvent.change(screen.getByLabelText("Grupo ERP (opcional)"), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("Plan de carga (opcional)"), { target: { value: "0" } });
     expect(radio).not.toBeChecked();
     fireEvent.click(radio);
     fireEvent.click(screen.getByRole("button", { name: "Cargar más filas" }));

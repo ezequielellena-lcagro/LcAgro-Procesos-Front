@@ -188,10 +188,10 @@ describe("Filtros aplicados de Cupos", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Cupos MacroGest" }));
     const table = await screen.findByRole("table", { name: "Cupos de MacroGest" });
     expect(
-      within(table).getByRole("columnheader", { name: "Productor del plan ERP" }),
+      within(table).getByRole("columnheader", { name: "Productor del plan" }),
     ).toBeInTheDocument();
     expect(
-      within(table).getByRole("columnheader", { name: "Cargador del plan ERP" }),
+      within(table).getByRole("columnheader", { name: "Cargador del plan" }),
     ).toBeInTheDocument();
     await waitFor(() => expect(within(table).getByText("0")).toBeInTheDocument());
     // Cabecera ausente o dato vacío se muestran igual: con un guion, no con una frase.
@@ -281,6 +281,8 @@ describe("Filtros aplicados de Cupos", () => {
     mostrar(<CuposPage />);
     fireEvent.click(screen.getByRole("tab", { name: "Cupos MacroGest" }));
     await screen.findByText("ERP-PRIMERA");
+    // La grilla más ancha de Cupos va de a 10: de a 50 los filtros quedaban fuera de pantalla.
+    expect(consultas[0].searchParams.get("tamano")).toBe("10");
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
     await screen.findByText("ERP-SEGUNDA");
     expect(screen.queryByText("ERP-PRIMERA")).not.toBeInTheDocument();

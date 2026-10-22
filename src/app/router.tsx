@@ -75,6 +75,16 @@ const LogisticaPedidosPage = lazy(() =>
 const LogisticaCuposPage = lazy(() =>
   import("@/features/logistica/pages/cupos-page").then((m) => ({ default: m.CuposPage })),
 );
+const LogisticaSolicitarCuposPage = lazy(() =>
+  import("@/features/logistica/pages/solicitar-cupos-page").then((m) => ({
+    default: m.SolicitarCuposPage,
+  })),
+);
+const LogisticaRecibirCuposPage = lazy(() =>
+  import("@/features/logistica/pages/recibir-cupos-page").then((m) => ({
+    default: m.RecibirCuposPage,
+  })),
+);
 const LogisticaCargasPage = lazy(() =>
   import("@/features/logistica/pages/cargas-page").then((m) => ({ default: m.CargasPage })),
 );
@@ -138,6 +148,14 @@ export const router = createBrowserRouter([
               />
             ),
             children: [{ path: "logistica/cupos", element: <LogisticaCuposPage /> }],
+          },
+          {
+            // Operar cupos pide el rol de gestión, no alcanza con la lectura de Logística.
+            element: <ProtectedRoute roles={["logistica-cupos"]} />,
+            children: [
+              { path: "logistica/cupos/solicitar", element: <LogisticaSolicitarCuposPage /> },
+              { path: "logistica/cupos/recibir", element: <LogisticaRecibirCuposPage /> },
+            ],
           },
           {
             element: <ProtectedRoute roles={["logistica-lectura", "logistica-flete"]} />,

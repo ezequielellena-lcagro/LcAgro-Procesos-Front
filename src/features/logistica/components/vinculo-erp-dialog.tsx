@@ -246,8 +246,8 @@ export function VinculoErpDialog({
               { titulo: "Referencia", celda: (f) => f.referencia },
               { titulo: "ID del vínculo", celda: (f) => f.id },
               { titulo: "Contrato", celda: (f) => f.contrato },
-              { titulo: "Grupo", numero: true, celda: (f) => f.grupo },
-              { titulo: "Cupo ERP", numero: true, celda: (f) => f.cupo },
+              { titulo: "Plan de carga", numero: true, celda: (f) => f.grupo },
+              { titulo: "Cupo", numero: true, celda: (f) => f.cupo },
             ]}
           />
         </div>
@@ -285,7 +285,7 @@ export function VinculoErpDialog({
         <PeriodoFiltro
           value={periodo}
           maxDias={31}
-          etiqueta="Fecha de carga ERP"
+          etiqueta="Fecha de carga"
           onChange={(p) => {
             setPeriodo(p);
             reiniciar();
@@ -301,7 +301,7 @@ export function VinculoErpDialog({
             }
           }}
         >
-          <Campo titulo="Grupo ERP (opcional)">
+          <Campo titulo="Plan de carga (opcional)">
             <Input
               type="number"
               min={0}
@@ -329,14 +329,14 @@ export function VinculoErpDialog({
           </label>
         ) : (
           <p className="mb-3 text-sm text-ink-soft">
-            Código propio pendiente. Buscamos por contrato, período y grupo ERP; no se genera un
+            Código propio pendiente. Buscamos por contrato, período y número de plan; no se genera un
             código.
           </p>
         )}
       </fieldset>
       <p className="mb-3 text-sm text-ink-soft">
-        Contrato fijo: {snapshot.cupo.contratoVenta}. Fecha de carga ERP, hasta 31 días. Una página
-        vacía no acredita ausencia histórica. El grupo ERP no identifica por sí solo un plan.
+        Contrato fijo: {snapshot.cupo.contratoVenta}. Fecha de carga de MacroGest, hasta 31 días. Una página
+        vacía no acredita ausencia histórica. El número de plan no identifica por sí solo un plan de carga.
       </p>
       <TablaLogistica
         titulo="Referencias candidatas de MacroGest"
@@ -398,7 +398,7 @@ export function VinculoErpDialog({
             celda: (f) =>
               textoPresente(f.erp.codigoTerminal) ? f.erp.codigoTerminal : "Código pendiente",
           },
-          { titulo: "Fecha de carga ERP", celda: (f) => fecha(f.erp.fechaCarga) },
+          { titulo: "Fecha de carga", celda: (f) => fecha(f.erp.fechaCarga) },
           {
             titulo: "Destino",
             celda: (f) =>

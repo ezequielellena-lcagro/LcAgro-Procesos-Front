@@ -14,6 +14,8 @@ import { usePaginacion } from "../lib/paginacion";
 import { Paginacion } from "../components/paginacion";
 import { PedidoDialog } from "../components/pedido-dialog";
 import { PeriodoFiltro } from "../components/periodo-filtro";
+import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
+import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
 import { TablaLogistica } from "../components/tabla-logistica";
 
 export function PedidosPage() {
@@ -24,7 +26,13 @@ export function PedidosPage() {
   const [historia, setHistoria] = useState<string | null>(null);
   const [dialogo, setDialogo] = useState<{ pedido?: Pedido; preventa?: Preventa } | null>(null);
   const [preventa, setPreventa] = useState<Preventa | null>(null);
-  const q = useListado<Pedido>("pedidos", periodo, cursorPropio);
+  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
+  const [comercial, setComercial] = useState(filtrosComercialesVacios);
+  const q = useListado<Pedido>(
+    "pedidos",
+    { ...periodo, ...paramsComerciales(comercial) },
+    cursorPropio,
+  );
   const paginacion = usePaginacion(q);
   return (
     <>
@@ -60,7 +68,23 @@ export function PedidosPage() {
           <TabsTrigger value="erp">Preventas MacroGest</TabsTrigger>
         </TabsList>
         <TabsContent value="agenda">
-          <PeriodoFiltro value={periodo} onChange={setPeriodo} />
+          <PeriodoFiltro
+            value={periodo}
+            onChange={setPeriodo}
+            onSubmit={(e) => {
+              e.preventDefault();
+              setComercial(borrador);
+            }}
+          >
+            <FiltrosComercialesCampos
+              value={borrador}
+              onChange={setBorrador}
+              onClear={() => {
+                setBorrador(filtrosComercialesVacios);
+                setComercial(filtrosComercialesVacios);
+              }}
+            />
+          </PeriodoFiltro>
           <TablaLogistica
             titulo="Pedidos de Logística"
             filas={paginacion.filas}
@@ -113,7 +137,8 @@ export function PedidosPage() {
           />
         </TabsContent>
         <TabsContent value="erp">
-          <PreventaPicker selected={preventa} onSelect={setPreventa} />
+          {/* Diez filas: la grilla entra entera en pantalla y no tapa los filtros al scrollear. */}
+          <PreventaPicker selected={preventa} onSelect={setPreventa} tamano={10} />
         </TabsContent>
       </Tabs>
       {dialogo && (

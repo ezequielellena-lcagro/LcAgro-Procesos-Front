@@ -8,7 +8,7 @@ import { DateField } from "@/components/ui/date-field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
 import { PageHeader } from "@/shared/components/page-header";
-import { FilterBar, FilterField } from "@/shared/components/filter-bar";
+import { FilterActions, FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { HistorialDialog } from "../components/historial-dialog";
 import { CatalogoSelect } from "../components/catalogo-select";
 import { AvisoDemo } from "../components/aviso-demo";
@@ -182,27 +182,21 @@ export function CargasPage() {
           ))}
         </Select>
       </FilterField>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" type="submit" disabled={!campaniaOk}>
-          Aplicar filtros
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => {
-            setBorrador(filtrosVacios);
-            setFiltros(filtrosVacios);
-            reiniciar();
-          }}
-        >
-          Limpiar filtros
-        </Button>
-      </div>
-      {!campaniaOk && (
-        <p role="alert" className="basis-full text-sm text-rojo">
-          Ingresá una campaña como 2025-2026.
-        </p>
-      )}
+      <FilterActions
+        aplicarDeshabilitado={!campaniaOk}
+        onClear={() => {
+          setBorrador(filtrosVacios);
+          setFiltros(filtrosVacios);
+          reiniciar();
+        }}
+        aviso={
+          !campaniaOk && (
+            <p role="alert" className="mr-auto text-sm text-rojo">
+              Ingresá una campaña como 2025-2026.
+            </p>
+          )
+        }
+      />
     </>
   );
   return (

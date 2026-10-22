@@ -60,17 +60,17 @@ export function SidebarProcesos({ area, roles, hidden }: Props) {
 /**
  * Subconjunto de procesos de un área (p. ej. Logística).
  *
- * Sigue siendo un `<details>` para poder plegarlo, pero sin recuadro propio: el encabezado se lee
- * como el rótulo "Procesos" de arriba y las hijas cuelgan de una guía vertical. El marco anterior
- * lo dibujaba como una tarjeta dentro del menú y competía con el proceso activo.
+ * Sigue siendo un `<details>` para poder plegarlo, pero el encabezado se lee igual que cualquier
+ * otro proceso del menú: mismo cuerpo de letra, mismo color y sin versalitas. Antes usaba el estilo
+ * del rótulo "Procesos" (10 px en mayúsculas) y parecía un título de sección, no un proceso más.
  */
 function Grupo({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <details open className="group/grupo mt-3">
-      <summary className="flex cursor-pointer list-none items-center gap-1 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-white/40 transition-colors hover:text-white/70 [&::-webkit-details-marker]:hidden">
+    <details open className="group/grupo">
+      <summary className="mb-0.5 flex cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-3 py-2 text-[13px] leading-tight text-[#cdd9e0] transition-colors hover:bg-white/10 hover:text-white [&::-webkit-details-marker]:hidden">
         <ChevronRight
           aria-hidden
-          className="size-3 transition-transform group-open/grupo:rotate-90"
+          className="size-3.5 flex-none text-white/45 transition-transform group-open/grupo:rotate-90"
         />
         {label}
       </summary>

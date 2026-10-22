@@ -28,6 +28,8 @@ export interface AppError {
 }
 
 const FALLBACK = "Ocurrió un error inesperado. Probá de nuevo.";
+/** Falla del propio navegador (bug nuestro), no una respuesta de la API. */
+export const FALLO_CLIENTE = "fallo_cliente";
 
 export function toAppError(error: unknown): AppError {
   if (error instanceof AxiosError) {
@@ -53,11 +55,20 @@ export function toAppError(error: unknown): AppError {
     };
   }
 
-  return { status: 0, message: FALLBACK };
+  // No es un error de la API: reventó nuestro propio código antes o después de la llamada.
+  // Decirlo así evita el "probá de nuevo" que no arregla nada y manda a recargar, que sí.
+  return {
+    status: 0,
+    codigo: FALLO_CLIENTE,
+    message:
+      "Falló la pantalla en el navegador. Recargá y verificá si la operación quedó guardada antes de repetirla.",
+  };
 }
 
 function mensajePorStatus(status: number): string {
   switch (status) {
+    case 400:
+      return "La operación no pasó las validaciones del servidor.";
     case 403:
       return "No tenés permiso para esta acción.";
     case 404:
@@ -70,6 +81,14 @@ function mensajePorStatus(status: number): string {
       return "Demasiados intentos. Esperá un momento e intentá de nuevo.";
     case 500:
       return "Error del servidor. Avisale al equipo si persiste.";
+    // 502/503/504 los puede emitir la API o el servidor que la publica; sin estos casos caían en
+    // el texto genérico y el operador no sabía si esperar, reintentar o avisar.
+    case 502:
+      return "No se pudo contactar con la API. Avisale al equipo.";
+    case 503:
+      return "MacroGest no está disponible. Reintentá en unos segundos.";
+    case 504:
+      return "El servidor tardó demasiado en responder.";
     default:
       return FALLBACK;
   }

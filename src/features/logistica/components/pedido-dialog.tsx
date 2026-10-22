@@ -6,13 +6,12 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
-import { hoy, campania, fecha, kg } from "../format";
+import { hoy, campania } from "../format";
 import { useDetalle, useOperacion } from "../queries/use-logistica";
 import type { Pedido, Preventa } from "../types";
 import { CatalogoSelect } from "./catalogo-select";
 import { PreventaPicker } from "./contrato-picker";
 import { Campo, FormOperacionFooter } from "./form-operacion";
-import { TablaLogistica } from "./tabla-logistica";
 const schema = z.object({
   clienteNumero: z.number().int().min(1).max(9999999999),
   producto: z.number().int().min(1).max(999999),
@@ -67,6 +66,7 @@ export function PedidoDialog({
   };
   const elegir = (p: Preventa | null) => {
     setElegida(p);
+    form.clearErrors("root");
     if (!p) return; // soltarla no borra lo cargado: puede pasarse a "sin preventa" y seguir
     form.setValue("clienteNumero", p.clienteNumero ?? 0);
     form.setValue("producto", p.producto ?? 0);
@@ -143,34 +143,8 @@ export function PedidoDialog({
           </Campo>
         </div>
       </div>
-      {/* La preventa elegida se lee DEBAJO del formulario que cierra: es el resumen de lo que se
-          va a guardar, no un paso previo. */}
-      {modo === "preventa" && seleccion && (
-        <div className="mt-4">
-          <TablaLogistica
-            titulo="Preventa seleccionada"
-            filas={[seleccion]}
-            clave={(p) => p.numero}
-            columnas={[
-              { titulo: "Preventa", celda: (p) => `${p.operacion} ${p.numero}` },
-              {
-                titulo: "Productor",
-                celda: (p) => p.clienteNombre ?? `Cliente ${p.clienteNumero}`,
-              },
-              { titulo: "Cereal", celda: (p) => p.productoNombre ?? p.producto },
-              { titulo: "Campaña", celda: (p) => campania(p.campania) },
-              { titulo: "Contratado", numero: true, celda: (p) => kg(p.kgContratados) },
-              {
-                titulo: "Entrega",
-                celda: (p) => `${fecha(p.fechaEntregaInicio)} — ${fecha(p.fechaEntregaFin)}`,
-              },
-            ]}
-          />
-          <p className="mt-2 text-xs text-ink-soft">
-            MacroGest · El saldo anterior al inicio de Logística queda pendiente de verificación.
-          </p>
-        </div>
-      )}
+      {/* Acá iba una tabla de una fila con la preventa elegida, y después una línea de texto con lo
+          mismo. Las dos repetían lo que ya dice el casillero marcado en la grilla de abajo. */}
     </fieldset>
   );
   return (
@@ -215,6 +189,13 @@ export function PedidoDialog({
       )}
       <form id={formId} onSubmit={enviar} className="mt-5">
         {modo === "libre" && datos}
+        {/* `setError("root")` no lo mostraba nadie: el pie sólo decía "completá los campos
+            obligatorios" y el motivo real —que falta elegir la preventa— se perdía. */}
+        {form.formState.errors.root?.message && (
+          <p role="alert" className="mb-3 text-sm text-rojo">
+            {form.formState.errors.root.message}
+          </p>
+        )}
         <FormOperacionFooter
           error={mutation.error}
           invalid={Object.keys(form.formState.errors).length > 0}

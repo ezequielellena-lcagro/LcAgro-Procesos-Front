@@ -93,8 +93,8 @@ export function RetirarVinculoErpDialog({
         columnas={[
           { titulo: "ID del vínculo", celda: (f) => f.id },
           { titulo: "Contrato", celda: (f) => f.contrato },
-          { titulo: "Grupo", numero: true, celda: (f) => f.grupo },
-          { titulo: "Cupo ERP", numero: true, celda: (f) => f.cupo },
+          { titulo: "Plan de carga", numero: true, celda: (f) => f.grupo },
+          { titulo: "Cupo", numero: true, celda: (f) => f.cupo },
         ]}
       />
       <form

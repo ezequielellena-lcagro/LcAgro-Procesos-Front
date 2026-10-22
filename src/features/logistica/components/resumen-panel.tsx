@@ -1,9 +1,10 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ErrorState } from "@/shared/components/error-state";
-import { FilterField } from "@/shared/components/filter-bar";
+import { KpiCard } from "@/shared/components/kpi-card";
+import { FilterActions, FilterField } from "@/shared/components/filter-bar";
 import { fecha, periodoInicial } from "../format";
 import {
   claveResumen,
@@ -15,82 +16,115 @@ import {
 import { useLogisticaResumen } from "../queries/use-logistica-resumen";
 import type { CursorResumen, GrupoResumen, MetricasResumen } from "../types";
 import { CatalogoSelect } from "./catalogo-select";
+import { DisponiblesPanel } from "./disponibles-panel";
 import { PeriodoFiltro } from "./periodo-filtro";
 import { TablaLogistica, type Columna } from "./tabla-logistica";
 const cantidad = (n: number) => new Intl.NumberFormat("es-AR").format(n);
 const solicitudes = (n: number) => `${cantidad(n)} ${n === 1 ? "solicitud" : "solicitudes"}`;
-function Contexto({ children }: { children: ReactNode }) {
-  return <div className="mt-1 text-xs text-ink-soft">{children}</div>;
+/**
+ * Los seis números del circuito, en el orden en que pasan las cosas: lo que pediste, lo que te
+ * confirmaron, lo que falta que te entreguen, lo que ya recibiste, lo que queda sin repartir y lo
+ * que repartiste. Leídos en fila se ven como un embudo.
+ *
+ * Antes era una tabla de UNA fila con once columnas numéricas, y abajo otra tabla que repetía esas
+ * mismas once por grupo: veintidós números sin jerarquía ni orden de lectura.
+ */
+function TarjetasResumen({ m }: { m: MetricasResumen }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <KpiCard
+        label="Solicitados"
+        value={cantidad(m.solicitados)}
+        hint={`En ${solicitudes(m.solicitudes)}${m.cerradas ? ` · ${cantidad(m.cerradas)} cerradas` : ""}`}
+      />
+      <KpiCard
+        label="Confirmados"
+        value={m.respuestaVigente === null ? "Sin respuesta" : cantidad(m.respuestaVigente)}
+        hint={
+          m.sinRespuesta || m.respuestaCero
+            ? [
+                m.sinRespuesta ? `${solicitudes(m.sinRespuesta)} sin responder` : null,
+                m.respuestaCero ? `${cantidad(m.respuestaCero)} con respuesta cero` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "La terminal respondió todo"
+        }
+      />
+      <KpiCard
+        label="Por recibir"
+        value={m.porRecibir === null ? "Sin respuesta" : cantidad(m.porRecibir)}
+        // Con solicitudes sin responder el número es parcial, y decirlo importa: si no, se lee
+        // como "falta esto y nada más".
+        hint={
+          m.porRecibir !== null && m.sinRespuesta > 0
+            ? `Parcial: ${solicitudes(m.sinRespuesta)} sin responder`
+            : "Confirmados que todavía no cargaste"
+        }
+      />
+      <KpiCard label="Recibidos" value={cantidad(m.recibidos)} hint="Cupos cargados en la app" />
+      <KpiCard
+        label="Disponibles"
+        value={cantidad(m.porOtorgar)}
+        hint="Listos para otorgar"
+        tone={m.porOtorgar > 0 ? "verde" : "default"}
+      />
+      <KpiCard
+        label="Otorgados"
+        value={cantidad(m.otorgados)}
+        hint="Ya asignados a un pedido o cliente"
+      />
+    </div>
+  );
 }
-const columnasMetricas: Columna<MetricasResumen>[] = [
-  {
-    titulo: "Solicitudes",
-    numero: true,
-    celda: (m) => (
-      <>
-        {cantidad(m.solicitudes)}
-        <Contexto>{cantidad(m.cerradas)} cerradas</Contexto>
-      </>
-    ),
-  },
-  { titulo: "Solicitados", numero: true, celda: (m) => cantidad(m.solicitados) },
-  {
-    titulo: "Respuesta vigente",
-    numero: true,
-    celda: (m) => (
-      <>
-        {m.respuestaVigente === null ? "Sin respuesta" : cantidad(m.respuestaVigente)}
-        {m.sinRespuesta > 0 && <Contexto>{solicitudes(m.sinRespuesta)} sin respuesta</Contexto>}
-        {m.respuestaCero > 0 && (
-          <Contexto>{solicitudes(m.respuestaCero)} con respuesta cero</Contexto>
-        )}
-      </>
-    ),
-  },
-  { titulo: "Recibidos", numero: true, celda: (m) => cantidad(m.recibidos) },
-  { titulo: "Otorgados", numero: true, celda: (m) => cantidad(m.otorgados) },
-  {
-    titulo: "Por recibir",
-    numero: true,
-    celda: (m) => (
-      <>
-        {m.porRecibir === null ? "Sin respuesta" : cantidad(m.porRecibir)}
-        {m.sinRespuesta > 0 && m.porRecibir !== null && (
-          <Contexto>Parcial: {solicitudes(m.sinRespuesta)} sin respuesta</Contexto>
-        )}
-      </>
-    ),
-  },
-  {
-    titulo: "Por otorgar",
-    numero: true,
-    celda: (m) => (
-      <>
-        {cantidad(m.porOtorgar)}
-        <Contexto>Disponibles</Contexto>
-      </>
-    ),
-  },
-  {
-    titulo: "Otros sin otorgar",
-    numero: true,
-    celda: (m) => (
-      <>
-        {cantidad(m.otrosSinOtorgar)}
-        <Contexto>No disponibles</Contexto>
-      </>
-    ),
-  },
-  { titulo: "Anulados", numero: true, celda: (m) => cantidad(m.anulados) },
-  { titulo: "Carga con otra fecha", numero: true, celda: (m) => cantidad(m.fechaCargaDistinta) },
-  { titulo: "Recepción en otra terminal", numero: true, celda: (m) => cantidad(m.destinoDistinto) },
-];
+
+/** Las excepciones, que son el 90% del ruido y casi siempre cero: sólo se nombran las que pasaron. */
+function avisosResumen(m: MetricasResumen): string[] {
+  return [
+    m.anulados ? `${cantidad(m.anulados)} anulados` : null,
+    m.otrosSinOtorgar
+      ? `${cantidad(m.otrosSinOtorgar)} sin otorgar que no están disponibles`
+      : null,
+    m.fechaCargaDistinta ? `${cantidad(m.fechaCargaDistinta)} con carga en otra fecha` : null,
+    m.destinoDistinto ? `${cantidad(m.destinoDistinto)} recibidos en otra terminal` : null,
+  ].filter((x): x is string => x !== null);
+}
+
 const columnasGrupos: Columna<GrupoResumen>[] = [
   { titulo: "Fecha solicitada", celda: (f) => fecha(f.fechaSolicitada) },
   { titulo: "Terminal solicitada", celda: (f) => f.destinoNombre ?? f.destinoCodigo },
   { titulo: "Contrato", celda: (f) => f.contrato },
   { titulo: "Cereal / campaña", celda: (f) => `${f.productoNombre ?? f.producto} / ${f.campania}` },
-  ...columnasMetricas.map((c) => ({ ...c, celda: (f: GrupoResumen) => c.celda(f.metricas) })),
+  { titulo: "Solicitados", numero: true, celda: (f) => cantidad(f.metricas.solicitados) },
+  {
+    titulo: "Confirmados",
+    numero: true,
+    celda: (f) =>
+      f.metricas.respuestaVigente === null
+        ? "Sin respuesta"
+        : cantidad(f.metricas.respuestaVigente),
+  },
+  {
+    titulo: "Por recibir",
+    numero: true,
+    celda: (f) =>
+      f.metricas.porRecibir === null ? "Sin respuesta" : cantidad(f.metricas.porRecibir),
+  },
+  { titulo: "Recibidos", numero: true, celda: (f) => cantidad(f.metricas.recibidos) },
+  { titulo: "Disponibles", numero: true, celda: (f) => cantidad(f.metricas.porOtorgar) },
+  { titulo: "Otorgados", numero: true, celda: (f) => cantidad(f.metricas.otorgados) },
+  {
+    // Las excepciones del grupo, nombradas; como columnas eran cuatro ceros por fila.
+    titulo: "Avisos",
+    celda: (f) => {
+      const avisos = avisosResumen(f.metricas);
+      return avisos.length ? (
+        <span className="text-xs text-ink-soft">{avisos.join(" · ")}</span>
+      ) : (
+        "—"
+      );
+    },
+  },
 ];
 export function ResumenPanel({ activo }: { activo: boolean }) {
   const [periodo, setPeriodo] = useState(() => periodoInicial());
@@ -112,6 +146,7 @@ export function ResumenPanel({ activo }: { activo: boolean }) {
   const anteriores = !!q.data && !nuevaLectura;
   return (
     <div className="min-w-0 space-y-4">
+
       {/* Fechas y filtros en la MISMA barra: son los filtros de la misma consulta. */}
       <PeriodoFiltro
         value={periodo}
@@ -163,28 +198,31 @@ export function ResumenPanel({ activo }: { activo: boolean }) {
           value={borrador.destinoCodigo}
           onChange={(destinoCodigo) => setBorrador({ ...borrador, destinoCodigo })}
         />
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" variant="outline" disabled={!filtrosResumenValidos(borrador)}>
-            Aplicar filtros
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => {
-              setBorrador(filtrosResumenVacios);
-              setAplicados(filtrosResumenVacios);
-              reiniciar();
-            }}
-          >
-            Limpiar filtros
-          </Button>
-        </div>
-        {!filtrosResumenValidos(borrador) && (
-          <p role="alert" className="basis-full text-sm text-rojo">
-            Revisá contrato, cereal, campaña y terminal solicitada.
-          </p>
-        )}
+        <FilterActions
+          aplicarDeshabilitado={!filtrosResumenValidos(borrador)}
+          onClear={() => {
+            setBorrador(filtrosResumenVacios);
+            setAplicados(filtrosResumenVacios);
+            reiniciar();
+          }}
+          aviso={
+            !filtrosResumenValidos(borrador) && (
+              <p role="alert" className="mr-auto text-sm text-rojo">
+                Revisá contrato, cereal, campaña y terminal solicitada.
+              </p>
+            )
+          }
+        />
       </PeriodoFiltro>
+      {/* Lo primero al entrar a Cupos: cuántos hay. Lo de abajo es el seguimiento de lo que se le
+          pidió a cada terminal, que es otra pregunta. */}
+      <DisponiblesPanel
+        periodo={periodo}
+        producto={aplicados.producto || undefined}
+        campania={aplicados.campania}
+        activo={activo}
+      />
+      <hr className="border-line" />
       {q.isError && !q.data && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
       {anteriores && (
         <p role="status" className="text-sm text-ink-soft">
@@ -197,16 +235,31 @@ export function ResumenPanel({ activo }: { activo: boolean }) {
           mensaje de tabla vacía diría "no hay solicitudes" cuando lo que hubo fue un error. */}
       {(q.data || q.isFetching) && (
         <>
-          <h2 className="font-medium">Totales de la selección completa</h2>
-          <TablaLogistica
-            titulo="Totales del resumen"
-            filas={q.data ? [q.data.totales] : []}
-            clave={() => "totales"}
-            columnas={columnasMetricas}
-            cargando={q.isFetching}
-            vacio="Todavía no se consultó el resumen."
-          />
-          <h2 className="font-medium">Grupos por fecha, terminal, contrato y cereal / campaña</h2>
+          <div>
+            <h2 className="font-display text-xl text-ink">Seguimiento de solicitudes</h2>
+            <p className="text-xs text-ink-soft">
+              Qué le pediste a cada terminal y en qué terminó. Cuenta sólo los cupos que pasaron por
+              una solicitud registrada acá.
+            </p>
+          </div>
+          {q.data ? (
+            <>
+              <TarjetasResumen m={q.data.totales} />
+              {avisosResumen(q.data.totales).length > 0 && (
+                <p className="text-sm text-ink-soft">
+                  <strong className="font-medium text-ink">Avisos:</strong>{" "}
+                  {avisosResumen(q.data.totales).join(" · ")}.
+                </p>
+              )}
+            </>
+          ) : (
+            <p role="status" className="text-sm text-ink-soft">
+              Consultando…
+            </p>
+          )}
+          <h2 className="font-display text-xl text-ink">
+            Detalle por fecha, terminal, contrato y cereal
+          </h2>
           <TablaLogistica
             titulo="Grupos del resumen"
             filas={q.data?.filas ?? []}

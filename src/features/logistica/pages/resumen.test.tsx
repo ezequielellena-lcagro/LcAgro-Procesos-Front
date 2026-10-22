@@ -130,16 +130,17 @@ async function sinConsultar() {
 }
 async function abrirResumen() {
   fireEvent.click(screen.getByRole("tab", { name: "Resumen" }));
-  await screen.findByRole("table", { name: "Totales del resumen" });
+  await screen.findByText("Seguimiento de solicitudes");
   await sinConsultar();
 }
-function tabla() {
-  return screen.getByRole("table", { name: "Totales del resumen" });
+/** La tarjeta de un total, por su rótulo: los totales dejaron de ser una tabla de once columnas. */
+function celda(titulo: string) {
+  const rotulo = screen.getByText(titulo, { selector: "div" });
+  return rotulo.parentElement!;
 }
-function celda(titulo: string, table = tabla()) {
-  const encabezados = within(table).getAllByRole("columnheader");
-  const index = encabezados.findIndex((h) => h.textContent === titulo);
-  return within(table).getAllByRole("row")[1].children[index];
+/** La línea de avisos, donde ahora viven las excepciones que antes eran cuatro columnas de ceros. */
+function avisos() {
+  return screen.queryByText(/^Avisos:/)?.parentElement ?? null;
 }
 async function grupos(n = 51) {
   for (let i = 0; i < n; i++) await solicitar(i + 1, 101 + i);
@@ -182,16 +183,18 @@ async function elegirCatalogo(etiqueta: string, buscado: string, opcion: string)
 }
 
 describe("Resumen de Cupos", () => {
-  it("aparece primero, conserva entrada por Solicitudes y consulta sólo al activar Resumen", async () => {
+  // Resumen es la pantalla de entrada de Cupos: lo primero que se pidió ver es cuánto hay. El costo
+  // es que la consulta del resumen —que pega a MacroGest— corre al abrir, y no recién al elegirla.
+  it("es la solapa de entrada y consulta al abrir Cupos", async () => {
     mostrar();
     expect(screen.getAllByRole("tab")[0]).toHaveTextContent("Resumen");
-    expect(screen.getByRole("tab", { name: "Solicitudes a terminal" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.getByRole("tab", { name: "Resumen" })).toHaveAttribute("aria-selected", "true");
+    await screen.findByText("Seguimiento de solicitudes");
+    await sinConsultar();
+    expect(consultas).toHaveLength(1);
+    // Las otras solapas no consultan hasta que se abren.
+    fireEvent.click(screen.getByRole("tab", { name: "Solicitudes a terminal" }));
     await screen.findByText(/Todavía no hay solicitudes/);
-    expect(consultas).toHaveLength(0);
-    await abrirResumen();
     expect(consultas).toHaveLength(1);
   });
   it("vacío muestra unidades, alcance, ausencia y filtros solicitados; permite abrir Recibidos", async () => {
@@ -203,7 +206,7 @@ describe("Resumen de Cupos", () => {
     expect(screen.getByLabelText("Terminal solicitada")).toBeInTheDocument();
     expect(screen.queryByLabelText("Circuito")).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Productor/)).not.toBeInTheDocument();
-    expect(celda("Respuesta vigente")).toHaveTextContent("Sin respuesta");
+    expect(celda("Confirmados")).toHaveTextContent("Sin respuesta");
     expect(celda("Por recibir")).toHaveTextContent("Sin respuesta");
     expect(screen.getByText("No hay solicitudes para estas fechas y filtros.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Siguiente" })).toBeDisabled();
@@ -229,17 +232,19 @@ describe("Resumen de Cupos", () => {
     await solicitar(4, 999);
     mostrar();
     await abrirResumen();
-    expect(celda("Solicitudes")).toHaveTextContent("1 cerradas");
+    expect(celda("Solicitados")).toHaveTextContent("1 cerradas");
     expect(celda("Solicitados")).toHaveTextContent("26");
-    expect(celda("Respuesta vigente")).toHaveTextContent("3");
-    expect(celda("Respuesta vigente")).toHaveTextContent("2 solicitudes sin respuesta");
-    expect(celda("Respuesta vigente")).toHaveTextContent("1 solicitud con respuesta cero");
-    expect(celda("Por recibir")).toHaveTextContent("1Parcial: 2 solicitudes sin respuesta");
-    expect(celda("Por otorgar")).toHaveTextContent("1Disponibles");
-    expect(celda("Otros sin otorgar")).toHaveTextContent("1No disponibles");
-    expect(celda("Anulados")).toHaveTextContent("1");
-    expect(celda("Carga con otra fecha")).toHaveTextContent("2");
-    expect(celda("Recepción en otra terminal")).toHaveTextContent("2");
+    expect(celda("Confirmados")).toHaveTextContent("3");
+    expect(celda("Confirmados")).toHaveTextContent("2 solicitudes sin responder");
+    expect(celda("Confirmados")).toHaveTextContent("1 con respuesta cero");
+    expect(celda("Por recibir")).toHaveTextContent("Parcial: 2 solicitudes sin responder");
+    expect(celda("Disponibles")).toHaveTextContent("1");
+    // Las excepciones se nombran en la línea de avisos; como columnas eran cuatro ceros por fila.
+    const linea = avisos()!;
+    expect(linea).toHaveTextContent("1 anulados");
+    expect(linea).toHaveTextContent("1 sin otorgar que no están disponibles");
+    expect(linea).toHaveTextContent("2 con carga en otra fecha");
+    expect(linea).toHaveTextContent("2 recibidos en otra terminal");
     const table = screen.getByRole("table", { name: "Grupos del resumen" });
     expect(within(table).getByText("999")).toBeInTheDocument();
     expect(within(table).getAllByText("Soja / 2025-2026")).toHaveLength(2);
@@ -248,9 +253,9 @@ describe("Resumen de Cupos", () => {
     await responder(await solicitar(), 0);
     mostrar();
     await abrirResumen();
-    expect(celda("Respuesta vigente")).toHaveTextContent("0");
-    expect(celda("Respuesta vigente")).toHaveTextContent("1 solicitud con respuesta cero");
-    expect(celda("Respuesta vigente")).not.toHaveTextContent("Sin respuesta");
+    expect(celda("Confirmados")).toHaveTextContent("0");
+    expect(celda("Confirmados")).toHaveTextContent("1 con respuesta cero");
+    expect(celda("Confirmados")).not.toHaveTextContent("Sin respuesta");
     expect(celda("Por recibir")).toHaveTextContent("0");
   });
   it("mantiene filtros en borrador hasta aplicar y conserva criterios aplicados en navegación", async () => {
@@ -380,7 +385,7 @@ describe("Resumen de Cupos", () => {
     ).not.toBeInTheDocument();
     fallo = false;
     fireEvent.click(screen.getByRole("button", { name: "Reintentar" }));
-    await screen.findByRole("table", { name: "Totales del resumen" });
+    await screen.findByText("Seguimiento de solicitudes");
   });
   it("recarga y fallo con caché muestran Datos anteriores, bloquean navegación y conservan los totales hasta éxito", async () => {
     await grupos();
@@ -547,25 +552,28 @@ describe("Resumen de Cupos", () => {
       });
       await waitFor(() => expect(consultas.length).toBe(n + 1));
       await sinConsultar();
-      const titulo =
-        operacion === "respuesta"
-          ? "Respuesta vigente"
-          : operacion === "recepción"
-            ? "Recibidos"
-            : operacion === "otorgamiento"
-              ? "Otorgados"
-              : operacion === "anulación"
-                ? "Anulados"
-                : "Solicitudes";
-      expect(celda(titulo)).toHaveTextContent(
-        operacion === "respuesta"
-          ? "3"
-          : operacion === "recepción"
-            ? "2"
-            : operacion === "cierre"
-              ? "1 cerradas"
-              : "1",
-      );
+      if (operacion === "anulación") {
+        // Anulados vive en la línea de avisos, no en una tarjeta.
+        expect(avisos()!).toHaveTextContent("1 anulados");
+      } else {
+        const titulo =
+          operacion === "respuesta"
+            ? "Confirmados"
+            : operacion === "recepción"
+              ? "Recibidos"
+              : operacion === "otorgamiento"
+                ? "Otorgados"
+                : "Solicitados";
+        expect(celda(titulo)).toHaveTextContent(
+          operacion === "respuesta"
+            ? "3"
+            : operacion === "recepción"
+              ? "2"
+              : operacion === "cierre"
+                ? "1 cerradas"
+                : "1",
+        );
+      }
     },
   );
   it("intento incierto de Otorgar bloquea nueva tab Resumen y reintenta cuerpo/clave congelados con store real", async () => {

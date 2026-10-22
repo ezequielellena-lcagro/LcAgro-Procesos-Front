@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { useAuth } from "@/features/auth/auth-context";
 import { ErrorState } from "@/shared/components/error-state";
 import { PageHeader } from "@/shared/components/page-header";
-import { FilterBar, FilterField } from "@/shared/components/filter-bar";
+import { FilterActions, FilterBar, FilterField } from "@/shared/components/filter-bar";
 import { fecha } from "../format";
 import { referenciaFlota, textoFlotaValido, trimFlota } from "../lib/flota";
 import { useFichaFlota, useFlota } from "../queries/use-logistica-flota";
@@ -151,14 +151,22 @@ export function FletePage() {
             <option value="false">Inactivas</option>
           </Select>
         </FilterField>
-        <Button type="submit" variant="outline">
-          Aplicar filtros
-        </Button>
-        {filtroInvalido && (
-          <p role="alert" className="basis-full text-sm text-rojo">
-            Revisá el texto de búsqueda.
-          </p>
-        )}
+        <FilterActions
+          onClear={() => {
+            setBuscar("");
+            setEstado("");
+            setFiltroInvalido(false);
+            setAplicacion((n) => n + 1);
+            setFiltros({});
+          }}
+          aviso={
+            filtroInvalido && (
+              <p role="alert" className="mr-auto text-sm text-rojo">
+                Revisá el texto de búsqueda.
+              </p>
+            )
+          }
+        />
       </FilterBar>
       {conflicto && (
         <p role="alert" className="mb-4 text-sm text-rojo">

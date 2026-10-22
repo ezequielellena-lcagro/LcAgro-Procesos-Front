@@ -644,7 +644,7 @@ describe("C7 garantías adicionales", () => {
     expect(radio).not.toBeChecked();
     fireEvent.click(radio);
     expect(radio).toBeChecked();
-    fireEvent.change(screen.getByLabelText("Grupo ERP (opcional)"), { target: { value: "0" } });
+    fireEvent.change(screen.getByLabelText("Plan de carga (opcional)"), { target: { value: "0" } });
     expect(radio).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Buscar grupo" }));
     await waitFor(() => expect(llamadas.at(-1)!.searchParams.get("grupo")).toBe("0"));

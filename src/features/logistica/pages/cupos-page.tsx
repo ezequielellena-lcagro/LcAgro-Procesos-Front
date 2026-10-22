@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
@@ -9,15 +10,21 @@ import type { Cupo, CupoErp, Solicitud } from "../types";
 import { HistorialDialog } from "../components/historial-dialog";
 import { AvisoDemo } from "../components/aviso-demo";
 import { PeriodoFiltro } from "../components/periodo-filtro";
-import { RecepcionDialog } from "../components/recepcion-dialog";
-import { RespuestaDialog, SolicitudDialog } from "../components/solicitud-dialog";
+import { RespuestaDialog } from "../components/solicitud-dialog";
 import { TablaLogistica } from "../components/tabla-logistica";
 import { OtorgarPanel } from "../components/otorgar-panel";
 import { Paginacion } from "../components/paginacion";
 import { usePaginacion } from "../lib/paginacion";
 import { kgErp } from "../lib/seguimiento";
 import { CuposFiltros } from "../components/cupos-filtros";
-import { campaniaValida, filtrosCuposVacios, paramsCupos } from "../lib/filtros-cupos";
+import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
+import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
+import {
+  campaniaValida,
+  filtrosCuposVacios,
+  paramsCupos,
+  paramsCuposErp,
+} from "../lib/filtros-cupos";
 import { ResumenPanel } from "../components/resumen-panel";
 
 /** Celda sin valor: el guion del resto de la app, no una frase. */
@@ -30,10 +37,23 @@ const SIN_DATO = "—";
  */
 const oDash = (valor: string | number | null | undefined) =>
   typeof valor === "string" && !valor.trim() ? SIN_DATO : (valor ?? SIN_DATO);
+/**
+ * Filas por página de la grilla de MacroGest.
+ *
+ * Es la tabla más ancha de Cupos (trece columnas, con razones sociales que parten en dos
+ * renglones): de a 50 obligaba a scrollear hasta perder los filtros de vista. Las demás solapas
+ * siguen con el tramo de 50 de `useListado`.
+ */
+const TRAMO_ERP = 10;
 export function CuposPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  // Volver de una recepción abre la solapa donde quedaron esos cupos, no la de arranque.
+  const solapaInicial = (useLocation().state as { tab?: string } | null)?.tab;
   const gestionar = user?.roles.includes("logistica-cupos") ?? false;
-  const [tab, setTab] = useState("solicitudes");
+  // Resumen es la pantalla de entrada: lo primero que se pidió ver al abrir Cupos es cuánto hay,
+  // no el formulario de solicitudes.
+  const [tab, setTab] = useState(solapaInicial ?? "resumen");
   const [otorgarInicial, setOtorgarInicial] = useState<Cupo | null>(null);
   const [otorgarLocked, setOtorgarLocked] = useState(false);
   const [periodo, setPeriodo] = useState(() => periodoInicial());
@@ -46,15 +66,15 @@ export function CuposPage() {
   const [erpVersion, setErpVersion] = useState(0);
   const reiniciarCupos = () => setCuposVersion((v) => v + 1);
   const reiniciarErp = () => setErpVersion((v) => v + 1);
-  const [nueva, setNueva] = useState(false);
   const [respuesta, setRespuesta] = useState<{ solicitud: Solicitud; cerrar?: boolean } | null>(
     null,
   );
-  const [recepcion, setRecepcion] = useState<{ solicitud?: Solicitud } | null>(null);
   const [historia, setHistoria] = useState<{ recurso: string; id: string } | null>(null);
+  const [solBorrador, setSolBorrador] = useState(filtrosComercialesVacios);
+  const [solComercial, setSolComercial] = useState(filtrosComercialesVacios);
   const solicitudes = useListado<Solicitud>(
     "solicitudes-terminal",
-    periodo,
+    { ...periodo, ...paramsComerciales(solComercial) },
     cursorPropio,
     tab === "solicitudes",
   );
@@ -67,7 +87,7 @@ export function CuposPage() {
   );
   const erp = useListado<CupoErp>(
     "cupos/macrogest",
-    { ...erpPeriodo, ...paramsCupos(erpFiltros) },
+    { ...erpPeriodo, ...paramsCuposErp(erpFiltros) },
     (f) => ({
       despuesFecha: f.fechaCarga,
       despuesContrato: f.contrato,
@@ -76,9 +96,10 @@ export function CuposPage() {
     }),
     tab === "erp",
     { version: erpVersion },
+    TRAMO_ERP,
   );
-  // Cada grilla muestra UN tramo de 50 por vez, como el resto de la app. El scroll infinito
-  // dejaba cientos de filas colgando abajo de los filtros y sin forma de volver atrás.
+  // Cada grilla muestra UN tramo por vez (50, salvo MacroGest), como el resto de la app. El
+  // scroll infinito dejaba cientos de filas colgando abajo de los filtros y sin forma de volver.
   const paginaSolicitudes = usePaginacion(solicitudes);
   const paginaCupos = usePaginacion(cupos);
   const paginaErp = usePaginacion(erp);
@@ -90,10 +111,20 @@ export function CuposPage() {
         actions={
           gestionar && (
             <>
-              <Button variant="outline" disabled={otorgarLocked} onClick={() => setNueva(true)}>
+              {/* Solicitar es una pantalla propia: la grilla de contratos no entra en un modal.
+                  Va como botón y no como enlace para poder bloquearlo mientras hay un otorgamiento
+                  sin confirmar, igual que el resto de las acciones de la cabecera. */}
+              <Button
+                variant="outline"
+                disabled={otorgarLocked}
+                onClick={() => void navigate("/logistica/cupos/solicitar")}
+              >
                 Solicitar cupos
               </Button>
-              <Button disabled={otorgarLocked} onClick={() => setRecepcion({})}>
+              <Button
+                disabled={otorgarLocked}
+                onClick={() => void navigate("/logistica/cupos/recibir")}
+              >
                 Recibir cupos
               </Button>
             </>
@@ -121,7 +152,23 @@ export function CuposPage() {
           <ResumenPanel activo={tab === "resumen"} />
         </TabsContent>
         <TabsContent value="solicitudes">
-          <PeriodoFiltro value={periodo} onChange={setPeriodo} />
+          <PeriodoFiltro
+            value={periodo}
+            onChange={setPeriodo}
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSolComercial(solBorrador);
+            }}
+          >
+            <FiltrosComercialesCampos
+              value={solBorrador}
+              onChange={setSolBorrador}
+              onClear={() => {
+                setSolBorrador(filtrosComercialesVacios);
+                setSolComercial(filtrosComercialesVacios);
+              }}
+            />
+          </PeriodoFiltro>
           <TablaLogistica
             titulo="Solicitudes a terminal"
             filas={paginaSolicitudes.filas}
@@ -168,7 +215,9 @@ export function CuposPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => setRecepcion({ solicitud: f })}
+                          onClick={() =>
+                            void navigate(`/logistica/cupos/recibir?solicitud=${f.id}`)
+                          }
                         >
                           Recibir
                         </Button>
@@ -312,7 +361,7 @@ export function CuposPage() {
                 setErpPeriodo(v);
                 reiniciarErp();
               }}
-              etiqueta="Fecha de carga ERP"
+              etiqueta="Fecha de carga"
               maxDias={31}
               onSubmit={(e) => {
                 e.preventDefault();
@@ -342,11 +391,11 @@ export function CuposPage() {
             pie={<Paginacion {...paginaErp} unidad={{ singular: "cupo", plural: "cupos" }} />}
             columnas={[
               { titulo: "Contrato", celda: (f) => f.contrato },
-              { titulo: "Grupo / cupo", celda: (f) => `${f.grupo} / ${f.cupo}` },
+              { titulo: "Plan de carga / cupo", celda: (f) => `${f.grupo} / ${f.cupo}` },
               { titulo: "Código", celda: (f) => oDash(f.codigoTerminal) },
               { titulo: "Carga", celda: (f) => (f.fechaCarga ? fecha(f.fechaCarga) : SIN_DATO) },
               {
-                titulo: "Alta ERP",
+                titulo: "Alta en MacroGest",
                 celda: (f) => (f.fechaAltaErp ? fecha(f.fechaAltaErp) : SIN_DATO),
               },
               {
@@ -356,16 +405,16 @@ export function CuposPage() {
               },
               // Productor, cargador y destino salen de la cabecera del plan: sin cabecera los tres
               // vienen nulos del ERP, así que el guion ya dice todo lo que había para decir.
-              { titulo: "Productor del plan ERP", celda: (f) => oDash(f.productorPlan) },
-              { titulo: "Cargador del plan ERP", celda: (f) => oDash(f.cargadorPlan) },
+              { titulo: "Productor del plan", celda: (f) => oDash(f.productorPlan) },
+              { titulo: "Cargador del plan", celda: (f) => oDash(f.cargadorPlan) },
               {
                 titulo: "Carta de Porte",
                 celda: (f) => (f.tieneCartaPorte ? "Presente" : "Pendiente"),
               },
               { titulo: "CTG", celda: (f) => oDash(f.ctg) },
               { titulo: "Patente", celda: (f) => oDash(f.patenteChasis) },
-              { titulo: "Carga ERP", numero: true, celda: (f) => kgErp(f.kgCargaErp) },
-              { titulo: "Descarga ERP", numero: true, celda: (f) => kgErp(f.kgDescargaErp) },
+              { titulo: "Kg de carga", numero: true, celda: (f) => kgErp(f.kgCargaErp) },
+              { titulo: "Kg de descarga", numero: true, celda: (f) => kgErp(f.kgDescargaErp) },
             ]}
           />
         </TabsContent>
@@ -377,21 +426,11 @@ export function CuposPage() {
           />
         </TabsContent>
       </Tabs>
-      {nueva && <SolicitudDialog onClose={() => setNueva(false)} />}
       {respuesta && (
         <RespuestaDialog
           solicitud={respuesta.solicitud}
           cerrarSolicitud={respuesta.cerrar}
           onClose={() => setRespuesta(null)}
-        />
-      )}
-      {recepcion && (
-        <RecepcionDialog
-          solicitud={recepcion.solicitud}
-          onClose={() => {
-            setRecepcion(null);
-            setTab("recibidos");
-          }}
         />
       )}
       {historia && <HistorialDialog {...historia} onClose={() => setHistoria(null)} />}

@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { FilterField } from "@/shared/components/filter-bar";
+import { FilterActions, FilterField } from "@/shared/components/filter-bar";
+import { uuid } from "@/lib/uuid";
 import { fecha, hoy, kg, periodoInicial, sumarDias } from "../format";
 import { cursorPropio, useListado } from "../queries/use-logistica";
 import type { Cupo, OtorgarBody, Pedido, Preventa } from "../types";
+import { CampaniaSelect } from "./campania-select";
 import { CatalogoSelect } from "./catalogo-select";
+import { ColaPrioridad } from "./cola-prioridad";
+import { Elegir } from "./elegir";
 import { PreventaPicker } from "./contrato-picker";
 import { OtorgamientoDialog, type RevisionOtorgamiento } from "./otorgamiento-dialog";
 import { PeriodoFiltro } from "./periodo-filtro";
@@ -69,7 +72,7 @@ export function OtorgarPanel({
   const [revision, setRevision] = useState<RevisionOtorgamiento | null>(null);
   const [mensaje, setMensaje] = useState("");
   const [advertencias, setAdvertencias] = useState<string[]>([]);
-  const [consultaId] = useState(() => crypto.randomUUID());
+  const [consultaId] = useState(() => uuid());
   const [paginaVersion, setPaginaVersion] = useState(0);
   const paginaContexto = { otorgar: consultaId, version: paginaVersion };
   const reiniciarPaginas = () => setPaginaVersion((version) => version + 1);
@@ -99,6 +102,18 @@ export function OtorgarPanel({
   );
   const grupo = seleccion[0];
   const limite = modo === "pedido" && pedido ? Math.min(200, pedido.pendientes) : 200;
+  /** Por qué un cupo disponible no se puede sumar a esta selección. */
+  const motivoCupo = (f: Cupo): string | null => {
+    if (!f.disponibleParaOtorgar) return "Ya asignado o no disponible";
+    if (grupo != null && !compatible(f, grupo)) return "Otro cereal o campaña que los elegidos";
+    if (modo === "pedido" && pedido != null && !compatible(f, pedido))
+      return "No coincide con el cereal o campaña del pedido";
+    if (seleccion.length >= limite)
+      return modo === "pedido" && pedido
+        ? `Ya cubriste los ${limite} pendientes del pedido`
+        : `Máximo ${limite} cupos por operación`;
+    return null;
+  };
   const valido =
     seleccion.length > 0 &&
     seleccion.length <= limite &&
@@ -169,14 +184,10 @@ export function OtorgarPanel({
             modoFiltro
             onChange={(producto) => setBorrador({ ...borrador, producto })}
           />
-          <FilterField label="Campaña">
-            <Input
-              className="w-32"
-              value={borrador.campania}
-              placeholder="2025-2026"
-              onChange={(e) => setBorrador({ ...borrador, campania: e.target.value })}
-            />
-          </FilterField>
+          <CampaniaSelect
+            value={borrador.campania}
+            onChange={(campania) => setBorrador({ ...borrador, campania })}
+          />
           <CatalogoSelect
             className="w-56"
             tipo="destinos"
@@ -197,27 +208,21 @@ export function OtorgarPanel({
               <option value="propia">Propia</option>
             </Select>
           </FilterField>
-          <div className="flex flex-wrap gap-2">
-            <Button type="submit" variant="outline" disabled={!campaniaValida}>
-              Aplicar filtros
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setBorrador(filtrosVacios);
-                setFiltros(filtrosVacios);
-                limpiar();
-              }}
-            >
-              Limpiar filtros
-            </Button>
-          </div>
-          {!campaniaValida && (
-            <p role="alert" className="basis-full text-sm text-rojo">
-              Ingresá una campaña como 2025-2026.
-            </p>
-          )}
+          <FilterActions
+            aplicarDeshabilitado={!campaniaValida}
+            onClear={() => {
+              setBorrador(filtrosVacios);
+              setFiltros(filtrosVacios);
+              limpiar();
+            }}
+            aviso={
+              !campaniaValida && (
+                <p role="alert" className="mr-auto text-sm text-rojo">
+                  Ingresá una campaña como 2025-2026.
+                </p>
+              )
+            }
+          />
         </PeriodoFiltro>
       </fieldset>
       {gestionar && (
@@ -281,6 +286,7 @@ export function OtorgarPanel({
               titulo="Cupos disponibles para otorgar"
               filas={disponibles.data?.pages.flatMap((p) => p.filas) ?? []}
               clave={(f) => f.id}
+              elegida={(f) => seleccion.some((c) => c.id === f.id)}
               cargando={disponibles.isLoading}
               error={disponibles.error}
               reintentar={() => void disponibles.refetch()}
@@ -295,20 +301,12 @@ export function OtorgarPanel({
                         titulo: "Elegir",
                         celda: (f: Cupo) => {
                           const elegido = seleccion.some((c) => c.id === f.id);
-                          const incompatible =
-                            (grupo != null && !compatible(f, grupo)) ||
-                            (modo === "pedido" && pedido != null && !compatible(f, pedido));
                           return (
-                            <input
-                              type="checkbox"
-                              aria-label={`Elegir cupo ${f.contratoVenta} fila ${f.ordinal}`}
+                            <Elegir
+                              tipo="checkbox"
+                              etiqueta={`Elegir cupo ${f.contratoVenta} fila ${f.ordinal}`}
                               checked={elegido}
-                              disabled={
-                                !elegido &&
-                                (!f.disponibleParaOtorgar ||
-                                  incompatible ||
-                                  seleccion.length >= limite)
-                              }
+                              motivo={motivoCupo(f)}
                               onChange={() => {
                                 setSeleccion((actual) => {
                                   if (actual.some((c) => c.id === f.id))
@@ -354,6 +352,7 @@ export function OtorgarPanel({
               titulo="Pedidos pendientes de otorgamiento"
               filas={pendientes.data?.pages.flatMap((p) => p.filas) ?? []}
               clave={(f) => f.id}
+              elegida={(f) => pedido?.id === f.id}
               cargando={pendientes.isLoading}
               error={pendientes.error}
               reintentar={() => void pendientes.refetch()}
@@ -367,12 +366,12 @@ export function OtorgarPanel({
                       {
                         titulo: "Elegir",
                         celda: (f: Pedido) => (
-                          <input
-                            type="radio"
+                          <Elegir
+                            tipo="radio"
                             name="pedido-otorgar"
-                            aria-label={`Elegir pedido de ${f.clienteNombre ?? `Cliente ${f.clienteNumero}`}`}
+                            etiqueta={`Elegir pedido de ${f.clienteNombre ?? `Cliente ${f.clienteNumero}`}`}
                             checked={pedido?.id === f.id}
-                            disabled={f.pendientes < 1}
+                            motivo={f.pendientes < 1 ? "Sin cupos pendientes" : null}
                             onChange={() => {
                               reiniciarPaginas();
                               setPedido(structuredClone(f));
@@ -418,6 +417,15 @@ export function OtorgarPanel({
           </div>
         </fieldset>
       </div>
+      {/* A quién le toca: el orden que el área usuaria ya usaba en su planilla. Va DEBAJO de los
+          cupos para que se lea "tengo esto · a quién se lo doy", que es como lo cuentan ellos. */}
+      <ColaPrioridad
+        campania={
+          /^\d{4}-\d{4}$/.test(filtros.campania) ? Number(filtros.campania.replace("-", "")) : null
+        }
+        producto={filtros.producto || undefined}
+        activo
+      />
       {gestionar && modo === "cliente" && (
         <fieldset disabled={revision != null} className="min-w-0 space-y-4">
           <div className="max-w-lg">

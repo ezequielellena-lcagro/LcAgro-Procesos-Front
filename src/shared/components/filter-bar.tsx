@@ -1,4 +1,5 @@
 import type { FormEventHandler, ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,5 +54,40 @@ export function FilterField({
       {label}
       {children}
     </label>
+  );
+}
+
+/**
+ * Acciones de una barra de filtros: SIEMPRE abajo a la derecha, en su propia fila.
+ *
+ * Una sola forma para toda la app. Antes cada pantalla los metía como dos campos más de la grilla
+ * de filtros: quedaban en el medio, al lado de "Campaña", y encima con la misma pinta entre sí
+ * —`outline` y `ghost`— así que no se distinguía cuál aplicaba y cuál borraba.
+ *
+ * `basis-full` fuerza el renglón propio dentro del `flex-wrap` de la barra; `justify-end` los
+ * manda a la derecha. Aplicar es el botón principal; limpiar queda en segundo plano.
+ */
+export function FilterActions({
+  aplicarDeshabilitado = false,
+  onClear,
+  aviso,
+}: {
+  aplicarDeshabilitado?: boolean;
+  onClear: () => void;
+  /** Por qué no se puede aplicar, debajo de los botones. */
+  aviso?: ReactNode;
+}) {
+  return (
+    <div className="basis-full">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line-soft pt-3">
+        {aviso}
+        <Button type="button" variant="ghost" onClick={onClear}>
+          Limpiar filtros
+        </Button>
+        <Button type="submit" disabled={aplicarDeshabilitado}>
+          Aplicar filtros
+        </Button>
+      </div>
+    </div>
   );
 }

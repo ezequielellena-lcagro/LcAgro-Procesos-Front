@@ -25,3 +25,15 @@ export function campaniaValida({ campania }: { campania: string }) {
 export function paramsCupos(filtros: FiltrosCupos) {
   return Object.fromEntries(Object.entries(filtros).filter(([, valor]) => valor !== ""));
 }
+/**
+ * Igual, para el listado de MacroGest: ahí la campaña es un entero (`20252026`) y no hay circuito,
+ * que es una clasificación propia y no un dato del ERP.
+ */
+export function paramsCuposErp({ campania, contrato, producto, destinoCodigo }: FiltrosCupos) {
+  return {
+    ...Object.fromEntries(
+      Object.entries({ contrato, producto, destinoCodigo }).filter(([, valor]) => valor !== ""),
+    ),
+    ...(campania ? { campania: Number(campania.replace("-", "")) } : {}),
+  };
+}

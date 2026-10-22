@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 import { toAppError } from "@/lib/api-error";
 import { apiClient } from "@/lib/api-client";
+import { uuid } from "@/lib/uuid";
 import type { Detalle, Evento, Pagina, Periodo, Referencia } from "../types";
 
 export function useListado<T>(
@@ -29,7 +30,7 @@ export function useListado<T>(
       page.hayMas && page.filas.length ? siguiente(page.filas[page.filas.length - 1]) : undefined,
   });
 }
-export function useCatalogo(tipo: "clientes" | "productos" | "destinos", buscar = "") {
+export function useCatalogo(tipo: "clientes" | "productos" | "destinos" | "campanias", buscar = "") {
   return useListado<Referencia>(
     `catalogos/${tipo}`,
     { buscar: buscar.trim() || undefined },
@@ -83,7 +84,7 @@ export function useOperacion<T>(ruta: string, metodo: "post" | "put" = "post") {
     mutationFn: async (body: object) => {
       const cuerpo = JSON.stringify(body);
       if (intento.current?.cuerpo !== cuerpo)
-        intento.current = { cuerpo, clave: crypto.randomUUID() };
+        intento.current = { cuerpo, clave: uuid() };
       return (
         await apiClient.request<T>({
           url: `/logistica/${ruta}`,

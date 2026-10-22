@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/shared/components/error-state";
 export interface Columna<T> {
   titulo: string;
-  celda: (fila: T) => ReactNode;
+  /** `indice` es la posición en la página; lo usa la columna de prioridad de la cola de entrega. */
+  celda: (fila: T, indice: number) => ReactNode;
   numero?: boolean;
 }
 interface Props<T> {
@@ -23,6 +24,13 @@ interface Props<T> {
    * "Cargar más filas": las dos cosas juntas serían dos formas de avanzar el mismo listado.
    */
   pie?: ReactNode;
+  /**
+   * Qué fila está elegida, para remarcarla.
+   *
+   * Es la única señal de la elección que hace falta: repetir la fila elegida en una tabla aparte o
+   * en una línea de texto decía lo mismo que el casillero marcado.
+   */
+  elegida?: (fila: T) => boolean;
 }
 export function TablaLogistica<T>({
   titulo,
@@ -37,6 +45,7 @@ export function TablaLogistica<T>({
   cargandoMas,
   vacio = "No hay registros en este período.",
   pie,
+  elegida,
 }: Props<T>) {
   return (
     <section className="overflow-hidden rounded-card border border-line bg-panel shadow-card">
@@ -58,25 +67,35 @@ export function TablaLogistica<T>({
             </tr>
           </thead>
           <tbody>
-            {filas.map((f, i) => (
+            {filas.map((f, i) => {
+              const activa = elegida?.(f) ?? false;
+              return (
               <tr
                 key={clave(f)}
                 // Franjas alternadas y hover por encima, igual que la `DataTable` del resto de la
-                // app: seguir una fila con la vista es la mitad del trabajo de leer la tabla.
+                // app: seguir una fila con la vista es la mitad del trabajo de leer la tabla. La
+                // elegida se lleva el acento, con una guía a la izquierda para ubicarla de un vistazo.
                 className={`border-b border-line-soft last:border-0 hover:bg-line-soft/90 ${
-                  i % 2 === 1 ? "bg-line-soft/45" : ""
+                  activa
+                    ? "bg-clementina/20 shadow-[inset_3px_0_0_0_var(--color-clementina-deep)]"
+                    : i % 2 === 1
+                      ? "bg-line-soft/45"
+                      : ""
                 }`}
               >
                 {columnas.map((c) => (
                   <td
                     key={c.titulo}
-                    className={`px-4 py-3 align-top ${c.numero ? "text-right tabular-nums" : ""}`}
+                    className={`px-4 py-3 align-top ${c.numero ? "text-right tabular-nums" : ""} ${
+                      activa ? "font-medium" : ""
+                    }`}
                   >
-                    {c.celda(f)}
+                    {c.celda(f, i)}
                   </td>
                 ))}
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

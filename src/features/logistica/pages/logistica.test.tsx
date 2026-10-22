@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 import type { RolNombre } from "@/features/auth/types";
@@ -12,6 +12,8 @@ import { hoy, sumarDias } from "../format";
 import { PedidoDialog } from "../components/pedido-dialog";
 import { PedidosPage } from "./pedidos-page";
 import { CuposPage } from "./cupos-page";
+import { SolicitarCuposPage } from "./solicitar-cupos-page";
+import { RecibirCuposPage } from "./recibir-cupos-page";
 const sesion = vi.hoisted(() => ({ roles: ["logistica-lectura"] as RolNombre[] }));
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => ({ user: { id: 8, nombre: "Operador ficticio", roles: sesion.roles } }),
@@ -31,6 +33,22 @@ function mostrar(children: ReactNode) {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+function mostrarCupos() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={["/logistica/cupos"]}>
+        <Routes>
+          <Route path="/logistica/cupos" element={<CuposPage />} />
+          <Route path="/logistica/cupos/solicitar" element={<SolicitarCuposPage />} />
+          <Route path="/logistica/cupos/recibir" element={<RecibirCuposPage />} />
+        </Routes>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -57,10 +75,12 @@ describe("Logística operativa", () => {
     );
     const cerrar = vi.fn();
     mostrar(<PedidoDialog onClose={cerrar} />);
-    fireEvent.click(await screen.findByRole("radio", { name: "Elegir preventa PF-DEMO/1" }));
-    const seleccion = await screen.findByRole("table", { name: "Preventa seleccionada" });
-    expect(within(seleccion).getByText("Productor ficticio")).toBeInTheDocument();
-    expect(within(seleccion).getByText("300.000 kg")).toBeInTheDocument();
+    const elegir = await screen.findByRole("radio", { name: "Elegir preventa PF-DEMO/1" });
+    fireEvent.click(elegir);
+    // La elección se lee en la fila remarcada de la grilla; no se repite en otra tabla ni en texto.
+    expect(elegir).toBeChecked();
+    expect(screen.queryByRole("table", { name: "Preventa seleccionada" })).not.toBeInTheDocument();
+    expect(elegir.closest("tr")).toHaveClass("bg-clementina/20");
     fireEvent.click(screen.getByRole("button", { name: "Guardar pedido" }));
     expect(await screen.findByRole("button", { name: "Reintentar operación" })).toBeInTheDocument();
     expect(screen.getByLabelText("Cupos que pide")).toBeDisabled();
@@ -80,8 +100,8 @@ describe("Logística operativa", () => {
     const dialogo = await screen.findByRole("dialog", { name: "Nuevo pedido" });
     expect(within(dialogo).getByLabelText("Buscar preventa")).toHaveValue("PF-DEMO/1");
     expect(
-      within(dialogo).getByRole("table", { name: "Preventa seleccionada" }),
-    ).toBeInTheDocument();
+      within(dialogo).queryByRole("table", { name: "Preventa seleccionada" }),
+    ).not.toBeInTheDocument();
     // Los datos del pedido van ENTRE los filtros y la grilla: cargarlos no exige cruzar las filas.
     const cupos = within(dialogo).getByLabelText("Cupos que pide");
     const grilla = await within(dialogo).findByRole("table", { name: "Elegir preventa" });
@@ -89,11 +109,27 @@ describe("Logística operativa", () => {
   });
   it("registra cero sin crear cupos y luego recibe filas con seguimiento", async () => {
     sesion.roles = ["logistica-cupos"];
-    mostrar(<CuposPage />);
+    mostrarCupos();
     fireEvent.click(screen.getByRole("button", { name: "Solicitar cupos" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Elegir V-DEMO/1" }));
+    // Pantalla propia, no modal: la grilla paginada arriba y los datos de la solicitud abajo.
+    await screen.findByRole("heading", { name: "Solicitar cupos a terminal" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    const elegirContrato = await screen.findByRole("radio", { name: "Elegir contrato V-DEMO/1" });
+    fireEvent.click(elegirContrato);
+    // El contrato elegido ya no se repite en un panel de cabecera: queda remarcado en la grilla y
+    // el formulario, que va DEBAJO de ella, lo nombra en su primera línea.
+    expect(screen.queryByRole("region", { name: "Contrato elegido" })).not.toBeInTheDocument();
+    const grilla = screen.getByRole("table", { name: "Elegir contrato de venta" });
+    const linea = screen.getByText(/^Contrato V-DEMO\/1 ·/);
+    expect(grilla.compareDocumentPosition(linea) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Segundo clic sobre el mismo radio: suelta el contrato y el formulario vuelve a bloquearse.
+    fireEvent.click(elegirContrato);
+    expect(elegirContrato).not.toBeChecked();
+    expect(screen.getByLabelText("Cantidad de cupos")).toBeDisabled();
+    fireEvent.click(elegirContrato);
     fireEvent.change(screen.getByLabelText("Cantidad de cupos"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar solicitud" }));
+    // Guardar vuelve a Cupos con la solicitud ya en la grilla.
     fireEvent.click(await screen.findByRole("button", { name: "Respuesta" }));
     fireEvent.change(screen.getByLabelText("Referencia del mensaje"), {
       target: { value: "Mensaje ficticio" },
@@ -104,6 +140,10 @@ describe("Logística operativa", () => {
     expect(within(tabla).queryByText("Sin respuesta")).not.toBeInTheDocument();
     expect(within(tabla).getAllByText("0")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "Recibir" }));
+    // Pantalla propia: el formulario recién se habilita cuando se sabe sobre qué contrato opera.
+    await screen.findByRole("heading", { name: "Recibir cupos de terminal" });
+    const solicitudElegida = await screen.findByRole("region", { name: "Solicitud elegida" });
+    await within(solicitudElegida).findByText("V-DEMO/1");
     fireEvent.change(screen.getByLabelText("Referencia de recepción"), {
       target: { value: "Recepción ficticia" },
     });

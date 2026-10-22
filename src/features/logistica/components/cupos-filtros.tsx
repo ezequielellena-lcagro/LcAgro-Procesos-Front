@@ -1,7 +1,7 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { FilterField } from "@/shared/components/filter-bar";
+import { FilterActions, FilterField } from "@/shared/components/filter-bar";
+import { CampaniaSelect } from "./campania-select";
 import { CatalogoSelect } from "./catalogo-select";
 
 import { campaniaValida, type FiltrosCupos } from "../lib/filtros-cupos";
@@ -53,18 +53,15 @@ export function CuposFiltros({
         modoFiltro
         onChange={(v) => onChange({ ...value, destinoCodigo: v ? String(v) : "" })}
       />
+      {/* La campaña va en TODAS las solapas, también en la de MacroGest: es el filtro que el área
+          usuaria pide siempre para acotar la búsqueda. El circuito no, porque es una clasificación
+          propia (directa/propia) que el ERP no guarda. */}
+      <CampaniaSelect
+        value={value.campania}
+        onChange={(campania) => onChange({ ...value, campania })}
+      />
       {!erp && (
         <>
-          <FilterField label="Campaña">
-            <Input
-              className="w-32"
-              value={value.campania}
-              maxLength={9}
-              pattern="[0-9]{4}-[0-9]{4}"
-              placeholder="2025-2026"
-              onChange={(e) => onChange({ ...value, campania: e.target.value })}
-            />
-          </FilterField>
           <FilterField label="Circuito">
             <Select
               className="w-40"
@@ -78,19 +75,17 @@ export function CuposFiltros({
           </FilterField>
         </>
       )}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" variant="outline" disabled={!erp && !campaniaOk}>
-          Aplicar filtros
-        </Button>
-        <Button type="button" variant="ghost" onClick={onClear}>
-          Limpiar filtros
-        </Button>
-      </div>
-      {!erp && !campaniaOk && (
-        <p role="alert" className="basis-full text-sm text-rojo">
-          Ingresá una campaña como 2025-2026.
-        </p>
-      )}
+      <FilterActions
+        aplicarDeshabilitado={!campaniaOk}
+        onClear={onClear}
+        aviso={
+          !campaniaOk && (
+            <p role="alert" className="mr-auto text-sm text-rojo">
+              Ingresá una campaña como 2025-2026.
+            </p>
+          )
+        }
+      />
     </>
   );
 }

@@ -54,6 +54,10 @@ const catalogos: Record<string, Referencia[]> = {
     { codigo: 10, nombre: "Soja", estado: "V" },
     { codigo: 1, nombre: "Maíz", estado: "V" },
   ],
+  campanias: [
+    { codigo: 20252026, nombre: "2025-2026", estado: "V" },
+    { codigo: 20242025, nombre: "2024-2025", estado: "V" },
+  ],
   destinos: [
     { codigo: 101, nombre: "Terminal de ejemplo", estado: null },
     { codigo: 102, nombre: "Otra terminal de ejemplo", estado: null },
@@ -218,6 +222,32 @@ export const logisticaHandlers = [
     const tamano = Math.min(200, Number(url.searchParams.get("tamano") ?? 50));
     return pagina(filas.slice(0, tamano), filas.length > tamano);
   }),
+  // Disponibles por cereal: la demo no tiene planes de carga en planta 0, así que va en cero y se
+  // ve el estado vacío, que es lo que hay que poder leer.
+  http.get(`${API}/cupos/disponibles`, () =>
+    HttpResponse.json({
+      porCereal: [],
+      porPlanta: [{ planta: 10, cupos: 1, conCartaPorte: 0 }],
+      kgPorCupo: 30000,
+      datosAl: new Date().toISOString(),
+    }),
+  ),
+  // Cola de prioridad de entrega: la demo trae una preventa que arranca hoy, así que cae en
+  // "vigentes y próximos" y la cola de vencidas queda vacía.
+  http.get(`${API}/preventas/cola`, ({ request }) => {
+    const url = new URL(request.url);
+    const campania = Number(url.searchParams.get("campania"));
+    const vencidas = url.searchParams.get("vencidas") !== "false";
+    const producto = url.searchParams.get("producto");
+    const arranco = Date.parse(`${preventa.fechaEntregaInicio}T12:00:00Z`) < Date.now();
+    const filas =
+      campania === preventa.campania &&
+      vencidas === arranco &&
+      (!producto || Number(producto) === preventa.producto)
+        ? [preventa]
+        : [];
+    return HttpResponse.json({ filas, hayMas: false, datosAl: new Date().toISOString() });
+  }),
   http.get(`${API}/preventas`, ({ request }) => {
     const url = new URL(request.url);
     const buscar = (url.searchParams.get("buscar") ?? "").toLowerCase();
@@ -258,6 +288,13 @@ export const logisticaHandlers = [
   http.get(`${API}/solicitudes-terminal`, ({ request }) =>
     listado(solicitudes, new URL(request.url), (f) => f.fechaSolicitada),
   ),
+  // La pantalla de recepción entra con ?solicitud=<id> y relee la solicitud por su cuenta.
+  http.get(`${API}/solicitudes-terminal/:id`, ({ params }) => {
+    const dato = solicitudes.find((s) => s.id === params.id);
+    return dato
+      ? HttpResponse.json({ dato, datosAl: new Date().toISOString() })
+      : error(404, "La solicitud no existe.");
+  }),
   http.get(`${API}/pedidos`, ({ request }) => {
     const url = new URL(request.url);
     return listado(
