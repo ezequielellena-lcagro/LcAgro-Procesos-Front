@@ -8,15 +8,17 @@ import { PageHeader } from "@/shared/components/page-header";
 import { useAvisoCambiosSinGuardar } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
 import { ConsolidadoPanel } from "../components/consolidado-panel";
 import { MarketShareForm } from "../components/market-share-form";
+import { ObjetivosPanel } from "../components/objetivos-panel";
 import { PlanSiembraPanel } from "../components/plan-siembra-panel";
 import { VendedoresDialog } from "../components/vendedores-dialog";
 import { useContextoPlanificacion } from "../queries/use-plan-siembra";
 
-type Solapa = "plan" | "consolidado" | "market-share";
+type Solapa = "plan" | "consolidado" | "market-share" | "objetivos";
 const SOLAPAS: { id: Solapa; nombre: string; gestion?: boolean }[] = [
   { id: "plan", nombre: "Plan de siembra" },
   { id: "consolidado", nombre: "Consolidado" },
   { id: "market-share", nombre: "Market Share", gestion: true },
+  { id: "objetivos", nombre: "Objetivos", gestion: true },
 ];
 
 export function PlanificacionVentasPage() {
@@ -26,12 +28,17 @@ export function PlanificacionVentasPage() {
   const [slotFuente, setSlotFuente] = useState<HTMLElement | null>(null);
   const [planDirty, setPlanDirty] = useState(false);
   const [marketDirty, setMarketDirty] = useState(false);
+  const [objetivosDirty, setObjetivosDirty] = useState(false);
   // Los vendedores no entran acá: el tilde de cada uno guarda solo, no deja borrador que avisar.
   const [ajustesOpen, setAjustesOpen] = useState(false);
-  useAvisoCambiosSinGuardar(planDirty || marketDirty);
+  useAvisoCambiosSinGuardar(planDirty || marketDirty || objetivosDirty);
   const puedeGestionar = contexto.data?.alcance.veTodo ?? false;
-  const solapaVisible =
-    contexto.data && !puedeGestionar && solapa === "market-share" ? "plan" : solapa;
+  const soloGestion = SOLAPAS.find((item) => item.id === solapa)?.gestion ?? false;
+  const solapaVisible = contexto.data && !puedeGestionar && soloGestion ? "plan" : solapa;
+  // Objetivos se monta recién al abrirla (consulta MacroGest) y después queda montada para no
+  // perder los porcentajes sin guardar al pasar a otra solapa.
+  const [objetivosAbierta, setObjetivosAbierta] = useState(false);
+  if (solapaVisible === "objetivos" && !objetivosAbierta) setObjetivosAbierta(true);
   return (
     <div>
       <PageHeader
@@ -99,6 +106,21 @@ export function PlanificacionVentasPage() {
                 contexto={contexto.data}
                 activo={solapaVisible === "market-share"}
                 onDirtyChange={setMarketDirty}
+              />
+            </div>
+          )}
+          {puedeGestionar && objetivosAbierta && (
+            <div
+              id="tabpanel-objetivos"
+              role="tabpanel"
+              aria-labelledby="tab-objetivos"
+              hidden={solapaVisible !== "objetivos"}
+            >
+              <ObjetivosPanel
+                contexto={contexto.data}
+                activo={solapaVisible === "objetivos"}
+                slotFuente={slotFuente}
+                onDirtyChange={setObjetivosDirty}
               />
             </div>
           )}

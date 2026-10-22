@@ -560,8 +560,12 @@ describe("plan de siembra", () => {
     const selector = screen.getByRole("combobox", { name: "Vendedor" });
     expect(within(selector).queryByRole("option", { name: "Todos" })).not.toBeInTheDocument();
     fireEvent.change(selector, { target: { value: "1" } });
+    // Abre sin los activos sin movimiento; tildarlos los pide al servidor.
+    expect(vi.mocked(usePlanSiembra).mock.lastCall).toEqual(["2026-2027", 1, false, true]);
+    const sinMovimiento = screen.getByRole("checkbox", { name: "Incluir activos sin movimiento" });
+    expect(sinMovimiento).not.toBeChecked();
+    fireEvent.click(sinMovimiento);
     expect(vi.mocked(usePlanSiembra).mock.lastCall).toEqual(["2026-2027", 1, true, true]);
-    expect(screen.getByRole("checkbox", { name: "Incluir activos sin movimiento" })).toBeChecked();
     fireEvent.change(screen.getByRole("textbox", { name: "Hectáreas de soja de Alfa Ficticia" }), {
       target: { value: "3" },
     });

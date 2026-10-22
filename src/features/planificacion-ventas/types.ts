@@ -251,3 +251,85 @@ export interface ControlPadron {
   facturacionSinCuitUsd: { cuentas: number; total: number };
   originacionSinCuitTn: { cuentas: number; total: number };
 }
+
+/**
+ * Indicadores de la base de objetivos. `margenBruto` y `marketShare` son fracciones (0,085 = 8,5 %);
+ * el market share queda en null sin plan de siembra o sin parámetros de Market Share.
+ */
+export interface IndicadoresBase {
+  facturacionUsd: number;
+  fertilizantesUsd: number;
+  semillaTrigoFiscalizadaBolsas: number;
+  semillaSojaFiscalizadaBolsas: number;
+  rentabilidadUsd: number;
+  margenBruto: number | null;
+  mercadoUsd: number | null;
+  marketShare: number | null;
+}
+
+export type IndicadorObjetivo =
+  | "facturacion"
+  | "fertilizantes"
+  | "semilla_trigo_fiscalizada"
+  | "semilla_soja_fiscalizada"
+  | "margen_bruto"
+  | "market_share";
+
+/** `crecimiento` multiplica lo real por (1 + %); `nivel` fija el valor (sólo margen y market share). */
+export type TipoObjetivo = "crecimiento" | "nivel";
+
+/** Objetivo de la campaña siguiente. Null donde no hay porcentaje cargado o no hay base. */
+export interface IndicadoresObjetivo {
+  facturacionUsd: number | null;
+  fertilizantesUsd: number | null;
+  semillaTrigoFiscalizadaBolsas: number | null;
+  semillaSojaFiscalizadaBolsas: number | null;
+  rentabilidadUsd: number | null;
+  margenBruto: number | null;
+  marketShare: number | null;
+}
+
+/** Porcentaje cargado por gestión, en puntos (13 = 13 %). */
+export interface PorcentajeObjetivo {
+  indicador: IndicadorObjetivo;
+  tipo: TipoObjetivo;
+  porcentaje: number;
+  revision: number;
+  modificadoPor: string | null;
+  modificadoEl: string | null;
+}
+
+export interface BaseObjetivosVendedor {
+  vendedorId: number;
+  vendedor: string;
+  sucursal: string | null;
+  indicadores: IndicadoresBase;
+  objetivo: IndicadoresObjetivo;
+}
+
+/** Lo real de `campania`, base de los objetivos de `campaniaObjetivo`. Sólo gestión. */
+export interface BaseObjetivosResponse {
+  campania: string;
+  campaniaObjetivo: string;
+  datosMacroGestAl: string | null;
+  vendedores: BaseObjetivosVendedor[];
+  fueraDeCarteras: IndicadoresBase | null;
+  objetivoFueraDeCarteras: IndicadoresObjetivo | null;
+  ajusteRedondeoUsd: number;
+  total: IndicadoresBase;
+  objetivoTotal: IndicadoresObjetivo;
+  porcentajes: PorcentajeObjetivo[];
+  porcentajesEditables: boolean;
+}
+
+/** Sin `porcentaje` (y sin `tipo`) se borra el objetivo de ese indicador. */
+export interface GuardarPorcentajeObjetivoRequest {
+  indicador: IndicadorObjetivo;
+  tipo: TipoObjetivo | null;
+  porcentaje: number | null;
+  revisionEsperada: number;
+}
+
+export interface GuardarPorcentajesObjetivoRequest {
+  indicadores: GuardarPorcentajeObjetivoRequest[];
+}

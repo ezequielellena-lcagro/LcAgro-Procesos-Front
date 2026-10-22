@@ -1,18 +1,8 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { numero, numero3, pct, usd } from "@/shared/format/format";
+import { alineacionCelda, mostrarCelda as mostrar } from "../lib/celdas";
 import { columnasConsolidado, type Columna, type LineaConsolidado } from "../lib/consolidado";
 
-function mostrar(valor: string | number | null, formato?: Columna["format"]): string {
-  if (valor === null) return "—";
-  if (formato === "usd") return usd(Number(valor));
-  if (formato === "percent") return pct(Number(valor));
-  if (formato === "number3") return numero3(Number(valor));
-  if (formato === "number") return numero(Number(valor));
-  return String(valor);
-}
-
-const alineacion = (columna: Columna) =>
-  columna.format && columna.format !== "text" ? "text-right" : "text-left";
+const alineacion = (columna: Columna) => alineacionCelda(columna.format);
 
 /** Nombre del grupo con el chevron que lo pliega. Al plegarlo, el renglón muestra sus totales. */
 function BotonGrupo({
@@ -98,22 +88,27 @@ export function ConsolidadoTabla({
               );
             }
             if (linea.grupo && colapsados.has(linea.grupo)) return null;
+            const fondo = linea.tipo === "total" ? "bg-primary/20"
+              : linea.tipo === "subtotal" || linea.tipo === "carteras" ? "bg-panel-soft"
+                : linea.tipo === "fuera" || linea.tipo === "ajuste" ? "bg-line-soft/60"
+                  : indice % 2 ? "bg-line-soft/30" : "bg-panel";
+            const peso = linea.tipo === "total" ? "font-bold"
+              : linea.tipo === "subtotal" || linea.tipo === "carteras" ? "font-semibold"
+                : linea.tipo === "fuera" || linea.tipo === "ajuste" ? "font-medium" : "";
             return (
-              <tr
-                key={`${linea.tipo}-${linea.cuit ?? indice}`}
-                className={`border-b border-line-soft text-ink ${linea.tipo === "total" ? "bg-primary/20 font-bold" : linea.tipo === "subtotal" || linea.tipo === "carteras" ? "bg-panel-soft font-semibold" : linea.tipo === "fuera" || linea.tipo === "ajuste" ? "bg-line-soft/60 font-medium" : indice % 2 ? "bg-line-soft/30" : "bg-panel"}`}
-              >
-                {columnas.map((columna) => (
-                  <td
-                    key={columna.key}
-                    className={`whitespace-nowrap px-3 py-2 ${alineacion(columna)} ${columna.key === "productor" ? "sticky left-0 z-10 bg-inherit" : ""}`}
-                  >
-                    {columna.key === "productor" ? (
-                      <span className="flex flex-col">
-                        <span>{linea.etiqueta}</span>
-                        {linea.cuit && <span className="font-normal text-ink-soft">{linea.cuit}</span>}
-                      </span>
-                    ) : mostrar(columna.get(linea), columna.format)}
+              <tr key={`${linea.tipo}-${linea.cuit ?? indice}`} className={`border-b border-line-soft text-ink ${fondo} ${peso}`}>
+                {columnas.map((columna) => columna.key === "productor" ? (
+                  // Varios fondos son semitransparentes: la celda fija va sobre bg-panel opaco y repite
+                  // el tinte adentro, así al desplazar la tabla no se ven las columnas que pasan por debajo.
+                  <td key={columna.key} className="sticky left-0 z-10 bg-panel p-0">
+                    <span className={`flex flex-col whitespace-nowrap px-3 py-2 text-left ${fondo}`}>
+                      <span>{linea.etiqueta}</span>
+                      {linea.cuit && <span className="font-normal text-ink-soft">{linea.cuit}</span>}
+                    </span>
+                  </td>
+                ) : (
+                  <td key={columna.key} className={`whitespace-nowrap px-3 py-2 ${alineacion(columna)}`}>
+                    {mostrar(columna.get(linea), columna.format)}
                   </td>
                 ))}
               </tr>

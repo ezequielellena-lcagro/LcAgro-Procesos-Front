@@ -53,7 +53,8 @@ export function PlanSiembraPanel({
   const [campaniaElegida, setCampaniaElegida] = useState<string>();
   const campania = campaniaElegida ?? contexto.campaniaVigente;
   const [vendedorId, setVendedorId] = useState<number>();
-  const [incluirSinMovimiento, setIncluirSinMovimiento] = useState(true);
+  // Arranca destildado: la grilla abre con los productores con movimiento o plan cargado.
+  const [incluirSinMovimiento, setIncluirSinMovimiento] = useState(false);
   const [soloSinPlan, setSoloSinPlan] = useState(false);
   const [buscar, setBuscar] = useState("");
   const [borrador, setBorrador] = useState<BorradorPlan>({});

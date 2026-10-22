@@ -1,19 +1,24 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useEffect, useState } from "react";
 import { PlanificacionVentasPage } from "./planificacion-ventas-page";
 import { useContextoPlanificacion, useVendedoresPlanificacion } from "../queries/use-plan-siembra";
 import { useConsolidado } from "../queries/use-consolidado";
+import { useBaseObjetivos, useGuardarPorcentajesObjetivos } from "../queries/use-base-objetivos";
 import { armarLineasConsolidado } from "../lib/consolidado";
 import { useActualizarDatosPlan } from "../queries/use-guardar-plan";
 import { useAvisoCambiosSinGuardar } from "@/shared/hooks/use-aviso-cambios-sin-guardar";
-import type { ConsolidadoResponse, ContextoPlanificacion } from "../types";
+import type { BaseObjetivosResponse, ConsolidadoResponse, ContextoPlanificacion } from "../types";
 
 vi.mock("../queries/use-plan-siembra", () => ({
   useContextoPlanificacion: vi.fn(),
   useVendedoresPlanificacion: vi.fn(),
 }));
 vi.mock("../queries/use-consolidado", () => ({ useConsolidado: vi.fn() }));
+vi.mock("../queries/use-base-objetivos", () => ({
+  useBaseObjetivos: vi.fn(),
+  useGuardarPorcentajesObjetivos: vi.fn(),
+}));
 vi.mock("../queries/use-guardar-plan", () => ({ useActualizarDatosPlan: vi.fn() }));
 vi.mock("@/shared/hooks/use-aviso-cambios-sin-guardar", () => ({
   useAvisoCambiosSinGuardar: vi.fn(),
@@ -138,7 +143,68 @@ function preparar(contexto: ContextoPlanificacion, datos: ConsolidadoResponse = 
     isError: false,
     isPlaceholderData: false,
   } as ReturnType<typeof useConsolidado>);
+  vi.mocked(useBaseObjetivos).mockReturnValue({
+    data: baseObjetivos,
+    isError: false,
+    isPlaceholderData: false,
+  } as ReturnType<typeof useBaseObjetivos>);
+  guardarPorcentajes.mockResolvedValue({});
+  vi.mocked(useGuardarPorcentajesObjetivos).mockReturnValue({
+    mutateAsync: guardarPorcentajes,
+    isPending: false,
+  } as unknown as ReturnType<typeof useGuardarPorcentajesObjetivos>);
 }
+
+const indicadoresBase = {
+  facturacionUsd: 1500,
+  fertilizantesUsd: 300,
+  semillaTrigoFiscalizadaBolsas: 10,
+  semillaSojaFiscalizadaBolsas: 20,
+  rentabilidadUsd: 130,
+  margenBruto: 0.0867,
+  mercadoUsd: null,
+  marketShare: null,
+};
+const objetivoBase = {
+  facturacionUsd: 1695,
+  fertilizantesUsd: null,
+  semillaTrigoFiscalizadaBolsas: null,
+  semillaSojaFiscalizadaBolsas: null,
+  rentabilidadUsd: null,
+  margenBruto: null,
+  marketShare: null,
+};
+const baseObjetivos: BaseObjetivosResponse = {
+  campania: "2025-2026",
+  campaniaObjetivo: "2026-2027",
+  datosMacroGestAl: "2026-10-21T15:40:00-03:00",
+  vendedores: [
+    {
+      vendedorId: 1,
+      vendedor: "Vendedor Ficticio",
+      sucursal: "Sucursal Ficticia",
+      indicadores: indicadoresBase,
+      objetivo: objetivoBase,
+    },
+  ],
+  fueraDeCarteras: null,
+  objetivoFueraDeCarteras: null,
+  ajusteRedondeoUsd: 0,
+  total: indicadoresBase,
+  objetivoTotal: objetivoBase,
+  porcentajes: [
+    {
+      indicador: "facturacion",
+      tipo: "crecimiento",
+      porcentaje: 13,
+      revision: 1,
+      modificadoPor: "Usuario Ficticio",
+      modificadoEl: "2026-10-22T12:00:00-03:00",
+    },
+  ],
+  porcentajesEditables: true,
+};
+const guardarPorcentajes = vi.fn();
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -409,3 +475,110 @@ describe("solapa Consolidado", () => {
     );
   });
 });
+
+describe("solapa Objetivos", () => {
+  it("es de gestión: el vendedor no la ve", () => {
+    preparar(seller);
+    render(<PlanificacionVentasPage />);
+    expect(screen.queryByRole("tab", { name: "Objetivos" })).not.toBeInTheDocument();
+    expect(useBaseObjetivos).not.toHaveBeenCalled();
+  });
+
+  it("abre en la campaña anterior a la vigente y muestra la base por vendedor", () => {
+    preparar({
+      ...seller,
+      campanias: [
+        { codigo: "2026-2027", editable: true },
+        { codigo: "2025-2026", editable: true },
+      ],
+      alcance: { veTodo: true, vendedor: null },
+    });
+    render(<PlanificacionVentasPage />);
+    // No consulta hasta que se elige la solapa.
+    expect(useBaseObjetivos).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("tab", { name: "Objetivos" }));
+
+    expect(useBaseObjetivos).toHaveBeenLastCalledWith("2025-2026", true);
+    expect(screen.getByText("Lo real de 2025-2026, base para los objetivos 2026-2027.")).toBeInTheDocument();
+    const tabla = screen.getByRole("table", { name: "Base de objetivos por vendedor" });
+    expect(tabla).toHaveTextContent("Vendedor Ficticio");
+    expect(tabla).toHaveTextContent("TOTAL");
+    expect(tabla).toHaveTextContent("8,67 %");
+    expect(screen.getByText(/Sin market share: falta el plan de siembra/)).toBeInTheDocument();
+  });
+
+  const gestion: ContextoPlanificacion = {
+    ...seller,
+    campanias: [
+      { codigo: "2026-2027", editable: true },
+      { codigo: "2025-2026", editable: true },
+    ],
+    alcance: { veTodo: true, vendedor: null },
+  };
+
+  it("gestión carga y modifica los porcentajes; se guarda sólo lo que cambió", async () => {
+    preparar(gestion);
+    render(<PlanificacionVentasPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Objetivos" }));
+
+    const tarjeta = screen.getByRole("region", { name: "Porcentajes de objetivos" });
+    expect(tarjeta).toHaveTextContent("Porcentajes de objetivos 2026-2027");
+    expect(tarjeta).toHaveTextContent("Usuario Ficticio");
+    const facturacion = screen.getByRole("textbox", { name: "Porcentaje de Facturación general USD" });
+    expect(facturacion).toHaveValue("13");
+    // Sólo margen y market share eligen entre crecer y llegar a.
+    expect(screen.queryByRole("combobox", { name: /Cómo se aplica Facturación/ })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Cómo se aplica Margen bruto" }), {
+      target: { value: "nivel" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Porcentaje de Margen bruto" }), {
+      target: { value: "10" },
+    });
+    fireEvent.change(facturacion, { target: { value: "15" } });
+    expect(useAvisoCambiosSinGuardar).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar porcentajes" }));
+
+    await waitFor(() => expect(guardarPorcentajes).toHaveBeenCalledWith({
+      campania: "2026-2027",
+      request: {
+        indicadores: [
+          { indicador: "facturacion", tipo: "crecimiento", porcentaje: 15, revisionEsperada: 1 },
+          { indicador: "margen_bruto", tipo: "nivel", porcentaje: 10, revisionEsperada: 0 },
+        ],
+      },
+    }));
+  });
+
+  it("un porcentaje fuera de rango no deja guardar", () => {
+    preparar(gestion);
+    render(<PlanificacionVentasPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Objetivos" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Cómo se aplica Market share de clientes" }), {
+      target: { value: "nivel" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Porcentaje de Market share de clientes" }), {
+      target: { value: "120" },
+    });
+    expect(screen.getByText("Un nivel va de 0 a 100 %.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar porcentajes" })).toBeDisabled();
+  });
+
+  it("el borrador sobrevive al cambio de solapa y la tabla pasa a mostrar el objetivo", () => {
+    preparar(gestion);
+    render(<PlanificacionVentasPage />);
+    fireEvent.click(screen.getByRole("tab", { name: "Objetivos" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Porcentaje de Facturación general USD" }), {
+      target: { value: "20" },
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Plan de siembra" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Objetivos" }));
+    expect(screen.getByRole("textbox", { name: "Porcentaje de Facturación general USD" })).toHaveValue("20");
+
+    fireEvent.click(screen.getByRole("button", { name: "Objetivo 2026-2027" }));
+    const tabla = screen.getByRole("table", { name: "Objetivos por vendedor" });
+    expect(tabla).toHaveTextContent("1.695,00");
+    expect(tabla).not.toHaveTextContent("Mercado USD");
+  });
+});
+
