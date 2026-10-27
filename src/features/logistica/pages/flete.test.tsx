@@ -594,8 +594,9 @@ describe("Flete UI", () => {
     );
     expect(JSON.stringify(campos)).not.toContain("No mostrar");
     expect(
-      camposHistorial(JSON.stringify({ vigenteDesde: "2026-10-04T12:00:00Z" }), "cupos")[0].campo,
-    ).toBe("Fecha de asignación");
+      camposHistorial(JSON.stringify({ vigenteDesde: "2026-10-04T12:00:00Z" }), "otorgamientos")[0]
+        .campo,
+    ).toBe("Fecha de otorgamiento");
   });
 });
 

@@ -1,509 +1,241 @@
-import { useState, type FormEvent } from "react";
-import { toAppError } from "@/lib/api-error";
-import { useLogisticaExcel } from "../queries/use-logistica-excel";
+import { FileSpreadsheet, Truck } from "lucide-react";
+import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { DateField } from "@/components/ui/date-field";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth-context";
+import { apiClient } from "@/lib/api-client";
+import { toAppError } from "@/lib/api-error";
+import { FilterActions, FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
-import { FilterActions, FilterBar, FilterField } from "@/shared/components/filter-bar";
-import { HistorialDialog } from "../components/historial-dialog";
-import { CatalogoSelect } from "../components/catalogo-select";
-import { AvisoDemo } from "../components/aviso-demo";
-import { PeriodoFiltro } from "../components/periodo-filtro";
-import { ConciliacionTabla } from "../components/conciliacion-tabla";
-import { RetirarVinculoErpDialog } from "../components/retirar-vinculo-erp-dialog";
-import { VinculoErpDialog } from "../components/vinculo-erp-dialog";
-import { SeguimientoDetalle } from "../components/seguimiento-detalle";
-import { FlotaSeguimientoDialog } from "../components/flota-seguimiento-dialog";
-import { RetirarFlotaSeguimientoDialog } from "../components/retirar-flota-seguimiento-dialog";
-import { SeguimientoDialog } from "../components/seguimiento-dialog";
-import type { EdicionSeguimiento } from "../components/seguimiento-dialog";
-import { TablaLogistica } from "../components/tabla-logistica";
-import { fecha, hoy, periodoInicial, sumarDias } from "../format";
-import {
-  datoVigente,
-  kgOperativos,
-  destinatarioSeguimiento,
-  ESTADO_LABEL,
-  FUENTE_LABEL,
-} from "../lib/seguimiento";
-import { campaniaValida } from "../lib/filtros-cupos";
+import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
+import { diaArgentina, fecha, hoy, kg, sumarDias } from "../format";
 import { useListado } from "../queries/use-logistica";
-import { ESTADOS_SEGUIMIENTO } from "../types";
-import type { ConciliacionFila, Periodo, Seguimiento, TipoDatoOperativo } from "../types";
+import type { CargaLogistica, EstadoCarga } from "../types";
+import { AvisoDemo } from "../components/aviso-demo";
+import { CargaDialog } from "../components/carga-dialog";
+import { CatalogoSelect } from "../components/catalogo-select";
+import { HistorialDialog } from "../components/historial-dialog";
+import { PeriodoFiltro } from "../components/periodo-filtro";
+import { PlanCargaBoton } from "../components/plan-carga-boton";
+import { TablaLogistica } from "../components/tabla-logistica";
 
-const filtrosVacios = {
-  contrato: "",
-  clienteNumero: "",
-  producto: "",
-  campania: "",
-  destinoCodigo: "",
-  circuito: "",
-  estadoObservado: "",
+/** Cómo se lee cada estado; sale de MacroGest en cada consulta. */
+const ESTADO_CARGA: Record<EstadoCarga, string> = {
+  falta_pasar: "Falta pasarlo en MacroGest",
+  por_cargar: "Por cargar",
+  en_viaje: "En viaje",
+  descargado: "Descargado",
+  revisar: "Revisar en MacroGest",
+  no_esta: "Ya no está en MacroGest",
+  sin_verificar: "Sin verificar",
 };
-type Filtros = typeof filtrosVacios;
+const filtrosVacios = { contrato: "", clienteNumero: 0, estado: "" };
+/** Kilos de MacroGest: vienen como texto exacto; vacío es guion. */
+const kgErp = (v: string | number | null | undefined) =>
+  v == null || v === "" ? "—" : kg(Number(v));
+const oDash = (v: string | null | undefined) => (v && v.trim() ? v.trim() : "—");
+
+/**
+ * Cargas a puerto, leyendo MacroGest (devolución del 2026-10-23, tramo 5). Cada cupo otorgado
+ * muestra carta de porte, CTG, patente y kilos de carga y descarga de MacroGest, y el estado sale
+ * de ahí. Lo propio es el camión de Flete y una observación.
+ */
 export function CargasPage() {
   const { user } = useAuth();
   const gestionar = user?.roles.includes("logistica-cargas") ?? false;
-  const gestionarVinculos = user?.roles.includes("logistica-cupos") ?? false;
-  const [vinculo, setVinculo] = useState<{
-    snapshot: Seguimiento;
-    modo: "vincular" | "reemplazar" | "retirar";
-  } | null>(null);
-  const [tab, setTab] = useState("dia");
-  const [dia, setDia] = useState(hoy);
-  const [periodo, setPeriodo] = useState<Periodo>(periodoInicial);
+  const [periodo, setPeriodo] = useState(() => ({
+    desde: sumarDias(hoy(), -30),
+    hastaExclusivo: sumarDias(hoy(), 1),
+  }));
   const [borrador, setBorrador] = useState(filtrosVacios);
-  const [filtros, setFiltros] = useState<Filtros>(filtrosVacios);
-  const [paginaVersion, setPaginaVersion] = useState(0);
-  const [detalleId, setDetalleId] = useState<string | null>(null);
-  const [historiaId, setHistoriaId] = useState<string | null>(null);
-  const [editor, setEditor] = useState<{ snapshot: Seguimiento; modo: EdicionSeguimiento } | null>(
-    null,
+  const [filtros, setFiltros] = useState(filtrosVacios);
+  const [editar, setEditar] = useState<CargaLogistica | null>(null);
+  const [historia, setHistoria] = useState<string | null>(null);
+  const params = {
+    ...periodo,
+    contrato: filtros.contrato.trim() || undefined,
+    clienteNumero: filtros.clienteNumero || undefined,
+  };
+  const q = useListado<CargaLogistica>("cargas", params, (f) => ({
+    despuesDia: diaArgentina(f.otorgamiento.otorgamiento.vigenteDesde),
+    despuesId: f.otorgamiento.otorgamiento.id,
+  }));
+  // El estado sale de MacroGest al leer, así que se filtra sobre lo leído.
+  const filas = (q.data?.pages.flatMap((p) => p.filas) ?? []).filter(
+    (f) => !filtros.estado || f.estado === filtros.estado,
   );
-  const [aviso, setAviso] = useState<string | null>(null);
-  const [flota, setFlota] = useState<{ snapshot: Seguimiento; retirar: boolean } | null>(null);
-  const abrirFlota = (snapshot: Seguimiento, retirar = false) => {
-    setDetalleId(null);
-    setAviso(null);
-    setFlota({ snapshot, retirar });
-  };
-  const conflictoFlota = () => {
-    setFlota(null);
-    setAviso(
-      "El seguimiento o la ficha de flota cambió. Abrí el detalle actualizado y revisá el padrón para realizar un nuevo intento explícito.",
-    );
-  };
-  const rango = tab === "dia" ? { desde: dia, hastaExclusivo: sumarDias(dia, 1) } : periodo;
-  const params = Object.fromEntries(Object.entries(filtros).filter(([, v]) => v !== ""));
-  const q = useListado<Seguimiento>(
-    "seguimientos",
-    { ...rango, ...params, anulados: tab === "anuladas" },
-    (f) => ({ despuesFecha: f.cupo.fechaCarga, despuesId: f.cupoId }),
-    tab !== "desfasajes",
-    { paginaVersion },
-  );
-  const conciliacion = useListado<ConciliacionFila>(
-    "conciliacion",
-    { ...periodo, ...params, anulados: false },
-    (f) => ({ despuesFecha: f.seguimiento.cupo.fechaCarga, despuesId: f.seguimiento.cupoId }),
-    tab === "desfasajes",
-    { paginaVersion },
-    20,
-  );
-  const excel = useLogisticaExcel();
-  const bloqueada = !!editor || !!vinculo || !!flota || excel.isPending;
-  const reiniciar = () => setPaginaVersion((v) => v + 1);
-  const editar = (snapshot: Seguimiento, modo: EdicionSeguimiento) => {
-    setDetalleId(null);
-    setAviso(null);
-    setEditor({ snapshot, modo });
-  };
-  const valorOperativo = (s: Seguimiento, tipo: TipoDatoOperativo) => {
-    const dato = datoVigente(s, tipo);
-    return (
-      <>
-        <div>
-          {!dato ? "Pendiente" : tipo === "patente" ? dato.texto : kgOperativos(dato.kilogramos)}
-        </div>
-        {dato && <div className="mt-1 text-xs text-ink-soft">{FUENTE_LABEL[dato.fuente]}</div>}
-      </>
-    );
-  };
-  const campaniaOk = campaniaValida(borrador);
-  const aplicarFiltros = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!campaniaOk) return;
-    setFiltros({ ...borrador });
-    reiniciar();
-  };
-  /** Los filtros de la tabla, para meterlos en la barra que corresponda a la solapa. */
-  const camposFiltro = (
-    <>
-      {(
-        [
-          ["contrato", "Contrato", 15],
-          ["campania", "Campaña", 9],
-        ] as const
-      ).map(([campo, titulo, max]) => (
-        <FilterField key={campo} label={titulo}>
-          <Input
-            className={campo === "campania" ? "w-32" : "w-40"}
-            value={borrador[campo]}
-            maxLength={max}
-            placeholder={campo === "campania" ? "2025-2026" : undefined}
-            onChange={(e) => setBorrador({ ...borrador, [campo]: e.target.value })}
-          />
-        </FilterField>
-      ))}
-      {(
-        [
-          ["clientes", "clienteNumero", "Productor"],
-          ["productos", "producto", "Cereal"],
-          ["destinos", "destinoCodigo", "Destino"],
-        ] as const
-      ).map(([tipo, campo, titulo]) => (
-        <CatalogoSelect
-          key={campo}
-          className="w-56"
-          tipo={tipo}
-          titulo={titulo}
-          value={Number(borrador[campo])}
-          required={false}
-          modoFiltro
-          onChange={(v) => setBorrador({ ...borrador, [campo]: v ? String(v) : "" })}
-        />
-      ))}
-      <FilterField label="Circuito">
-        <Select
-          className="w-40"
-          value={borrador.circuito}
-          onChange={(e) => setBorrador({ ...borrador, circuito: e.target.value })}
-        >
-          <option value="">Todos</option>
-          <option value="directa">Directa</option>
-          <option value="propia">Propia</option>
-        </Select>
-      </FilterField>
-      <FilterField label="Estado observado">
-        <Select
-          className="w-52"
-          value={borrador.estadoObservado}
-          onChange={(e) => setBorrador({ ...borrador, estadoObservado: e.target.value })}
-        >
-          <option value="">Todos</option>
-          {ESTADOS_SEGUIMIENTO.map((v) => (
-            <option key={v} value={v}>
-              {ESTADO_LABEL[v]}
-            </option>
-          ))}
-        </Select>
-      </FilterField>
-      <FilterActions
-        aplicarDeshabilitado={!campaniaOk}
-        onClear={() => {
-          setBorrador(filtrosVacios);
-          setFiltros(filtrosVacios);
-          reiniciar();
-        }}
-        aviso={
-          !campaniaOk && (
-            <p role="alert" className="mr-auto text-sm text-rojo">
-              Ingresá una campaña como 2025-2026.
-            </p>
-          )
-        }
-      />
-    </>
-  );
+  const excel = useMutation({
+    mutationFn: async () => {
+      const res = await apiClient.get("/logistica/cargas/excel", { params, responseType: "blob" });
+      downloadBlob(
+        res.data as Blob,
+        filenameFromContentDisposition(res.headers["content-disposition"], "cargas-a-puerto.xlsx"),
+      );
+    },
+  });
   return (
     <>
       <PageHeader
         title="Cargas a puerto"
-        subtitle="Seguimiento operativo por cupo recibido y fecha prevista de carga."
+        subtitle="Cupos otorgados con lo que dice MacroGest: carta de porte, CTG, patente y kilos. Acá se elige el camión y se anota una observación."
         actions={
-          <Button
-            variant="outline"
-            disabled={bloqueada}
-            onClick={() => excel.exportar({ ...rango, ...params, anulados: tab === "anuladas" })}
-          >
-            {excel.isPending ? "Exportando…" : "Exportar Excel"}
+          <Button variant="outline" disabled={excel.isPending} onClick={() => excel.mutate()}>
+            <FileSpreadsheet className="size-4" aria-hidden />{" "}
+            {excel.isPending ? "Generando…" : "Exportar XLSX"}
           </Button>
         }
       />
-      <div inert={!!flota}>
-        <AvisoDemo />
-      </div>
-      {excel.isPending && (
-        <p role="status" className="mb-4 text-sm text-ink-soft">
-          Preparando todos los seguimientos del período y los filtros aplicados…
-        </p>
-      )}
+      <AvisoDemo />
       {excel.error && (
-        <p role="alert" className="mb-4 text-sm text-rojo">
+        <p role="alert" className="mb-3 text-sm text-rojo">
           {toAppError(excel.error).message}
         </p>
       )}
-      {aviso && (
-        <p role="status" className="mb-4 text-sm text-rojo">
-          {aviso}
-        </p>
-      )}
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          if (!bloqueada) {
-            setTab(v);
-            reiniciar();
-          }
+      <PeriodoFiltro
+        value={periodo}
+        etiqueta="Fecha de otorgamiento"
+        onChange={setPeriodo}
+        onSubmit={(e) => {
+          e.preventDefault();
+          setFiltros({ ...borrador });
         }}
       >
-        <fieldset disabled={bloqueada} className="min-w-0">
-          <TabsList className="mb-4 max-w-full overflow-x-auto">
-            <TabsTrigger value="dia">Día</TabsTrigger>
-            <TabsTrigger value="periodo">Período</TabsTrigger>
-            <TabsTrigger value="anuladas">Anuladas</TabsTrigger>
-            <TabsTrigger value="desfasajes">Desfasajes</TabsTrigger>
-          </TabsList>
-        </fieldset>
-        <fieldset disabled={bloqueada}>
-          {/* Fecha y filtros en la MISMA barra, como en Cupos: son los filtros de la misma tabla.
-              Sueltos, sin la barra que los agrupa, se estiraban a lo ancho de la pantalla. */}
-          {tab === "dia" ? (
-            <FilterBar onSubmit={aplicarFiltros}>
-              <FilterField label="Fecha prevista de carga">
-                <div className="w-40">
-                  <DateField
-                    value={dia}
-                    onChange={(v) => {
-                      setDia(v);
-                      reiniciar();
-                    }}
-                  />
-                </div>
-              </FilterField>
-              {camposFiltro}
-            </FilterBar>
-          ) : (
-            <PeriodoFiltro
-              value={periodo}
-              etiqueta="Fecha prevista de carga"
-              onChange={(v) => {
-                setPeriodo(v);
-                reiniciar();
-              }}
-              onSubmit={aplicarFiltros}
-            >
-              {camposFiltro}
-            </PeriodoFiltro>
-          )}
-        </fieldset>
-        {["dia", "periodo", "anuladas"].map((v) => (
-          <TabsContent key={v} value={v}>
-            <TablaLogistica
-              titulo="Cargas a puerto"
-              filas={q.data?.pages.flatMap((p) => p.filas) ?? []}
-              clave={(f) => f.cupoId}
-              cargando={q.isLoading}
-              error={q.error}
-              reintentar={!bloqueada ? () => void q.refetch() : undefined}
-              hayMas={!bloqueada && q.hasNextPage}
-              mas={() => void q.fetchNextPage()}
-              cargandoMas={q.isFetchingNextPage}
-              vacio={
-                tab === "anuladas"
-                  ? "No hay seguimientos anulados para estas fechas y filtros."
-                  : "No hay cargas para estas fechas y filtros. Los cupos aparecen al registrar su recepción."
-              }
-              columnas={[
-                {
-                  titulo: "Cupo / recepción",
-                  celda: (f) => (
-                    <>
-                      <div>{f.cupo.codigoTerminal || "Código pendiente"}</div>
-                      <div className="text-xs text-ink-soft">{f.cupo.contratoVenta}</div>
-                      <div className="text-xs text-ink-soft">
-                        {f.referenciaRecepcion} · fila {f.cupo.ordinal}
-                      </div>
-                    </>
-                  ),
-                },
-                { titulo: "Fecha prevista de carga", celda: (f) => fecha(f.cupo.fechaCarga) },
-                { titulo: "Destinatario", celda: destinatarioSeguimiento },
-                {
-                  titulo: "Cereal / campaña",
-                  celda: (f) => `${f.cupo.productoNombre ?? f.cupo.producto} / ${f.cupo.campania}`,
-                },
-                {
-                  titulo: "Destino / circuito / lugar",
-                  celda: (f) => (
-                    <>
-                      <div>{f.cupo.destinoNombre ?? f.cupo.destinoCodigo}</div>
-                      <div className="text-xs text-ink-soft">
-                        {f.cupo.circuito} · {f.cupo.lugarTipo}
-                        {f.cupo.lugarReferencia ? `: ${f.cupo.lugarReferencia}` : ""}
-                      </div>
-                    </>
-                  ),
-                },
-                {
-                  titulo: "Estado observado",
-                  celda: (f) => (
-                    <>
-                      <div>{ESTADO_LABEL[f.estadoObservado]}</div>
-                      <div className="text-xs text-ink-soft">
-                        {f.anuladoAl
-                          ? "Anulado"
-                          : f.estadoFuente
-                            ? FUENTE_LABEL[f.estadoFuente]
-                            : "Sin observación registrada"}
-                      </div>
-                    </>
-                  ),
-                },
-                {
-                  titulo: "Camión elegido",
-                  celda: (f) =>
-                    f.flotaVigente ? (
-                      <>
-                        <div>{f.flotaVigente.patenteChasis}</div>
-                        <div className="mt-1 text-xs text-ink-soft">
-                          {f.flotaVigente.patenteAcoplado ?? "Sin acoplado informado"}
-                        </div>
-                        <div className="text-xs text-ink-soft">
-                          {f.flotaVigente.conductor ?? "Sin conductor informado"} · revisión{" "}
-                          {f.flotaVigente.revision}
-                        </div>
-                      </>
-                    ) : (
-                      "Sin camión elegido"
-                    ),
-                },
-                { titulo: "Patente operativa", celda: (f) => valorOperativo(f, "patente") },
-                {
-                  titulo: "Carga operativa",
-                  numero: true,
-                  celda: (f) => valorOperativo(f, "kg_carga"),
-                },
-                {
-                  titulo: "Descarga operativa",
-                  numero: true,
-                  celda: (f) => valorOperativo(f, "kg_descarga"),
-                },
-                {
-                  titulo: "Acciones",
-                  celda: (f) => (
-                    <div className="flex gap-1">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={bloqueada}
-                        onClick={() => setDetalleId(f.cupoId)}
-                      >
-                        Detalle
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={bloqueada}
-                        onClick={() => setHistoriaId(f.cupoId)}
-                      >
-                        Historial
-                      </Button>
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </TabsContent>
-        ))}
-        <TabsContent value="desfasajes">
-          <ConciliacionTabla
-            paginas={conciliacion.data?.pages ?? []}
-            cargando={conciliacion.isLoading}
-            error={conciliacion.error}
-            reintentar={() => {
-              if (!bloqueada) void conciliacion.refetch();
-            }}
-            hayMas={!bloqueada && conciliacion.hasNextPage}
-            mas={() => void conciliacion.fetchNextPage()}
-            cargandoMas={conciliacion.isFetchingNextPage}
-            bloqueada={bloqueada}
-            onDetalle={setDetalleId}
+        <FilterField label="Contrato">
+          <Input
+            className="w-40"
+            maxLength={15}
+            value={borrador.contrato}
+            onChange={(e) => setBorrador({ ...borrador, contrato: e.target.value })}
           />
-        </TabsContent>
-      </Tabs>
-      {detalleId && (
-        <SeguimientoDetalle
-          cupoId={detalleId}
-          gestionar={gestionar}
-          gestionarVinculos={gestionarVinculos}
-          onElegirCamion={(snapshot) => abrirFlota(snapshot)}
-          onRetirarCamion={(snapshot) => abrirFlota(snapshot, true)}
-          onVincular={(snapshot) => {
-            setDetalleId(null);
-            setAviso(null);
-            setVinculo({ snapshot, modo: "vincular" });
-          }}
-          onReemplazar={(snapshot) => {
-            setDetalleId(null);
-            setAviso(null);
-            setVinculo({ snapshot, modo: "reemplazar" });
-          }}
-          onRetirar={(snapshot) => {
-            setDetalleId(null);
-            setAviso(null);
-            setVinculo({ snapshot, modo: "retirar" });
-          }}
-          onClose={() => setDetalleId(null)}
-          onEditar={editar}
-          onHistoria={() => {
-            setHistoriaId(detalleId);
-            setDetalleId(null);
+        </FilterField>
+        <CatalogoSelect
+          className="w-56"
+          tipo="clientes"
+          titulo="Cliente"
+          required={false}
+          modoFiltro
+          value={borrador.clienteNumero}
+          onChange={(clienteNumero) => setBorrador({ ...borrador, clienteNumero })}
+        />
+        <FilterField label="Estado">
+          <Select
+            className="w-52"
+            value={borrador.estado}
+            onChange={(e) => setBorrador({ ...borrador, estado: e.target.value })}
+          >
+            <option value="">Todos</option>
+            {Object.entries(ESTADO_CARGA).map(([valor, texto]) => (
+              <option key={valor} value={valor}>
+                {texto}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterActions
+          onClear={() => {
+            setBorrador(filtrosVacios);
+            setFiltros(filtrosVacios);
           }}
         />
-      )}
-      {editor && (
-        <SeguimientoDialog
-          seguimiento={editor.snapshot}
-          modo={editor.modo}
-          onClose={() => setEditor(null)}
-          onConflict={() => {
-            setEditor(null);
-            setAviso(
-              "El seguimiento cambió. Abrí el detalle actualizado para revisar y volver a registrar la observación.",
-            );
-          }}
-        />
-      )}
-      {vinculo?.modo === "retirar" && (
-        <RetirarVinculoErpDialog
-          seguimiento={vinculo.snapshot}
-          onClose={() => setVinculo(null)}
-          onConflict={() => {
-            setVinculo(null);
-            setAviso(
-              "El cupo cambió. Abrí el detalle actualizado para revisar la referencia y realizar un nuevo intento explícito.",
-            );
-          }}
-        />
-      )}
-      {vinculo && vinculo.modo !== "retirar" && (
-        <VinculoErpDialog
-          seguimiento={vinculo.snapshot}
-          modo={vinculo.modo}
-          onClose={() => setVinculo(null)}
-          onConflict={() => {
-            setVinculo(null);
-            setAviso(
-              "El cupo cambió. Abrí el detalle actualizado para revisar y volver a vincular con una nueva lectura propia.",
-            );
-          }}
-        />
-      )}
-      {flota &&
-        (flota.retirar ? (
-          <RetirarFlotaSeguimientoDialog
-            seguimiento={flota.snapshot}
-            onClose={() => setFlota(null)}
-            onConflict={conflictoFlota}
-          />
-        ) : (
-          <FlotaSeguimientoDialog
-            seguimiento={flota.snapshot}
-            onClose={() => setFlota(null)}
-            onConflict={conflictoFlota}
-          />
-        ))}
-      {historiaId && (
-        <HistorialDialog
-          recurso="seguimientos"
-          id={historiaId}
-          onClose={() => setHistoriaId(null)}
-        />
+      </PeriodoFiltro>
+      <TablaLogistica
+        titulo="Cargas a puerto"
+        filas={filas}
+        clave={(f) => f.otorgamiento.otorgamiento.id}
+        cargando={q.isLoading}
+        error={q.error}
+        reintentar={() => void q.refetch()}
+        hayMas={q.hasNextPage}
+        mas={() => void q.fetchNextPage()}
+        cargandoMas={q.isFetchingNextPage}
+        vacio="No hay cupos otorgados para estas fechas y filtros."
+        columnas={[
+          {
+            titulo: "Estado",
+            celda: (f) => (
+              <span
+                className={
+                  ["revisar", "no_esta", "sin_verificar"].includes(f.estado)
+                    ? "font-medium text-rojo"
+                    : undefined
+                }
+              >
+                {ESTADO_CARGA[f.estado]}
+              </span>
+            ),
+          },
+          {
+            titulo: "Contrato · plan / cupo",
+            celda: (f) =>
+              `${f.otorgamiento.otorgamiento.contrato} · ${f.otorgamiento.otorgamiento.plan} / ${f.otorgamiento.otorgamiento.cupo}`,
+          },
+          { titulo: "Código otorgado", celda: (f) => oDash(f.otorgamiento.erp?.codigoTerminal) },
+          {
+            titulo: "Fecha de carga",
+            celda: (f) =>
+              f.otorgamiento.erp?.fechaCarga ? fecha(f.otorgamiento.erp.fechaCarga) : "—",
+          },
+          {
+            titulo: "Destinatario",
+            celda: (f) =>
+              f.otorgamiento.otorgamiento.destinatarioTipo === "propio"
+                ? "Propio"
+                : (f.otorgamiento.otorgamiento.clienteNombre ??
+                  `Cliente ${f.otorgamiento.otorgamiento.clienteNumero}`),
+          },
+          { titulo: "Carta de porte", celda: (f) => f.cartaPorte ?? "—" },
+          { titulo: "CTG", celda: (f) => oDash(f.otorgamiento.erp?.ctg) },
+          { titulo: "Patente", celda: (f) => oDash(f.otorgamiento.erp?.patenteChasis) },
+          { titulo: "Kg carga", numero: true, celda: (f) => kgErp(f.otorgamiento.erp?.kgCargaErp) },
+          {
+            titulo: "Kg descarga",
+            numero: true,
+            celda: (f) => kgErp(f.otorgamiento.erp?.kgDescargaErp),
+          },
+          {
+            titulo: "Camión (Flete)",
+            celda: (f) =>
+              f.propio?.camion ? (
+                <span>
+                  {f.propio.camion.patenteChasis}
+                  {f.propio.camion.conductor && (
+                    <span className="block text-xs text-ink-soft">{f.propio.camion.conductor}</span>
+                  )}
+                </span>
+              ) : (
+                "—"
+              ),
+          },
+          { titulo: "Observación", celda: (f) => f.propio?.observacion ?? "—" },
+          {
+            titulo: "Acciones",
+            celda: (f) => (
+              <div className="flex flex-wrap gap-1">
+                {gestionar && (
+                  <Button size="sm" variant="outline" onClick={() => setEditar(f)}>
+                    <Truck className="size-4" aria-hidden /> Camión
+                  </Button>
+                )}
+                <PlanCargaBoton otorgamientoId={f.otorgamiento.otorgamiento.id} variant="ghost" />
+                {f.propio && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setHistoria(f.otorgamiento.otorgamiento.id)}
+                  >
+                    Historial
+                  </Button>
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
+      {editar && <CargaDialog carga={editar} onClose={() => setEditar(null)} />}
+      {historia && (
+        <HistorialDialog recurso="cargas" id={historia} onClose={() => setHistoria(null)} />
       )}
     </>
   );

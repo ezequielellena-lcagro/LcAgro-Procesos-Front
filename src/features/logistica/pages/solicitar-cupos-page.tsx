@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/shared/components/page-header";
 import { AvisoDemo } from "../components/aviso-demo";
-import { CatalogoSelect } from "../components/catalogo-select";
 import { VentaPicker } from "../components/contrato-picker";
 import { Campo, FormOperacionFooter } from "../components/form-operacion";
 import { campania, hoy } from "../format";
@@ -36,20 +35,20 @@ const TRAMO_CONTRATOS = 10;
 export function SolicitarCuposPage() {
   const navigate = useNavigate();
   const [venta, setVenta] = useState<Venta | null>(null);
-  const [destino, setDestino] = useState(0);
   const mutation = useOperacion<Solicitud>("solicitudes-terminal");
   const bloqueado = mutation.isPending || confirmacionPendiente(mutation.error);
   const form = useForm<Valores>({
-    defaultValues: { fechaSolicitada: hoy(), cantidadCupos: 1, canal: "correo", observacion: "" },
+    // El canal arranca en WhatsApp: es por donde se piden hoy (devolución del 2026-10-23).
+    defaultValues: { fechaSolicitada: hoy(), cantidadCupos: 1, canal: "WhatsApp", observacion: "" },
   });
   const volver = () => {
-    if (!bloqueado) void navigate("/logistica/cupos");
+    if (!bloqueado) void navigate("/logistica/cupos", { state: { tab: "historial" } });
   };
   return (
     <>
       <PageHeader
         title="Solicitar cupos a terminal"
-        subtitle="Qué cupos le pediste a la terminal y sobre qué contrato de venta. El pedido a la terminal no crea cupos."
+        subtitle="Qué cupos le pediste a la terminal y sobre qué contrato de venta. Los conseguidos se cuentan solos con lo que entra a MacroGest."
         actions={
           <Button variant="outline" type="button" disabled={bloqueado} onClick={volver}>
             <ArrowLeft className="size-4" aria-hidden /> Volver a Cupos
@@ -64,24 +63,18 @@ export function SolicitarCuposPage() {
           tamano={TRAMO_CONTRATOS}
           onSelect={(v) => {
             setVenta(v);
-            setDestino(v.destinoCodigo ?? 0);
             form.clearErrors("root");
           }}
-          onSoltar={() => {
-            setVenta(null);
-            setDestino(0);
-          }}
+          onSoltar={() => setVenta(null)}
         />
       </fieldset>
 
       <form
         className="mt-6"
         onSubmit={form.handleSubmit(async (values) => {
-          if (!venta || !destino) {
+          if (!venta) {
             form.setError("root", {
-              message: venta
-                ? "Elegí el destino solicitado."
-                : "Elegí un contrato de venta en la grilla de arriba.",
+              message: "Elegí un contrato de venta en la grilla de arriba.",
             });
             return;
           }
@@ -89,11 +82,10 @@ export function SolicitarCuposPage() {
             await mutation.mutateAsync({
               ...values,
               contratoVenta: venta.numero,
-              destinoCodigo: destino,
               observacion: values.observacion || null,
             });
             // Vuelve a la solapa donde quedó la solicitud recién creada, no a la de entrada.
-            void navigate("/logistica/cupos", { state: { tab: "solicitudes" } });
+            void navigate("/logistica/cupos", { state: { tab: "historial" } });
           } catch {
             /* El error se muestra en el pie, con la misma clave disponible para reintentar. */
           }
@@ -115,17 +107,9 @@ export function SolicitarCuposPage() {
                 } / ${campania(venta.campania)}`
               : "Elegí un contrato de venta en la grilla de arriba y marcá su casillero."}
           </p>
-          {/* Los cuatro campos cortos en una sola fila; la observación, entera abajo. */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <CatalogoSelect
-              tipo="destinos"
-              titulo="Destino solicitado"
-              value={destino}
-              onChange={(v) => {
-                setDestino(v);
-                form.clearErrors("root");
-              }}
-            />
+          {/* Sin destino: a la terminal se le dice el contrato y manda el cupo según dónde tenga
+              lugar. Quedan fecha, cantidad y canal en una fila; la observación, entera abajo. */}
+          <div className="grid gap-4 sm:grid-cols-3">
             <Campo titulo="Fecha solicitada">
               <Input type="date" {...form.register("fechaSolicitada", { required: true })} />
             </Campo>
@@ -148,7 +132,7 @@ export function SolicitarCuposPage() {
                 {...form.register("canal", { required: true, maxLength: 30 })}
               />
             </Campo>
-            <div className="sm:col-span-2 lg:col-span-4">
+            <div className="sm:col-span-3">
               <Campo titulo="Observación (opcional)">
                 <Textarea maxLength={500} {...form.register("observacion")} />
               </Campo>

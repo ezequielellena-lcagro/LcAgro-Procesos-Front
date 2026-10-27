@@ -86,6 +86,7 @@ describe("grupo Logística", () => {
     expect(
       pedidos?.kind === "grupo" && pedidos.procesos.some((p) => p.label === "Cargas a puerto"),
     ).toBe(false);
+    // Cargas a puerto se rehízo leyendo MacroGest (tramo 5 de la devolución del 2026-10-23).
     for (const rol of ["logistica-lectura", "logistica-cupos", "logistica-cargas"] as const) {
       const grupo = procesosVisibles(acopio(), [rol]).find((p) => p.kind === "grupo");
       expect(

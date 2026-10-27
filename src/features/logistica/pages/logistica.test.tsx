@@ -13,7 +13,6 @@ import { PedidoDialog } from "../components/pedido-dialog";
 import { PedidosPage } from "./pedidos-page";
 import { CuposPage } from "./cupos-page";
 import { SolicitarCuposPage } from "./solicitar-cupos-page";
-import { RecibirCuposPage } from "./recibir-cupos-page";
 const sesion = vi.hoisted(() => ({ roles: ["logistica-lectura"] as RolNombre[] }));
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => ({ user: { id: 8, nombre: "Operador ficticio", roles: sesion.roles } }),
@@ -46,7 +45,6 @@ function mostrarCupos() {
         <Routes>
           <Route path="/logistica/cupos" element={<CuposPage />} />
           <Route path="/logistica/cupos/solicitar" element={<SolicitarCuposPage />} />
-          <Route path="/logistica/cupos/recibir" element={<RecibirCuposPage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -107,10 +105,15 @@ describe("Logística operativa", () => {
     const grilla = await within(dialogo).findByRole("table", { name: "Elegir preventa" });
     expect(cupos.compareDocumentPosition(grilla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
-  it("registra cero sin crear cupos y luego recibe filas con seguimiento", async () => {
+  it("solicita desde el historial sin destino y los conseguidos se cuentan solos", async () => {
     sesion.roles = ["logistica-cupos"];
     mostrarCupos();
-    fireEvent.click(screen.getByRole("button", { name: "Solicitar cupos" }));
+    // Solicitar vive dentro de la última solapa, no en la cabecera de Cupos.
+    expect(screen.queryByRole("button", { name: "Solicitar cupos" })).not.toBeInTheDocument();
+    const solapas = screen.getAllByRole("tab").map((t) => t.textContent);
+    expect(solapas).toEqual(["Resumen", "Otorgar", "Historial de pedidos de cupo"]);
+    fireEvent.click(screen.getByRole("tab", { name: "Historial de pedidos de cupo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Solicitar cupos" }));
     // Pantalla propia, no modal: la grilla paginada arriba y los datos de la solicitud abajo.
     await screen.findByRole("heading", { name: "Solicitar cupos a terminal" });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -127,41 +130,37 @@ describe("Logística operativa", () => {
     expect(elegirContrato).not.toBeChecked();
     expect(screen.getByLabelText("Cantidad de cupos")).toBeDisabled();
     fireEvent.click(elegirContrato);
-    fireEvent.change(screen.getByLabelText("Cantidad de cupos"), { target: { value: "2" } });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar solicitud" }));
-    // Guardar vuelve a Cupos con la solicitud ya en la grilla.
-    fireEvent.click(await screen.findByRole("button", { name: "Respuesta" }));
-    fireEvent.change(screen.getByLabelText("Referencia del mensaje"), {
-      target: { value: "Mensaje ficticio" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar respuesta" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    const tabla = screen.getByRole("table", { name: "Solicitudes a terminal" });
-    expect(within(tabla).queryByText("Sin respuesta")).not.toBeInTheDocument();
-    expect(within(tabla).getAllByText("0")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "Recibir" }));
-    // Pantalla propia: el formulario recién se habilita cuando se sabe sobre qué contrato opera.
-    await screen.findByRole("heading", { name: "Recibir cupos de terminal" });
-    const solicitudElegida = await screen.findByRole("region", { name: "Solicitud elegida" });
-    await within(solicitudElegida).findByText("V-DEMO/1");
-    fireEvent.change(screen.getByLabelText("Referencia de recepción"), {
-      target: { value: "Recepción ficticia" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar fila" }));
-    fireEvent.change(screen.getByLabelText("Fecha de carga fila 2"), {
+    // Quedan fecha, cantidad y canal; sin destino y con WhatsApp de arranque.
+    expect(screen.queryByLabelText("Destino solicitado")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Canal")).toHaveValue("WhatsApp");
+    // El MacroGest de la demo tiene tres cupos del contrato para mañana (uno ya en planta 10):
+    // cuentan todos, en cualquier planta.
+    fireEvent.change(screen.getByLabelText("Fecha solicitada"), {
       target: { value: sumarDias(hoy(), 1) },
     });
-    fireEvent.change(screen.getByLabelText("Circuito fila 2"), { target: { value: "propia" } });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar recepción completa" }));
+    fireEvent.change(screen.getByLabelText("Cantidad de cupos"), { target: { value: "4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar solicitud" }));
+    // Guardar vuelve al historial con el pedido ya en la grilla y lo conseguido contado.
+    const tabla = await screen.findByRole("table", { name: "Historial de pedidos de cupo" });
+    const fila = (await within(tabla).findByText("WhatsApp")).closest("tr")!;
     expect(
-      await screen.findByText("Se recibieron 2 cupos y se creó su seguimiento."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Hay filas con fecha o destino distintos a lo solicitado."),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Ver cupos recibidos" }));
-    await waitFor(() => expect(screen.getAllByText("por iniciar")).toHaveLength(2));
-    expect(screen.getAllByText("Pendiente de informar")).toHaveLength(2);
+      within(fila)
+        .getAllByRole("cell")
+        .map((c) => c.textContent),
+    ).toEqual(expect.arrayContaining(["4", "3", "1"]));
+    expect(screen.queryByRole("button", { name: "Respuesta" })).not.toBeInTheDocument();
+    fireEvent.click(within(fila).getByRole("button", { name: "Cerrar" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Cerrar pedido de cupo" });
+    fireEvent.change(within(dialogo).getByLabelText("Motivo de cierre"), {
+      target: { value: "La terminal no da más" },
+    });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cerrar pedido de cupo" }));
+    expect(await within(tabla).findByText("Cerrada")).toBeInTheDocument();
+    // Los cupos ya no se reciben a mano: son los de MacroGest.
+    expect(screen.queryByRole("button", { name: "Recibir" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Recibir cupos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Cupos recibidos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Cupos MacroGest" })).not.toBeInTheDocument();
   });
   it("soltar la preventa elegida devuelve el alta sin preventa", async () => {
     sesion.roles = ["logistica-pedidos"];

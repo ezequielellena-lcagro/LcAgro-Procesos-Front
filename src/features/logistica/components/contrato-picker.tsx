@@ -176,14 +176,23 @@ export function PreventaPicker({
             celda: (p) => `${fecha(p.fechaEntregaInicio)} — ${fecha(p.fechaEntregaFin)}`,
           },
           { titulo: "Contratado", numero: true, celda: (p) => kg(p.kgContratados) },
+          {
+            titulo: "Descargado",
+            numero: true,
+            celda: (p) => (p.kgDescargados ? kg(p.kgDescargados) : "—"),
+          },
+          // Cumplida = lo descargado en MacroGest de sus cupos alcanza lo contratado. Si el puerto
+          // rechaza un camión no hay descarga, y vuelve sola a pendiente.
+          { titulo: "Estado de entrega", celda: (p) => (p.cumplida ? "Cumplida" : "Pendiente") },
         ]}
       />
       {/* Aclara qué NO es la columna "Contratado". Antes decía "el saldo anterior al inicio de
           Logística queda pendiente de verificación", que no se entendía: lo que importa es que ese
           número es el contrato entero y no el remanente. */}
       <p className="mt-2 text-xs text-ink-soft">
-        «Contratado» son los kilos del contrato en MacroGest, no lo que falta entregar: las entregas
-        anteriores al inicio de Logística todavía no se descuentan.
+        «Contratado» son los kilos del contrato en MacroGest. «Descargado» suma la descarga en
+        MacroGest de los cupos otorgados en la app a la preventa; las entregas anteriores al inicio
+        de Logística no se cuentan.
       </p>
     </div>
   );

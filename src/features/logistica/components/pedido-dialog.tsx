@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { hoy, campania } from "../format";
 import { useDetalle, useOperacion } from "../queries/use-logistica";
 import type { Pedido, Preventa } from "../types";
+import { CampaniaSelect } from "./campania-select";
 import { CatalogoSelect } from "./catalogo-select";
 import { PreventaPicker } from "./contrato-picker";
 import { Campo, FormOperacionFooter } from "./form-operacion";
@@ -22,6 +23,7 @@ const schema = z.object({
   fechaSolicitada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   cantidadCupos: z.number().int().min(1).max(100000),
   observacion: z.string().max(120),
+  seCargaEnPlanta: z.boolean(),
 });
 type Valores = z.infer<typeof schema>;
 export function PedidoDialog({
@@ -58,6 +60,7 @@ export function PedidoDialog({
       fechaSolicitada: pedido?.fechaSolicitada ?? hoy(),
       cantidadCupos: pedido?.cantidadCupos ?? 1,
       observacion: pedido?.observacion ?? "",
+      seCargaEnPlanta: pedido?.seCargaEnPlanta ?? false,
     },
   });
   const valores = useWatch({ control: form.control });
@@ -117,9 +120,14 @@ export function PedidoDialog({
               value={valores.producto ?? 0}
               onChange={(v) => form.setValue("producto", v, { shouldValidate: true })}
             />
-            <Campo titulo="Campaña">
-              <Input placeholder="2025-2026" form={formId} {...form.register("campania")} />
-            </Campo>
+            {/* Desplegable con las campañas de MacroGest: escrita a mano se aceptaba cualquier cosa
+                hasta que el servidor la rechazaba (nota de la devolución del 2026-10-23). */}
+            <CampaniaSelect
+              className="w-full"
+              vacio="Elegí una campaña"
+              value={valores.campania ?? ""}
+              onChange={(v) => form.setValue("campania", v, { shouldValidate: true })}
+            />
           </>
         )}
         <Campo titulo="Cupos que pide">
@@ -137,6 +145,20 @@ export function PedidoDialog({
         <Campo titulo="Estimación por cupo">
           <Input value="30.000 kg" disabled />
         </Campo>
+        {/* El productor sigue siendo el dueño del cereal: guardamos cereal de clientes en
+            consignación, así que el camión puede cargarse en la planta y no en su campo. */}
+        <label className="flex items-center gap-2 text-sm text-ink sm:col-span-3">
+          <input
+            type="checkbox"
+            className="size-4 accent-primary"
+            form={formId}
+            {...form.register("seCargaEnPlanta")}
+          />
+          Se carga en planta
+          <span className="text-xs text-ink-soft">
+            (el camión carga en La Clementina; el productor sigue siendo el dueño del cereal)
+          </span>
+        </label>
         <div className="sm:col-span-3">
           <Campo titulo="Observación (opcional)">
             <Textarea maxLength={120} form={formId} {...form.register("observacion")} />

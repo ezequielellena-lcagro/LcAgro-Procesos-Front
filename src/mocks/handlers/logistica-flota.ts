@@ -9,7 +9,6 @@ import {
   trimFlota,
 } from "@/features/logistica/lib/flota";
 import type {
-  FlotaSeguimientoDto,
   FichaFlotaDto,
   FichaFlotaRequest,
   FichaFlotaVersionDto,
@@ -23,6 +22,15 @@ const fichas = new Map<string, FichaFlotaDto>();
 const versiones = new Map<string, FichaFlotaVersionDto>();
 const historias = new Map<string, Evento[]>();
 const comandos = new Map<string, { cuerpo: string; dato: FichaFlotaDto }>();
+/** Camiones activos del padrón, como los ve Cargas a puerto para elegir. */
+export function fichasActivasDemo(): FichaFlotaDto[] {
+  return [...fichas.values()].filter((f) => f.activo).map((f) => structuredClone(f));
+}
+/** La versión de una ficha, si existe: Cargas guarda la versión exacta elegida. */
+export function versionFlotaDemo(versionId: string): FichaFlotaVersionDto | undefined {
+  const v = versiones.get(versionId.toLowerCase());
+  return v ? structuredClone(v) : undefined;
+}
 // El padrón propio comienza vacío. El reset sólo sirve a pruebas; no borra datos al login.
 export function resetFlotaDemo() {
   fichas.clear();
@@ -52,53 +60,6 @@ function repetida(id: string, campos: FichaFlotaRequest) {
 }
 function leer(f: FichaFlotaDto) {
   return { ...structuredClone(f), patenteChasisRepetida: repetida(f.id, f.ficha) };
-}
-function referenciaOperativa(f: FichaFlotaVersionDto): FlotaSeguimientoDto {
-  return structuredClone({
-    fichaId: f.fichaId,
-    versionId: f.id,
-    revision: f.revision,
-    patenteChasis: f.ficha.patenteChasis,
-    patenteAcoplado: f.ficha.patenteAcoplado,
-    conductor: f.ficha.conductor,
-    transportista: f.ficha.transportista,
-    importeReferencia: f.ficha.importeReferencia,
-    moneda: f.ficha.moneda,
-    vigenteDesde: f.ficha.vigenteDesde,
-  });
-}
-// Sólo lecturas operativas clonadas: la proyección excluye datos fiscales del padrón.
-export function flotaDisponibleDemo(buscar: string | null, cursor: string | null) {
-  const busqueda = buscar === null ? null : mayusculasFlotaInvariantes(trimFlota(buscar));
-  const equivalencia = buscar === null ? null : patenteFlotaEquivalente(trimFlota(buscar));
-  return [...fichas.values()]
-    .filter(
-      (f) =>
-        f.activo &&
-        (cursor === null || f.id > cursor.toLowerCase()) &&
-        (busqueda === null ||
-          [
-            f.ficha.patenteChasis,
-            f.ficha.patenteAcoplado,
-            f.ficha.conductor,
-            f.ficha.transportista,
-          ].some((t) => t !== null && mayusculasFlotaInvariantes(t).includes(busqueda)) ||
-          (equivalencia !== null &&
-            equivalencia.length > 0 &&
-            patenteFlotaEquivalente(f.ficha.patenteChasis).includes(equivalencia))),
-    )
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((f) => referenciaOperativa(versiones.get(f.versionId)!));
-}
-export function versionFlotaDisponibleDemo(
-  fichaId: string,
-  versionId: string,
-): { status: 200; dato: FlotaSeguimientoDto } | { status: 404 | 409; dato: null } {
-  const ficha = fichas.get(fichaId.toLowerCase());
-  const version = versiones.get(versionId.toLowerCase());
-  if (!ficha || !version || version.fichaId !== ficha.id) return { status: 404, dato: null };
-  if (!ficha.activo || ficha.versionId !== version.id) return { status: 409, dato: null };
-  return { status: 200, dato: referenciaOperativa(version) };
 }
 function detalle(dato: unknown) {
   return HttpResponse.json({ dato, datosAl: new Date().toISOString() });

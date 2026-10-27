@@ -74,3 +74,12 @@ export function instanteArgentinaUtc(valor: string): string | null {
   const local = new Date(instante.getTime() - 3 * 3600000).toISOString().slice(0, valor.length);
   return local === valor ? instante.toISOString() : null;
 }
+/** Día argentino (AAAA-MM-DD) de un instante: el que usa el servidor para paginar otorgamientos. */
+export function diaArgentina(instante: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(instante));
+}

@@ -17,11 +17,14 @@ export function CampaniaSelect({
   value,
   onChange,
   className = "w-36",
+  vacio = "Todas",
 }: {
   /** Campaña en formato de pantalla (`2025-2026`); vacío = todas. */
   value: string;
   onChange: (campania: string) => void;
   className?: string;
+  /** Texto de la opción vacía: «Todas» en un filtro, una invitación a elegir en un alta. */
+  vacio?: string;
 }) {
   const q = useCatalogo("campanias");
   const opciones = (q.data?.pages.flatMap((p) => p.filas) ?? [])
@@ -45,7 +48,7 @@ export function CampaniaSelect({
   return (
     <FilterField label="Campaña">
       <Select className={className} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Todas</option>
+        <option value="">{vacio}</option>
         {/* La elegida puede no estar en la lista (ERP lento o campaña vieja): igual se lee. */}
         {value && !opciones.includes(value) && <option value={value}>{value}</option>}
         {opciones.map((c) => (

@@ -5,13 +5,13 @@ import { toAppError } from "@/lib/api-error";
 import { fecha, kg } from "../format";
 import { confirmacionPendiente } from "../lib/comandos";
 import { useOperacion } from "../queries/use-logistica";
-import type { Cupo, OtorgarBody, OtorgarResultado, Pedido } from "../types";
+import type { CupoPlanta0, OtorgarBody, OtorgarResultado, Pedido } from "../types";
 import { FormOperacionFooter } from "./form-operacion";
 import { TablaLogistica } from "./tabla-logistica";
 
 export interface RevisionOtorgamiento {
   body: OtorgarBody;
-  cupos: Cupo[];
+  cupos: CupoPlanta0[];
   pedido: Pedido | null;
   destinatario: string;
   preventa: string;
@@ -43,7 +43,9 @@ export function OtorgamientoDialog({
   return (
     <Modal open title="Revisar otorgamiento" onClose={cerrar} className="max-w-6xl">
       <p className="mb-4 text-sm text-ink-soft">
-        Revisá el destinatario y las filas antes de confirmar la asignación.
+        Revisá el destinatario y los cupos antes de confirmar. Al confirmar queda registrado en la
+        app; después hay que pasar el plan en MacroGest (productor y planta 10, o planta 15 si es
+        propio) y la app lo da por confirmado cuando lo lee.
       </p>
       <TablaLogistica
         titulo="Destinatario del otorgamiento"
@@ -81,18 +83,17 @@ export function OtorgamientoDialog({
       <TablaLogistica
         titulo="Cupos a otorgar"
         filas={revision.cupos}
-        clave={(f) => f.id}
+        clave={(f) => `${f.contrato}/${f.plan}/${f.cupo}`}
         columnas={[
-          { titulo: "Contrato", celda: (f) => f.contratoVenta },
-          { titulo: "Código terminal", celda: (f) => f.codigoTerminal || "Pendiente de informar" },
-          { titulo: "Destino", celda: (f) => f.destinoNombre ?? f.destinoCodigo },
+          { titulo: "Contrato", celda: (f) => f.contrato },
+          { titulo: "Plan / cupo", celda: (f) => `${f.plan} / ${f.cupo}` },
+          { titulo: "Código otorgado", celda: (f) => f.codigoTerminal || "Sin código" },
+          { titulo: "Destino", celda: (f) => f.destinoNombre ?? f.destinoCodigo ?? "—" },
           { titulo: "Fecha de carga", celda: (f) => fecha(f.fechaCarga) },
           {
             titulo: "Cereal / campaña",
             celda: (f) => `${f.productoNombre ?? f.producto} / ${f.campania}`,
           },
-          { titulo: "Circuito", celda: (f) => f.circuito },
-          { titulo: "Seguimiento", celda: (f) => f.estadoObservado.replaceAll("_", " ") },
         ]}
       />
       {revision.advertencias.length > 0 && (

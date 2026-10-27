@@ -30,6 +30,10 @@ export interface Preventa extends PreventaRef {
   fechaEntregaFin: string | null;
   kgContratados: number | null;
   estado: string | null;
+  /** Kg de descarga en MacroGest de los cupos otorgados en la app a esta preventa. */
+  kgDescargados?: number;
+  /** Descargado ≥ contratado: deja de estar pendiente (vuelve sola si el puerto rechaza). */
+  cumplida?: boolean;
 }
 export interface Venta {
   numero: string;
@@ -50,16 +54,14 @@ export interface Solicitud {
   productoNombre?: string | null;
   producto: number;
   campania: string;
-  destinoNombre?: string | null;
-  destinoCodigo: number;
   fechaSolicitada: string;
   cantidadCupos: number;
   canal: string;
   observacion: string | null;
   cerradaAl: string | null;
   motivoCierre: string | null;
-  ultimaRespuesta: number | null;
-  recibidos: number;
+  /** Cupos que entraron a MacroGest para ese contrato y esa fecha; `null` = MacroGest no respondió. */
+  conseguidos: number | null;
 }
 export interface Pedido {
   id: string;
@@ -76,40 +78,151 @@ export interface Pedido {
   otorgados: number;
   pendientes: number;
   estado: string;
+  /** El camión se carga en la planta propia; el productor sigue siendo el dueño del cereal. */
+  seCargaEnPlanta: boolean;
 }
-export interface Cupo {
+/** Clave de un cupo en MacroGest: contrato de venta, plan de carga y cupo. */
+export interface ClaveCupo {
+  contrato: string;
+  plan: number;
+  cupo: number;
+}
+/** Otorgamiento registrado en la app contra un cupo de MacroGest. */
+export interface Otorgamiento extends ClaveCupo {
   id: string;
   revision: number;
-  tandaId: string;
-  contratoVenta: string;
-  productoNombre?: string | null;
-  producto: number;
-  campania: string;
-  ordinal: number;
-  fechaCarga: string;
-  destinoNombre?: string | null;
-  destinoCodigo: number;
-  codigoTerminal: string | null;
-  circuito: "directa" | "propia";
-  lugarTipo: "campo" | "planta" | "otro";
-  lugarReferencia: string | null;
-  estadoObservado: string;
-  otorgamientoVigente: Otorgamiento | null;
-  seguimientoAnulado: boolean;
-  tieneVinculoErpVigente: boolean;
-  disponibleParaOtorgar: boolean;
-}
-export interface Otorgamiento {
-  id: string;
-  revision: number;
-  cupoId: string;
   pedidoId: string | null;
   destinatarioTipo: "cliente" | "propio";
   clienteNumero: number | null;
-  clienteNombre: string | null;
+  clienteNombre?: string | null;
   preventa: PreventaRef | null;
-  kgEstimados: number;
   vigenteDesde: string;
+  vigenteHasta?: string | null;
+  motivoDeshecho?: string | null;
+}
+/**
+ * Un cupo de planta 0 de MacroGest. Cereal y campaña son los del contrato leídos ahora; si ya se
+ * otorgó en la app y falta pasarlo en MacroGest, trae ese otorgamiento.
+ */
+export interface CupoPlanta0 extends ClaveCupo {
+  codigoTerminal: string | null;
+  fechaCarga: string | null;
+  producto: number | null;
+  productoNombre: string | null;
+  campania: string | null;
+  destinoCodigo: number | null;
+  destinoNombre: string | null;
+  otorgamientoVigente: Otorgamiento | null;
+}
+/** Un cupo de MacroGest con su plan: la planta del plan ES el estado del cupo. */
+export interface CupoErp extends ClaveCupo {
+  codigoTerminal: string | null;
+  fechaCarga: string | null;
+  planta: number | null;
+  productorPlan: number | null;
+  cargadorPlan: number | null;
+  producto: number | null;
+  productoNombre: string | null;
+  campania: number | null;
+  destinoNombre: string | null;
+  destinoCodigo: number | null;
+  tieneCabecera: boolean;
+  tieneCartaPorte: boolean;
+  tieneDescarga: boolean;
+  ctg: string | null;
+  patenteChasis: string | null;
+  // API devuelve texto exacto para no perder decimales.
+  kgCargaErp: string | number | null;
+  kgDescargaErp: string | number | null;
+  fechaDescarga: string | null;
+}
+export type EstadoOtorgamiento =
+  | "pendiente"
+  | "confirmado"
+  | "otro_productor"
+  | "otra_planta"
+  | "no_esta"
+  | "deshecho"
+  | "sin_verificar";
+/** Otorgamiento con lo que MacroGest dice hoy de su cupo; se recalcula en cada lectura. */
+export interface OtorgamientoConEstado {
+  otorgamiento: Otorgamiento;
+  estado: EstadoOtorgamiento;
+  detalle: string;
+  erp: CupoErp | null;
+  productorPlanNombre: string | null;
+}
+/** Un maestro de MacroGest tal como sale en el Plan de Carga. */
+export interface ReferenciaPlanCarga {
+  codigo: number | null;
+  nombre: string | null;
+  cuit?: string | null;
+}
+/** Datos del Plan de Carga de un otorgamiento, con el formato del que imprime MacroGest. */
+export interface PlanCarga {
+  contrato: string;
+  plan: number;
+  viajes: number | null;
+  toneladas: number | null;
+  fecha: string | null;
+  cereal: ReferenciaPlanCarga;
+  campania: number | null;
+  titular: ReferenciaPlanCarga;
+  numeroEstablecimiento: number | null;
+  destino: ReferenciaPlanCarga;
+  destinoDomicilio: string | null;
+  planta: ReferenciaPlanCarga;
+  destinatario: ReferenciaPlanCarga;
+  corredorVentaSecundaria: ReferenciaPlanCarga;
+  mercadoTermino: number | null;
+  corredorVentaPrimaria: ReferenciaPlanCarga;
+  entregador: ReferenciaPlanCarga;
+  observaciones: string | null;
+  cupos: {
+    cupo: number;
+    fechaCarga: string | null;
+    codigoOtorgado: string | null;
+    cartaPorte: string | null;
+  }[];
+  destinatarioApp: string;
+  datosAl: string;
+}
+/** Camión del padrón de Flete, con la versión exacta elegida para la carga. */
+export interface CamionCarga {
+  fichaId: string;
+  versionId: string;
+  revision: number;
+  patenteChasis: string;
+  patenteAcoplado: string | null;
+  conductor: string | null;
+  transportista: string | null;
+}
+export interface CargaPropia {
+  otorgamientoId: string;
+  revision: number;
+  camion: CamionCarga | null;
+  observacion: string | null;
+}
+export type EstadoCarga =
+  | "falta_pasar"
+  | "por_cargar"
+  | "en_viaje"
+  | "descargado"
+  | "revisar"
+  | "no_esta"
+  | "sin_verificar";
+/** Un cupo otorgado con lo que dice MacroGest y lo propio (camión y observación). */
+export interface CargaLogistica {
+  otorgamiento: OtorgamientoConEstado;
+  estado: EstadoCarga;
+  cartaPorte: string | null;
+  propio: CargaPropia | null;
+}
+export interface GuardarCargaBody {
+  revision: number | null;
+  fichaId: string | null;
+  versionId: string | null;
+  observacion: string | null;
 }
 export interface OtorgarBody {
   destinatarioTipo: "cliente" | "propio";
@@ -117,51 +230,17 @@ export interface OtorgarBody {
   pedidoId?: string;
   pedidoRevision?: number;
   preventa?: PreventaRef;
-  cupos: { id: string; revision: number }[];
+  cupos: ClaveCupo[];
 }
 export interface OtorgarResultado {
   otorgamientos: Otorgamiento[];
-  cupos: Cupo[];
   pedido: Pedido | null;
   advertencias: string[];
 }
-export interface Recepcion {
-  id: string;
-  revision: number;
-  contratoVenta: string;
-  solicitudId: string | null;
-  referencia: string;
-  recibidoAl: string;
-  cupos: Cupo[];
+export interface DeshacerResultado {
+  otorgamiento: Otorgamiento;
+  pedido: Pedido | null;
   advertencias: string[];
-}
-export interface CupoErp {
-  contrato: string;
-  grupo: number;
-  cupo: number;
-  codigoTerminal: string | null;
-  fechaCarga: string | null;
-  fechaAltaErp: string | null;
-  destinoNombre: string | null;
-  destinoCodigo: number | null;
-  plantaTrabajo: number | null;
-  plantaDetalle: number | null;
-  productorPlan: number | null;
-  cargadorPlan: number | null;
-  codigoCp: number | null;
-  sucursalCp: number | null;
-  numeroCp: number | null;
-  ordenCp: number | null;
-  tieneCabecera: boolean;
-  tieneCartaPorte: boolean;
-  tieneDescarga: boolean;
-  ctg: string | null;
-  patenteChasis: string | null;
-  // API devuelve texto exacto; number admite sólo fixtures administrativos pequeños previos.
-  kgCargaErp: string | number | null;
-  kgDescargaErp: string | number | null;
-  patenteAcoplado: string | null;
-  fechaDescarga: string | null;
 }
 export interface Evento {
   id: string;
@@ -172,89 +251,7 @@ export interface Evento {
   registradoPorId: number;
   motivo: string | null;
 }
-export const ESTADOS_SEGUIMIENTO = [
-  "por_iniciar",
-  "cargando",
-  "en_viaje",
-  "en_puerto",
-  "calado",
-  "descargado",
-] as const;
-export const FUENTES_OPERATIVAS = [
-  "operador",
-  "cliente",
-  "balanza",
-  "agroentregas",
-  "terminal",
-  "otro",
-] as const;
-export type EstadoSeguimiento = (typeof ESTADOS_SEGUIMIENTO)[number];
-export type FuenteOperativa = (typeof FUENTES_OPERATIVAS)[number];
-export type TipoDatoOperativo = "kg_carga" | "kg_descarga" | "patente";
-export interface DatoOperativo {
-  id: string;
-  cupoId: string;
-  tipo: TipoDatoOperativo;
-  kilogramos: string | null;
-  texto: string | null;
-  fuente: FuenteOperativa;
-  observadoAl: string;
-  referencia: string;
-  registradoAl: string;
-  registradoPorId: number;
-  reemplazaId: string | null;
-  motivoCorreccion: string | null;
-}
-export interface VinculoErpSeguimiento {
-  id: string;
-  contrato: string;
-  grupo: number;
-  cupo: number;
-  vigenteDesde: string;
-  evidencia: string;
-  registradoPorId: number;
-}
-export interface Seguimiento {
-  cupoId: string;
-  revision: number;
-  cupo: Cupo;
-  referenciaRecepcion: string;
-  estadoObservado: EstadoSeguimiento;
-  estadoObservadoAl: string | null;
-  estadoFuente: FuenteOperativa | null;
-  estadoReferencia: string | null;
-  observacion: string | null;
-  anuladoAl: string | null;
-  anuladoPorId: number | null;
-  motivoAnulacion: string | null;
-  datosVigentes: DatoOperativo[];
-  vinculoErpVigente: VinculoErpSeguimiento | null;
-  flotaVigente?: FlotaSeguimientoDto | null;
-}
-export interface EstadoSeguimientoBody {
-  revision: number;
-  estadoObservado: EstadoSeguimiento;
-  observadoAl: string;
-  fuente: FuenteOperativa;
-  referencia: string;
-  motivoCorreccion?: string;
-}
-export interface DatoOperativoBody {
-  revision: number;
-  tipo: TipoDatoOperativo;
-  kilogramos?: string;
-  texto?: string;
-  fuente: FuenteOperativa;
-  observadoAl: string;
-  referencia: string;
-  reemplazaId?: string;
-  motivoCorreccion?: string;
-}
-export interface AnularSeguimientoBody {
-  revision: number;
-  motivo: string;
-}
-export type Recurso = "pedidos" | "solicitudes-terminal" | "cupos" | "seguimientos" | "flota";
+export type Recurso = "pedidos" | "solicitudes-terminal" | "otorgamientos" | "flota";
 export const ROLES_LECTURA = [
   "logistica-lectura",
   "logistica-pedidos",
@@ -263,112 +260,6 @@ export const ROLES_LECTURA = [
 ] as const;
 export const ROLES_CUPOS = ["logistica-lectura", "logistica-cupos", "logistica-cargas"] as const;
 
-export interface ClaveCupoErp {
-  contrato: string;
-  grupo: number;
-  cupo: number;
-}
-export interface CandidatoErp {
-  erp: CupoErp;
-  ocupado: boolean;
-}
-export interface VinculoErpBody {
-  revision: number;
-  clave: ClaveCupoErp;
-  evidencia: string;
-  confirmado: boolean;
-  motivoCambio?: null;
-}
-export interface RetirarVinculoErpBody {
-  revision: number;
-  vinculoActualId: string;
-  evidencia: string;
-  motivo: string;
-  confirmado: boolean;
-}
-export interface ReemplazarVinculoErpBody extends RetirarVinculoErpBody {
-  claveNueva: ClaveCupoErp;
-}
-export interface RetiroVinculoErpResultado {
-  seguimiento: Seguimiento;
-  retiradoAl: string;
-}
-export interface VinculoErpResultado {
-  seguimiento: Seguimiento;
-  verificadoAl: string;
-}
-export type EstadoConsultaErp = "sin_vinculo" | "verificado" | "no_encontrado" | "no_disponible";
-export interface ConciliacionFila {
-  seguimiento: Seguimiento;
-  estadoConsulta: EstadoConsultaErp;
-  erp: CupoErp | null;
-  incidencias: string[];
-}
-export interface MetricasResumen {
-  solicitudes: number;
-  cerradas: number;
-  solicitados: number;
-  respuestaVigente: number | null;
-  sinRespuesta: number;
-  respuestaCero: number;
-  recibidos: number;
-  otorgados: number;
-  porRecibir: number | null;
-  porOtorgar: number;
-  otrosSinOtorgar: number;
-  anulados: number;
-  fechaCargaDistinta: number;
-  destinoDistinto: number;
-}
-export interface GrupoResumen {
-  fechaSolicitada: string;
-  destinoCodigo: number;
-  contrato: string;
-  producto: number;
-  campania: string;
-  metricas: MetricasResumen;
-  productoNombre?: string | null;
-  destinoNombre?: string | null;
-}
-export interface ResumenLogistica {
-  filas: GrupoResumen[];
-  totales: MetricasResumen;
-  hayMas: boolean;
-  propiosAl: string;
-  datosAl: string;
-  baseFecha: "fecha_solicitada";
-  fuente: "logistica";
-}
-export interface CursorResumen {
-  despuesFecha: string;
-  despuesDestinoCodigo: number;
-  despuesContrato: string;
-  despuesProducto: number;
-  despuesCampania: string;
-}
-
-export interface FlotaSeguimientoDto {
-  fichaId: string;
-  versionId: string;
-  revision: number;
-  patenteChasis: string;
-  patenteAcoplado: string | null;
-  conductor: string | null;
-  transportista: string | null;
-  importeReferencia: string | null;
-  moneda: MonedaFlota | null;
-  vigenteDesde: string | null;
-}
-export interface SeleccionarFlotaSeguimientoBody {
-  revision: number;
-  fichaId: string;
-  versionId: string;
-  motivo: string | null;
-}
-export interface RetirarFlotaSeguimientoBody {
-  revision: number;
-  motivo: string;
-}
 export type MonedaFlota = "ARS" | "USD";
 export interface FichaFlotaRequest {
   patenteChasis: string;

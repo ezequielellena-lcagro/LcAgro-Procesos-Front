@@ -80,11 +80,6 @@ const LogisticaSolicitarCuposPage = lazy(() =>
     default: m.SolicitarCuposPage,
   })),
 );
-const LogisticaRecibirCuposPage = lazy(() =>
-  import("@/features/logistica/pages/recibir-cupos-page").then((m) => ({
-    default: m.RecibirCuposPage,
-  })),
-);
 const LogisticaCargasPage = lazy(() =>
   import("@/features/logistica/pages/cargas-page").then((m) => ({ default: m.CargasPage })),
 );
@@ -154,7 +149,6 @@ export const router = createBrowserRouter([
             element: <ProtectedRoute roles={["logistica-cupos"]} />,
             children: [
               { path: "logistica/cupos/solicitar", element: <LogisticaSolicitarCuposPage /> },
-              { path: "logistica/cupos/recibir", element: <LogisticaRecibirCuposPage /> },
             ],
           },
           {
