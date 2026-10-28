@@ -50,8 +50,6 @@ const pedir = (cantidad: number, preventa: { operacion: string; numero: string }
   });
 const otorgar = (pedido: Pedido, cupos: { contrato: string; plan: number; cupo: number }[]) =>
   post<OtorgarResultado>("otorgamientos", {
-    destinatarioTipo: "cliente",
-    clienteNumero: pedido.clienteNumero,
     pedidoId: pedido.id,
     pedidoRevision: pedido.revision,
     cupos,
@@ -64,6 +62,7 @@ function mostrar() {
     [
       { path: "/logistica/pedidos", element: <PedidosPage /> },
       { path: "/logistica/cupos", element: <CuposPage /> },
+      { path: "/logistica/cupos/otorgar", element: <div>Otorgar cupos</div> },
     ],
     { initialEntries: ["/logistica/pedidos"] },
   );
@@ -73,6 +72,7 @@ function mostrar() {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+  return router;
 }
 const tabla = () => screen.findByRole("table", { name: "Pedidos de Logística" });
 
@@ -153,22 +153,15 @@ describe("Pedidos (devolución del 2026-10-23)", () => {
     );
   });
 
-  it("Otorgar desde la fila abre Cupos › Otorgar con el pedido elegido y los cupos de su cereal", async () => {
+  it("Otorgar desde la fila abre la pantalla por pasos con el pedido ya elegido", async () => {
     sesion.roles = ["logistica-pedidos", "logistica-cupos"];
-    await pedir(2);
-    mostrar();
+    const pedido = await pedir(2);
+    const router = mostrar();
     fireEvent.click(await within(await tabla()).findByRole("button", { name: "Otorgar" }));
     await waitFor(() =>
-      expect(
-        screen.getByRole("radio", { name: "Elegir pedido de Productor ficticio" }),
-      ).toBeChecked(),
-    );
-    expect(screen.getByRole("tab", { name: "Otorgar" })).toHaveAttribute("aria-selected", "true");
-    fireEvent.click(await screen.findByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-2" }));
-    fireEvent.click(screen.getByRole("button", { name: "Revisar otorgamiento" }));
-    expect(await screen.findByRole("dialog", { name: "Revisar otorgamiento" })).toHaveTextContent(
-      "Productor ficticio · Pedido",
+      expect(`${router.state.location.pathname}${router.state.location.search}`).toBe(
+        `/logistica/cupos/otorgar?pedido=${pedido.id}`,
+      ),
     );
   });
 

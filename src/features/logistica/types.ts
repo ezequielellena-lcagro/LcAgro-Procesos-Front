@@ -30,6 +30,8 @@ export interface Preventa extends PreventaRef {
   fechaEntregaFin: string | null;
   kgContratados: number | null;
   estado: string | null;
+  /** «P» = entrega pendiente en MacroGest; ordena el listado por prioridad de entrega. */
+  estadoEntrega?: string | null;
   /** Kg de descarga en MacroGest de los cupos otorgados en la app a esta preventa. */
   kgDescargados?: number;
   /** Descargado ≥ contratado: deja de estar pendiente (vuelve sola si el puerto rechaza). */
@@ -80,6 +82,8 @@ export interface Pedido {
   estado: string;
   /** El camión se carga en la planta propia; el productor sigue siendo el dueño del cereal. */
   seCargaEnPlanta: boolean;
+  /** Inicio del período de entrega de la preventa, leído de MacroGest: desde cuándo se le debe. */
+  preventaEntregaDesde?: string | null;
 }
 /** Clave de un cupo en MacroGest: contrato de venta, plan de carga y cupo. */
 export interface ClaveCupo {
@@ -91,9 +95,9 @@ export interface ClaveCupo {
 export interface Otorgamiento extends ClaveCupo {
   id: string;
   revision: number;
-  pedidoId: string | null;
-  destinatarioTipo: "cliente" | "propio";
-  clienteNumero: number | null;
+  /** Siempre sale de un pedido: el cliente y la preventa son los del pedido al otorgar. */
+  pedidoId: string;
+  clienteNumero: number;
   clienteNombre?: string | null;
   preventa: PreventaRef | null;
   vigenteDesde: string;
@@ -225,16 +229,13 @@ export interface GuardarCargaBody {
   observacion: string | null;
 }
 export interface OtorgarBody {
-  destinatarioTipo: "cliente" | "propio";
-  clienteNumero?: number;
-  pedidoId?: string;
-  pedidoRevision?: number;
-  preventa?: PreventaRef;
+  pedidoId: string;
+  pedidoRevision: number;
   cupos: ClaveCupo[];
 }
 export interface OtorgarResultado {
   otorgamientos: Otorgamiento[];
-  pedido: Pedido | null;
+  pedido: Pedido;
   advertencias: string[];
 }
 export interface DeshacerResultado {
@@ -250,6 +251,8 @@ export interface Evento {
   registradoAl: string;
   registradoPorId: number;
   motivo: string | null;
+  /** Nombre del operador; `null` si el usuario ya no existe. */
+  registradoPorNombre?: string | null;
 }
 export type Recurso = "pedidos" | "solicitudes-terminal" | "otorgamientos" | "flota";
 export const ROLES_LECTURA = [

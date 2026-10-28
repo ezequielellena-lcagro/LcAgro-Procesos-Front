@@ -414,11 +414,12 @@ describe("Flete UI", () => {
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Baja" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Historial" }));
-    const h = await screen.findByRole("dialog", { name: "Historial de la operación" });
-    expect(await within(h).findByText("ficha flota baja")).toBeInTheDocument();
-    fireEvent.click(within(h).getAllByText("Ver datos registrados")[1]);
+    const h = await screen.findByRole("dialog", { name: "Historial de la ficha" });
+    expect(await within(h).findByText("Ficha dada de baja")).toBeInTheDocument();
+    // El alta muestra lo cargado; la baja, sólo lo que cambió y su motivo.
     expect(within(h).getAllByText("Patente de chasis").length).toBeGreaterThan(0);
     expect(within(h).getAllByText("Fin de vigencia").length).toBeGreaterThan(0);
+    expect(within(h).queryByText("ID de versión")).not.toBeInTheDocument();
   });
   it("lector consulta detalle/CUIT e historial sin acciones de gestión y navegación Flete-only", async () => {
     await command("", ficha({ conductor: "Ana", cuitConductor: "20-12345678-6" }));

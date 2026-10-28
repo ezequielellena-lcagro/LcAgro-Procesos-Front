@@ -48,6 +48,7 @@ const preventa: Preventa = {
   fechaEntregaFin: sumarDias(hoy(), 30),
   kgContratados: 300000,
   estado: "V",
+  estadoEntrega: "P",
 };
 const catalogos: Record<string, Referencia[]> = {
   clientes: [
@@ -161,6 +162,16 @@ const campaniaTexto = (c: number | null) =>
 const nombreCliente = (numero: number | null) =>
   catalogos.clientes.find((c) => c.codigo === numero)?.nombre ?? null;
 const vigentes = () => otorgamientos.filter((o) => !o.vigenteHasta);
+/** Cereal y campaña del pedido al que se otorgó, como filtra el servicio. */
+function delPedido(o: Otorgamiento, url: URL) {
+  const producto = url.searchParams.get("producto");
+  const campania = url.searchParams.get("campania");
+  const pedido = pedidos.find((p) => p.id === o.pedidoId);
+  return (
+    (!producto || pedido?.producto === Number(producto)) &&
+    (!campania || pedido?.campania === campania)
+  );
+}
 const conCliente = (o: Otorgamiento): Otorgamiento => ({
   ...o,
   clienteNombre: nombreCliente(o.clienteNumero),
@@ -175,7 +186,6 @@ function estado(o: Otorgamiento): OtorgamientoConEstado {
     erp,
     productorPlanNombre: nombreCliente(erp?.productorPlan ?? null),
   });
-  const propio = o.destinatarioTipo === "propio";
   if (o.vigenteHasta)
     return fila(
       "deshecho",
@@ -187,12 +197,8 @@ function estado(o: Otorgamiento): OtorgamientoConEstado {
   if (erp.planta === 0)
     return fila(
       "pendiente",
-      `Falta pasarlo en MacroGest: ${propio ? "planta 15" : `productor ${o.clienteNumero} y planta 10`}.`,
+      `Falta pasarlo en MacroGest: productor ${o.clienteNumero} y planta 10.`,
     );
-  if (propio)
-    return erp.planta === 15
-      ? fila("confirmado", "MacroGest lo tiene en planta 15.")
-      : fila("otra_planta", `MacroGest lo tiene en planta ${erp.planta}; se esperaba planta 15.`);
   if (erp.planta !== 10)
     return fila(
       "otra_planta",
@@ -229,6 +235,7 @@ function registrar(
     datos: JSON.stringify(datos),
     registradoAl: new Date().toISOString(),
     registradoPorId: actor,
+    registradoPorNombre: "Operador de demostración",
     motivo,
   });
   historia.set(clave, previos);
@@ -405,19 +412,14 @@ export const logisticaHandlers = [
     return pagina(filas.slice(0, n), filas.length > n);
   }),
   // Plan de Carga ficticio con las mismas reglas que el servicio: titular La Clementina si se carga
-  // en planta o es propio; los cupos son los del plan otorgados al mismo destinatario.
+  // en planta; los cupos son los del plan otorgados al mismo cliente.
   http.get(`${API}/otorgamientos/:id/plan-carga`, ({ params }) => {
     const o = otorgamientos.find((f) => f.id === params.id);
     if (!o) return error(404, "El otorgamiento no existe.");
     if (o.vigenteHasta) return error(409, "El otorgamiento está deshecho: no tiene Plan de Carga.");
-    const propio = o.destinatarioTipo === "propio";
-    const enPlanta = propio || pedidos.find((p) => p.id === o.pedidoId)?.seCargaEnPlanta === true;
+    const enPlanta = pedidos.find((p) => p.id === o.pedidoId)?.seCargaEnPlanta === true;
     const mismos = vigentes().filter(
-      (x) =>
-        x.contrato === o.contrato &&
-        x.plan === o.plan &&
-        x.destinatarioTipo === o.destinatarioTipo &&
-        x.clienteNumero === o.clienteNumero,
+      (x) => x.contrato === o.contrato && x.plan === o.plan && x.clienteNumero === o.clienteNumero,
     );
     const cupos = macro
       .filter((c) => mismos.some((x) => mismaClave(x, c)))
@@ -441,9 +443,7 @@ export const logisticaHandlers = [
       numeroEstablecimiento: 12345,
       destino: ref(101, "Terminal de ejemplo"),
       destinoDomicilio: "Calle de ejemplo 100 - (2000) - Localidad de ejemplo - Santa Fe",
-      planta: propio
-        ? { codigo: 15, nombre: "Planta propia (ejemplo)" }
-        : { codigo: 10, nombre: "DIRECTA" },
+      planta: { codigo: 10, nombre: "DIRECTA" },
       destinatario: ref(7, "Comprador de ejemplo"),
       corredorVentaSecundaria: ref(8, "Corredor de ejemplo"),
       mercadoTermino: null,
@@ -456,7 +456,7 @@ export const logisticaHandlers = [
         codigoOtorgado: c.codigoTerminal,
         cartaPorte: null,
       })),
-      destinatarioApp: propio ? "Carga propia" : (nombreCliente(o.clienteNumero) ?? ""),
+      destinatarioApp: nombreCliente(o.clienteNumero) ?? "",
       datosAl: new Date().toISOString(),
     };
     return HttpResponse.json(plan);
@@ -476,7 +476,12 @@ export const logisticaHandlers = [
     const desde = url.searchParams.get("desde") ?? "";
     const hasta = url.searchParams.get("hastaExclusivo") ?? "9999";
     const filas = vigentes()
-      .filter((o) => o.vigenteDesde.slice(0, 10) >= desde && o.vigenteDesde.slice(0, 10) < hasta)
+      .filter(
+        (o) =>
+          o.vigenteDesde.slice(0, 10) >= desde &&
+          o.vigenteDesde.slice(0, 10) < hasta &&
+          delPedido(o, url),
+      )
       .map((o): CargaLogistica => {
         const fila = estado(o);
         const erp = fila.erp;
@@ -561,28 +566,13 @@ export const logisticaHandlers = [
         (o) =>
           !!o.vigenteHasta === deshechos &&
           (!pedidoId || o.pedidoId === pedidoId) &&
+          delPedido(o, url) &&
           o.vigenteDesde.slice(0, 10) >= desde &&
           o.vigenteDesde.slice(0, 10) < hasta,
       )
       .map(estado);
     const n = Math.min(200, Number(url.searchParams.get("tamano") ?? 50));
     return pagina(filas.slice(0, n), filas.length > n);
-  }),
-  // Cola de prioridad de entrega: la demo trae una preventa que arranca hoy, así que cae en
-  // "vigentes y próximos" y la cola de vencidas queda vacía.
-  http.get(`${API}/preventas/cola`, ({ request }) => {
-    const url = new URL(request.url);
-    const campania = Number(url.searchParams.get("campania"));
-    const vencidas = url.searchParams.get("vencidas") !== "false";
-    const producto = url.searchParams.get("producto");
-    const arranco = Date.parse(`${preventa.fechaEntregaInicio}T12:00:00Z`) < Date.now();
-    const filas =
-      campania === preventa.campania &&
-      vencidas === arranco &&
-      (!producto || Number(producto) === preventa.producto)
-        ? [conDescarga(preventa)].filter((p) => !p.cumplida)
-        : [];
-    return HttpResponse.json({ filas, hayMas: false, datosAl: new Date().toISOString() });
   }),
   http.get(`${API}/preventas`, ({ request }) => {
     const url = new URL(request.url);
@@ -643,18 +633,44 @@ export const logisticaHandlers = [
   }),
   http.get(`${API}/pedidos`, ({ request }) => {
     const url = new URL(request.url);
-    return listado(
-      filtrosComerciales(pedidos, url)
-        .map(pedidoConNombres)
+    const filas = filtrosComerciales(pedidos, url)
+      .map(pedidoConNombres)
+      .map((p) => ({
+        ...p,
+        preventaEntregaDesde:
+          p.preventa?.numero === preventa.numero ? preventa.fechaEntregaInicio : null,
+      }));
+    // Por prioridad: una sola página, primero lo que se debe hace más tiempo (como el servicio).
+    if (url.searchParams.get("orden") === "prioridad") {
+      const desde = url.searchParams.get("desde") ?? "";
+      const hasta = url.searchParams.get("hastaExclusivo") ?? "";
+      const todos = filas
         .filter(
           (p) =>
-            (!url.searchParams.has("clienteNumero") ||
-              p.clienteNumero === Number(url.searchParams.get("clienteNumero"))) &&
+            p.fechaSolicitada >= desde &&
+            p.fechaSolicitada < hasta &&
             (url.searchParams.get("soloPendientes") !== "true" || p.pendientes > 0) &&
-            (url.searchParams.get("cumplidos") !== "true" || p.pendientes === 0) &&
-            (!url.searchParams.get("preventaNumero") ||
-              (p.preventa?.numero ?? "").includes(url.searchParams.get("preventaNumero")!)),
-        ),
+            (url.searchParams.get("cumplidos") !== "true" || p.pendientes === 0),
+        )
+        .sort(
+          (a, b) =>
+            Number(!a.preventaEntregaDesde) - Number(!b.preventaEntregaDesde) ||
+            (a.preventaEntregaDesde ?? "").localeCompare(b.preventaEntregaDesde ?? "") ||
+            a.fechaSolicitada.localeCompare(b.fechaSolicitada) ||
+            a.id.localeCompare(b.id),
+        );
+      return pagina(todos.slice(0, 200), todos.length > 200);
+    }
+    return listado(
+      filas.filter(
+        (p) =>
+          (!url.searchParams.has("clienteNumero") ||
+            p.clienteNumero === Number(url.searchParams.get("clienteNumero"))) &&
+          (url.searchParams.get("soloPendientes") !== "true" || p.pendientes > 0) &&
+          (url.searchParams.get("cumplidos") !== "true" || p.pendientes === 0) &&
+          (!url.searchParams.get("preventaNumero") ||
+            (p.preventa?.numero ?? "").includes(url.searchParams.get("preventaNumero")!)),
+      ),
       url,
       (f) => f.fechaSolicitada,
     );
@@ -733,7 +749,7 @@ export const logisticaHandlers = [
       ? HttpResponse.json({ dato: pedidoConNombres(dato), datosAl: new Date().toISOString() })
       : error(404, "El pedido no existe.");
   }),
-  // Eliminar se bloquea con otorgamientos vigentes y dice cuántos; los deshechos quedan sin pedido.
+  // Eliminar se bloquea con otorgamientos vigentes y dice cuántos; los deshechos se van con él.
   http.post(`${API}/pedidos/:id/eliminar`, async ({ request, params }) => {
     const body = (await request.json()) as { revision: number };
     const pedido = pedidos.find((p) => p.id === params.id);
@@ -747,9 +763,7 @@ export const logisticaHandlers = [
           409,
           `El pedido tiene ${otorgados} ${otorgados === 1 ? "cupo otorgado" : "cupos otorgados"}. Deshacé esos otorgamientos antes de eliminarlo.`,
         );
-      otorgamientos.forEach((o) => {
-        if (o.pedidoId === pedido.id) o.pedidoId = null;
-      });
+      otorgamientos = otorgamientos.filter((o) => o.pedidoId !== pedido.id);
       pedidos = pedidos.filter((p) => p.id !== pedido.id);
       registrar("pedidos", pedido.id, pedido.revision + 1, "pedido_eliminado", {
         anterior: pedido,
@@ -810,21 +824,8 @@ export const logisticaHandlers = [
         body.cupos.some((c, i) => body.cupos.findIndex((d) => mismaClave(c, d)) !== i)
       )
         return error(400, "Elegí de 1 a 200 cupos únicos de MacroGest.");
-      if (body.destinatarioTipo !== "cliente" && body.destinatarioTipo !== "propio")
-        return error(400, "Elegí un destinatario válido.");
-      if (
-        body.destinatarioTipo === "propio" &&
-        (body.clienteNumero != null ||
-          body.pedidoId != null ||
-          body.pedidoRevision != null ||
-          body.preventa != null)
-      )
-        return error(400, "Propio no admite cliente, pedido ni preventa.");
-      if (
-        body.destinatarioTipo === "cliente" &&
-        !catalogos.clientes.some((c) => c.codigo === body.clienteNumero && c.estado === "A")
-      )
-        return error(400, "Elegí un cliente activo.");
+      if (!body.pedidoId || !(body.pedidoRevision > 0))
+        return error(400, "Elegí el pedido al que van los cupos.");
       // Se lee MacroGest en el momento: planta, fecha, cereal y campaña.
       const filas = body.cupos.map((c) => macro.find((m) => mismaClave(m, c)));
       const faltante = body.cupos.find((_, i) => !filas[i]);
@@ -855,29 +856,27 @@ export const logisticaHandlers = [
           409,
           `Ya se otorgó en la app: ${yaOtorgados.map((c) => `${c.contrato} plan ${c.plan} cupo ${c.cupo}`).join(", ")}. Actualizá los datos.`,
         );
-      const pedido = body.pedidoId ? pedidos.find((p) => p.id === body.pedidoId) : null;
-      if (body.pedidoId && !pedido) return error(404, "El pedido no existe.");
-      if (pedido && pedido.revision !== body.pedidoRevision)
+      const pedido = pedidos.find((p) => p.id === body.pedidoId);
+      if (!pedido) return error(404, "El pedido no existe.");
+      if (pedido.revision !== body.pedidoRevision)
         return error(409, "El pedido cambió. Actualizá los datos y elegí de nuevo.");
       const campania = campaniaTexto(primero.campania);
-      if (pedido && (pedido.producto !== primero.producto || pedido.campania !== campania))
+      if (pedido.producto !== primero.producto || pedido.campania !== campania)
         return error(
           400,
           `El cupo no coincide con el pedido: cupo ${primero.productoNombre} ${campania} · pedido ${pedido.productoNombre ?? pedido.producto} ${pedido.campania}.`,
         );
-      if (pedido && elegidos.length > pedido.pendientes)
+      if (elegidos.length > pedido.pendientes)
         return error(
           409,
           `Elegiste ${elegidos.length} cupos y al pedido le faltan ${pedido.pendientes}.`,
         );
-      if (pedido && pedido.clienteNumero !== body.clienteNumero)
-        return error(400, "El cliente o la preventa no coinciden con el pedido.");
-      const ref = body.preventa ?? pedido?.preventa ?? null;
+      const ref = pedido.preventa;
       if (ref && (ref.numero !== preventa.numero || ref.operacion !== preventa.operacion))
         return error(404, "La preventa no existe.");
       if (
         ref &&
-        (preventa.clienteNumero !== body.clienteNumero ||
+        (preventa.clienteNumero !== pedido.clienteNumero ||
           preventa.producto !== primero.producto ||
           preventa.campania !== primero.campania)
       )
@@ -887,14 +886,11 @@ export const logisticaHandlers = [
         const [contrato, numero] = plan.split("|");
         const delPlan = (o: ClaveCupo) => o.contrato === contrato && o.plan === Number(numero);
         const otros = vigentes().filter(
-          (o) =>
-            delPlan(o) &&
-            (o.destinatarioTipo !== body.destinatarioTipo ||
-              o.clienteNumero !== (body.clienteNumero ?? null)),
+          (o) => delPlan(o) && o.clienteNumero !== pedido.clienteNumero,
         );
         if (otros.length)
           advertencias.push(
-            `El plan ${numero} del contrato ${contrato} ya tiene ${otros.length} cupo(s) otorgados a otro destinatario. En MacroGest un plan va a un solo cliente: hay que partirlo.`,
+            `El plan ${numero} del contrato ${contrato} ya tiene ${otros.length} cupo(s) otorgados a otro cliente. En MacroGest un plan va a un solo cliente: hay que partirlo.`,
           );
         const libres = macro.filter(
           (c) =>
@@ -905,12 +901,12 @@ export const logisticaHandlers = [
         ).length;
         if (libres)
           advertencias.push(
-            `El plan ${numero} del contrato ${contrato} tiene ${libres} cupo(s) más sin otorgar. Al pasarlo de planta en MacroGest se van todos al mismo destinatario, salvo que partas el plan.`,
+            `El plan ${numero} del contrato ${contrato} tiene ${libres} cupo(s) más sin otorgar. Al pasarlo de planta en MacroGest se van todos al mismo cliente, salvo que partas el plan.`,
           );
       }
       if (new Set(elegidos.map(diaCarga)).size > 1)
         advertencias.push("Los cupos tienen fechas de carga distintas.");
-      if (pedido && elegidos.some((c) => diaCarga(c) !== pedido.fechaSolicitada))
+      if (elegidos.some((c) => diaCarga(c) !== pedido.fechaSolicitada))
         advertencias.push(
           "Hay cupos con fecha de carga distinta de la fecha solicitada del pedido.",
         );
@@ -921,9 +917,8 @@ export const logisticaHandlers = [
         contrato: c.contrato,
         plan: c.plan,
         cupo: c.cupo,
-        pedidoId: pedido?.id ?? null,
-        destinatarioTipo: body.destinatarioTipo,
-        clienteNumero: body.clienteNumero ?? null,
+        pedidoId: pedido.id,
+        clienteNumero: pedido.clienteNumero,
         preventa: ref,
         vigenteDesde,
         vigenteHasta: null,
@@ -933,26 +928,24 @@ export const logisticaHandlers = [
       nuevos.forEach((o) =>
         registrar("otorgamientos", o.id, 1, "otorgamiento_creado", { otorgamiento: o }),
       );
-      if (pedido) {
-        pedido.revision++;
-        pedido.otorgados += nuevos.length;
-        pedido.pendientes = pedido.cantidadCupos - pedido.otorgados;
-        pedido.estado = pedido.pendientes === 0 ? "atendido" : "parcial";
-        registrar("pedidos", pedido.id, pedido.revision, "cupos_otorgados", {
-          pedidoId: pedido.id,
-          otorgamientos: nuevos.map((o) => ({
-            id: o.id,
-            contrato: o.contrato,
-            plan: o.plan,
-            cupo: o.cupo,
-          })),
-          otorgados: pedido.otorgados,
-          pendientes: pedido.pendientes,
-        });
-      }
+      pedido.revision++;
+      pedido.otorgados += nuevos.length;
+      pedido.pendientes = pedido.cantidadCupos - pedido.otorgados;
+      pedido.estado = pedido.pendientes === 0 ? "atendido" : "parcial";
+      registrar("pedidos", pedido.id, pedido.revision, "cupos_otorgados", {
+        pedidoId: pedido.id,
+        otorgamientos: nuevos.map((o) => ({
+          id: o.id,
+          contrato: o.contrato,
+          plan: o.plan,
+          cupo: o.cupo,
+        })),
+        otorgados: pedido.otorgados,
+        pendientes: pedido.pendientes,
+      });
       return {
         otorgamientos: nuevos,
-        pedido: pedido ? { ...pedido } : null,
+        pedido: { ...pedido },
         advertencias,
       } satisfies OtorgarResultado;
     });

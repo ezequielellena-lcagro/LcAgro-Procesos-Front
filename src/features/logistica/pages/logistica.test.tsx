@@ -111,7 +111,7 @@ describe("Logística operativa", () => {
     // Solicitar vive dentro de la última solapa, no en la cabecera de Cupos.
     expect(screen.queryByRole("button", { name: "Solicitar cupos" })).not.toBeInTheDocument();
     const solapas = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(solapas).toEqual(["Resumen", "Otorgar", "Historial de pedidos de cupo"]);
+    expect(solapas).toEqual(["Resumen", "Historial de pedidos de cupo"]);
     fireEvent.click(screen.getByRole("tab", { name: "Historial de pedidos de cupo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Solicitar cupos" }));
     // Pantalla propia, no modal: la grilla paginada arriba y los datos de la solicitud abajo.
@@ -149,7 +149,7 @@ describe("Logística operativa", () => {
         .map((c) => c.textContent),
     ).toEqual(expect.arrayContaining(["4", "3", "1"]));
     expect(screen.queryByRole("button", { name: "Respuesta" })).not.toBeInTheDocument();
-    fireEvent.click(within(fila).getByRole("button", { name: "Cerrar" }));
+    fireEvent.click(within(fila).getByRole("button", { name: "Cerrar demanda" }));
     const dialogo = await screen.findByRole("dialog", { name: "Cerrar pedido de cupo" });
     fireEvent.change(within(dialogo).getByLabelText("Motivo de cierre"), {
       target: { value: "La terminal no da más" },

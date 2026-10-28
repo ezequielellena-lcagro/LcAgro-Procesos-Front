@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/shared/components/error-state";
 export interface Columna<T> {
@@ -6,6 +7,8 @@ export interface Columna<T> {
   /** `indice` es la posición en la página; lo usa la columna de prioridad de la cola de entrega. */
   celda: (fila: T, indice: number) => ReactNode;
   numero?: boolean;
+  /** Si se pasa, el encabezado es un botón que ordena la tabla por esta columna. */
+  orden?: { activo: boolean; ordenar: () => void };
 }
 interface Props<T> {
   titulo: string;
@@ -60,8 +63,26 @@ export function TablaLogistica<T>({
                   key={c.titulo}
                   scope="col"
                   className={`px-4 py-2.5 font-semibold ${c.numero ? "text-right" : ""}`}
+                  aria-sort={c.orden?.activo ? "other" : undefined}
                 >
-                  {c.titulo}
+                  {c.orden ? (
+                    <button
+                      type="button"
+                      onClick={c.orden.ordenar}
+                      title={`Ordenar por ${c.titulo.toLowerCase()}`}
+                      className={`inline-flex items-center gap-1 uppercase tracking-wide hover:text-ink ${
+                        c.orden.activo ? "text-ink" : ""
+                      }`}
+                    >
+                      {c.titulo}
+                      <ArrowDown
+                        aria-hidden
+                        className={`size-3.5 ${c.orden.activo ? "" : "opacity-30"}`}
+                      />
+                    </button>
+                  ) : (
+                    c.titulo
+                  )}
                 </th>
               ))}
             </tr>
@@ -70,30 +91,30 @@ export function TablaLogistica<T>({
             {filas.map((f, i) => {
               const activa = elegida?.(f) ?? false;
               return (
-              <tr
-                key={clave(f)}
-                // Franjas alternadas y hover por encima, igual que la `DataTable` del resto de la
-                // app: seguir una fila con la vista es la mitad del trabajo de leer la tabla. La
-                // elegida se lleva el acento, con una guía a la izquierda para ubicarla de un vistazo.
-                className={`border-b border-line-soft last:border-0 hover:bg-line-soft/90 ${
-                  activa
-                    ? "bg-clementina/20 shadow-[inset_3px_0_0_0_var(--color-clementina-deep)]"
-                    : i % 2 === 1
-                      ? "bg-line-soft/45"
-                      : ""
-                }`}
-              >
-                {columnas.map((c) => (
-                  <td
-                    key={c.titulo}
-                    className={`px-4 py-3 align-top ${c.numero ? "text-right tabular-nums" : ""} ${
-                      activa ? "font-medium" : ""
-                    }`}
-                  >
-                    {c.celda(f, i)}
-                  </td>
-                ))}
-              </tr>
+                <tr
+                  key={clave(f)}
+                  // Franjas alternadas y hover por encima, igual que la `DataTable` del resto de la
+                  // app: seguir una fila con la vista es la mitad del trabajo de leer la tabla. La
+                  // elegida se lleva el acento, con una guía a la izquierda para ubicarla de un vistazo.
+                  className={`border-b border-line-soft last:border-0 hover:bg-line-soft/90 ${
+                    activa
+                      ? "bg-clementina/20 shadow-[inset_3px_0_0_0_var(--color-clementina-deep)]"
+                      : i % 2 === 1
+                        ? "bg-line-soft/45"
+                        : ""
+                  }`}
+                >
+                  {columnas.map((c) => (
+                    <td
+                      key={c.titulo}
+                      className={`px-4 py-3 align-top ${c.numero ? "text-right tabular-nums" : ""} ${
+                        activa ? "font-medium" : ""
+                      }`}
+                    >
+                      {c.celda(f, i)}
+                    </td>
+                  ))}
+                </tr>
               );
             })}
           </tbody>

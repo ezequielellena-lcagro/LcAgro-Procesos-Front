@@ -29,18 +29,6 @@ interface Disponibles {
   datosAl: string;
 }
 
-/**
- * Qué significa cada planta, según el modelo que el área usuaria dejó escrito en su propio mockup:
- * «Disponible = el cupo está en Planta 0, sin asignar. Otorgado = el cupo pasó a Planta 10 /
- * Directa. Planta 15 es carga propia y no forma parte del otorgamiento a cliente.»
- */
-const PLANTAS: Record<number, string> = {
-  0: "Disponibles · sin asignar",
-  10: "Otorgados · Directa",
-  15: "Carga propia",
-  20: "Semillero",
-};
-
 const cantidad = (n: number) => new Intl.NumberFormat("es-AR").format(n);
 
 /**
@@ -91,7 +79,6 @@ export function DisponiblesPanel({
 
   const porCereal = q.data?.porCereal ?? [];
   const totalDisponibles = porCereal.reduce((a, c) => a + c.cupos, 0);
-  const porPlanta = q.data?.porPlanta ?? [];
 
   return (
     <section aria-label="Cupos disponibles" className="min-w-0 space-y-3">
@@ -176,25 +163,6 @@ export function DisponiblesPanel({
           ]}
         />
       )}
-
-      {/* El estado del cupo ES la planta, así que este desglose dice en qué estado está cada uno. */}
-      {porPlanta.length > 0 && (
-        <p className="text-xs text-ink-soft">
-          De hoy en adelante:{" "}
-          {porPlanta
-            .filter((p) => p.planta !== null)
-            .map(
-              (p) => `Planta ${p.planta} (${PLANTAS[p.planta!] ?? "otra"}): ${cantidad(p.cupos)}`,
-            )
-            .join(" · ")}
-          .
-        </p>
-      )}
-
-      <p className="text-xs text-ink-soft">
-        La estimación usa {kg(q.data?.kgPorCupo ?? 30000)} por cupo; no es peso real. Un cupo sin
-        contrato en MacroGest aparece como «Sin cereal» en vez de ocultarse.
-      </p>
     </section>
   );
 }

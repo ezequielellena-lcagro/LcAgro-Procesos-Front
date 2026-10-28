@@ -25,11 +25,11 @@ const CAMPOS: Record<string, string> = {
   preventa: "Preventa",
   advertencias: "Advertencias",
   otorgamientos: "Cupos otorgados en esta operación",
-  destinatarioTipo: "Tipo de destinatario",
   vigenteDesde: "Fecha de otorgamiento",
   vigenteHasta: "Deshecho al",
   motivoDeshecho: "Motivo",
   camion: "Camión (Flete)",
+  seCargaEnPlanta: "Dónde se carga",
 };
 export interface CampoHistorial {
   campo: string;
@@ -39,7 +39,9 @@ export interface CampoHistorial {
 function texto(valor: unknown, campo: string): string {
   if (valor == null) return "Sin dato";
   if (["motivo", "motivoDeshecho"].includes(campo) && typeof valor === "string") return valor;
-  if (campo === "destinatarioTipo") return valor === "propio" ? "Propio" : "Cliente";
+  if (["fechaSolicitada", "fechaCarga"].includes(campo) && typeof valor === "string")
+    return fecha(valor);
+  if (campo === "seCargaEnPlanta") return valor === true ? "En planta" : "En campo";
   if (["observadoAl", "registradoAl"].includes(campo) && typeof valor === "string")
     return fechaHoraArgentina(valor);
   if (campo === "registradoPorId") return `Usuario ${valor}`;

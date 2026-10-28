@@ -1,4 +1,4 @@
-import { FileSpreadsheet, Truck } from "lucide-react";
+import { FileSpreadsheet, History, Truck } from "lucide-react";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Select } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth-context";
 import { apiClient } from "@/lib/api-client";
 import { toAppError } from "@/lib/api-error";
-import { FilterActions, FilterField } from "@/shared/components/filter-bar";
+import { FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
 import { diaArgentina, fecha, hoy, kg, sumarDias } from "../format";
@@ -16,8 +16,15 @@ import type { CargaLogistica, EstadoCarga } from "../types";
 import { AvisoDemo } from "../components/aviso-demo";
 import { CargaDialog } from "../components/carga-dialog";
 import { CatalogoSelect } from "../components/catalogo-select";
+import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
+import {
+  filtrosComercialesIniciales,
+  filtrosComercialesVacios,
+  paramsComerciales,
+} from "../lib/filtros-comerciales";
 import { HistorialDialog } from "../components/historial-dialog";
 import { PeriodoFiltro } from "../components/periodo-filtro";
+import { BotonIcono } from "../components/boton-icono";
 import { PlanCargaBoton } from "../components/plan-carga-boton";
 import { TablaLogistica } from "../components/tabla-logistica";
 
@@ -31,7 +38,9 @@ const ESTADO_CARGA: Record<EstadoCarga, string> = {
   no_esta: "Ya no está en MacroGest",
   sin_verificar: "Sin verificar",
 };
-const filtrosVacios = { contrato: "", clienteNumero: 0, estado: "" };
+const filtrosVacios = { contrato: "", clienteNumero: 0, estado: "", ...filtrosComercialesVacios };
+/** Arranca en la campaña vigente; «Limpiar filtros» muestra todas. */
+const filtrosIniciales = () => ({ ...filtrosVacios, ...filtrosComercialesIniciales() });
 /** Kilos de MacroGest: vienen como texto exacto; vacío es guion. */
 const kgErp = (v: string | number | null | undefined) =>
   v == null || v === "" ? "—" : kg(Number(v));
@@ -49,14 +58,16 @@ export function CargasPage() {
     desde: sumarDias(hoy(), -30),
     hastaExclusivo: sumarDias(hoy(), 1),
   }));
-  const [borrador, setBorrador] = useState(filtrosVacios);
-  const [filtros, setFiltros] = useState(filtrosVacios);
+  const [borrador, setBorrador] = useState(filtrosIniciales);
+  const [filtros, setFiltros] = useState(borrador);
   const [editar, setEditar] = useState<CargaLogistica | null>(null);
-  const [historia, setHistoria] = useState<string | null>(null);
+  const [historia, setHistoria] = useState<CargaLogistica | null>(null);
   const params = {
     ...periodo,
     contrato: filtros.contrato.trim() || undefined,
     clienteNumero: filtros.clienteNumero || undefined,
+    // Cereal y campaña del pedido al que se otorgó el cupo.
+    ...paramsComerciales(filtros),
   };
   const q = useListado<CargaLogistica>("cargas", params, (f) => ({
     despuesDia: diaArgentina(f.otorgamiento.otorgamiento.vigenteDesde),
@@ -95,7 +106,6 @@ export function CargasPage() {
       )}
       <PeriodoFiltro
         value={periodo}
-        etiqueta="Fecha de otorgamiento"
         onChange={setPeriodo}
         onSubmit={(e) => {
           e.preventDefault();
@@ -119,26 +129,29 @@ export function CargasPage() {
           value={borrador.clienteNumero}
           onChange={(clienteNumero) => setBorrador({ ...borrador, clienteNumero })}
         />
-        <FilterField label="Estado">
-          <Select
-            className="w-52"
-            value={borrador.estado}
-            onChange={(e) => setBorrador({ ...borrador, estado: e.target.value })}
-          >
-            <option value="">Todos</option>
-            {Object.entries(ESTADO_CARGA).map(([valor, texto]) => (
-              <option key={valor} value={valor}>
-                {texto}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-        <FilterActions
+        <FiltrosComercialesCampos
+          value={borrador}
+          onChange={(v) => setBorrador({ ...borrador, ...v })}
           onClear={() => {
             setBorrador(filtrosVacios);
             setFiltros(filtrosVacios);
           }}
-        />
+        >
+          <FilterField label="Estado">
+            <Select
+              className="w-52"
+              value={borrador.estado}
+              onChange={(e) => setBorrador({ ...borrador, estado: e.target.value })}
+            >
+              <option value="">Todos</option>
+              {Object.entries(ESTADO_CARGA).map(([valor, texto]) => (
+                <option key={valor} value={valor}>
+                  {texto}
+                </option>
+              ))}
+            </Select>
+          </FilterField>
+        </FiltrosComercialesCampos>
       </PeriodoFiltro>
       <TablaLogistica
         titulo="Cargas a puerto"
@@ -178,12 +191,10 @@ export function CargasPage() {
               f.otorgamiento.erp?.fechaCarga ? fecha(f.otorgamiento.erp.fechaCarga) : "—",
           },
           {
-            titulo: "Destinatario",
+            titulo: "Productor",
             celda: (f) =>
-              f.otorgamiento.otorgamiento.destinatarioTipo === "propio"
-                ? "Propio"
-                : (f.otorgamiento.otorgamiento.clienteNombre ??
-                  `Cliente ${f.otorgamiento.otorgamiento.clienteNumero}`),
+              f.otorgamiento.otorgamiento.clienteNombre ??
+              `Cliente ${f.otorgamiento.otorgamiento.clienteNumero}`,
           },
           { titulo: "Carta de porte", celda: (f) => f.cartaPorte ?? "—" },
           { titulo: "CTG", celda: (f) => oDash(f.otorgamiento.erp?.ctg) },
@@ -212,21 +223,13 @@ export function CargasPage() {
           {
             titulo: "Acciones",
             celda: (f) => (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex gap-1">
                 {gestionar && (
-                  <Button size="sm" variant="outline" onClick={() => setEditar(f)}>
-                    <Truck className="size-4" aria-hidden /> Camión
-                  </Button>
+                  <BotonIcono icono={Truck} etiqueta="Camión" onClick={() => setEditar(f)} />
                 )}
-                <PlanCargaBoton otorgamientoId={f.otorgamiento.otorgamiento.id} variant="ghost" />
+                <PlanCargaBoton otorgamientoId={f.otorgamiento.otorgamiento.id} soloIcono />
                 {f.propio && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setHistoria(f.otorgamiento.otorgamiento.id)}
-                  >
-                    Historial
-                  </Button>
+                  <BotonIcono icono={History} etiqueta="Historial" onClick={() => setHistoria(f)} />
                 )}
               </div>
             ),
@@ -235,7 +238,12 @@ export function CargasPage() {
       />
       {editar && <CargaDialog carga={editar} onClose={() => setEditar(null)} />}
       {historia && (
-        <HistorialDialog recurso="cargas" id={historia} onClose={() => setHistoria(null)} />
+        <HistorialDialog
+          recurso="cargas"
+          id={historia.otorgamiento.otorgamiento.id}
+          descripcion={`Contrato ${historia.otorgamiento.otorgamiento.contrato} · plan ${historia.otorgamiento.otorgamiento.plan} · cupo ${historia.otorgamiento.otorgamiento.cupo}`}
+          onClose={() => setHistoria(null)}
+        />
       )}
     </>
   );

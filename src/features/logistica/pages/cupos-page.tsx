@@ -1,3 +1,4 @@
+import { CircleOff, History, Truck } from "lucide-react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,39 +8,46 @@ import { PageHeader } from "@/shared/components/page-header";
 import { fecha, periodoInicial } from "../format";
 import { cursorPropio, useListado } from "../queries/use-logistica";
 import type { Solicitud } from "../types";
+import { BotonIcono } from "../components/boton-icono";
 import { HistorialDialog } from "../components/historial-dialog";
 import { AvisoDemo } from "../components/aviso-demo";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { CerrarSolicitudDialog } from "../components/cerrar-solicitud-dialog";
 import { TablaLogistica } from "../components/tabla-logistica";
-import { OtorgarPanel } from "../components/otorgar-panel";
 import { Paginacion } from "../components/paginacion";
 import { usePaginacion } from "../lib/paginacion";
 import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
-import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
+import {
+  filtrosComercialesIniciales,
+  filtrosComercialesVacios,
+  paramsComerciales,
+} from "../lib/filtros-comerciales";
 import { ResumenPanel } from "../components/resumen-panel";
 
 /**
- * Cupos, con el cupo de MacroGest como única fuente (decisiones del 2026-10-27): Resumen de lo que
- * hay en planta 0, Otorgar contra esos cupos y las solicitudes a terminal al final.
+ * Cupos, con el cupo de MacroGest como única fuente (decisiones del 2026-10-27): Resumen con lo
+ * disponible y lo otorgado, y el historial de pedidos de cupo a terminal. Otorgar es una pantalla
+ * por pasos que sale de un pedido (2026-10-28).
  */
 export function CuposPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  // Volver de Solicitar abre el historial de pedidos de cupo; el botón Otorgar de un pedido abre Otorgar
-  // con ese pedido ya elegido.
-  const estado = useLocation().state as { tab?: string; pedidoId?: string } | null;
+  // Volver de Solicitar abre el historial de pedidos de cupo.
+  const estado = useLocation().state as { tab?: string } | null;
   const solapaInicial = estado?.tab;
   const gestionar = user?.roles.includes("logistica-cupos") ?? false;
   // Resumen es la pantalla de entrada: lo primero que se pidió ver al abrir Cupos es cuánto hay,
   // no el formulario de solicitudes.
   const [tab, setTab] = useState(solapaInicial ?? "resumen");
-  const [otorgarLocked, setOtorgarLocked] = useState(false);
   const [periodo, setPeriodo] = useState(() => periodoInicial());
   const [cerrarSolicitud, setCerrarSolicitud] = useState<Solicitud | null>(null);
-  const [historia, setHistoria] = useState<{ recurso: string; id: string } | null>(null);
-  const [solBorrador, setSolBorrador] = useState(filtrosComercialesVacios);
-  const [solComercial, setSolComercial] = useState(filtrosComercialesVacios);
+  const [historia, setHistoria] = useState<{
+    recurso: string;
+    id: string;
+    descripcion?: string;
+  } | null>(null);
+  const [solBorrador, setSolBorrador] = useState(filtrosComercialesIniciales);
+  const [solComercial, setSolComercial] = useState(solBorrador);
   const solicitudes = useListado<Solicitud>(
     "solicitudes-terminal",
     { ...periodo, ...paramsComerciales(solComercial) },
@@ -54,21 +62,22 @@ export function CuposPage() {
       <PageHeader
         title="Cupos"
         subtitle="Cupos de MacroGest: lo disponible en planta 0, a quién se otorga y lo pedido a cada terminal."
+        actions={
+          gestionar && (
+            <Button onClick={() => void navigate("/logistica/cupos/otorgar")}>
+              <Truck className="size-4" aria-hidden /> Otorgar cupo
+            </Button>
+          )
+        }
       />
       <AvisoDemo />
-      <Tabs
-        value={tab}
-        onValueChange={(v) => {
-          if (!otorgarLocked) setTab(v);
-        }}
-      >
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4 max-w-full overflow-x-auto">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
-          <TabsTrigger value="otorgar">Otorgar</TabsTrigger>
           <TabsTrigger value="historial">Historial de pedidos de cupo</TabsTrigger>
         </TabsList>
         <TabsContent value="resumen">
-          <ResumenPanel activo={tab === "resumen"} />
+          <ResumenPanel activo={tab === "resumen"} gestionar={gestionar} />
         </TabsContent>
         <TabsContent value="historial">
           {/* Lo que se le pidió a cada terminal, por si un contrato no se cumple. Solicitar vive
@@ -140,30 +149,29 @@ export function CuposPage() {
               {
                 titulo: "Acciones",
                 celda: (f) => (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex gap-1">
                     {gestionar && !f.cerradaAl && (
-                      <Button size="sm" variant="ghost" onClick={() => setCerrarSolicitud(f)}>
-                        Cerrar
-                      </Button>
+                      <BotonIcono
+                        icono={CircleOff}
+                        etiqueta="Cerrar demanda"
+                        onClick={() => setCerrarSolicitud(f)}
+                      />
                     )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setHistoria({ recurso: "solicitudes-terminal", id: f.id })}
-                    >
-                      Historial
-                    </Button>
+                    <BotonIcono
+                      icono={History}
+                      etiqueta="Historial"
+                      onClick={() =>
+                        setHistoria({
+                          recurso: "solicitudes-terminal",
+                          id: f.id,
+                          descripcion: `Contrato ${f.contratoVenta} · ${f.cantidadCupos} ${f.cantidadCupos === 1 ? "cupo" : "cupos"} para el ${fecha(f.fechaSolicitada)}`,
+                        })
+                      }
+                    />
                   </div>
                 ),
               },
             ]}
-          />
-        </TabsContent>
-        <TabsContent value="otorgar">
-          <OtorgarPanel
-            gestionar={gestionar}
-            pedidoInicialId={estado?.pedidoId}
-            onLockChange={setOtorgarLocked}
           />
         </TabsContent>
       </Tabs>

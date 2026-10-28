@@ -30,7 +30,10 @@ export function useListado<T>(
       page.hayMas && page.filas.length ? siguiente(page.filas[page.filas.length - 1]) : undefined,
   });
 }
-export function useCatalogo(tipo: "clientes" | "productos" | "destinos" | "campanias", buscar = "") {
+export function useCatalogo(
+  tipo: "clientes" | "productos" | "destinos" | "campanias",
+  buscar = "",
+) {
   return useListado<Referencia>(
     `catalogos/${tipo}`,
     { buscar: buscar.trim() || undefined },
@@ -83,8 +86,7 @@ export function useOperacion<T>(ruta: string, metodo: "post" | "put" = "post") {
     retry: false,
     mutationFn: async (body: object) => {
       const cuerpo = JSON.stringify(body);
-      if (intento.current?.cuerpo !== cuerpo)
-        intento.current = { cuerpo, clave: uuid() };
+      if (intento.current?.cuerpo !== cuerpo) intento.current = { cuerpo, clave: uuid() };
       return (
         await apiClient.request<T>({
           url: `/logistica/${ruta}`,

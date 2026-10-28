@@ -34,14 +34,12 @@ function dias(desde: string, hasta: string) {
 export function PeriodoFiltro({
   value,
   onChange,
-  etiqueta = "Fecha solicitada",
   maxDias = 366,
   children,
   onSubmit,
 }: {
   value: Periodo;
   onChange: (v: Periodo) => void;
-  etiqueta?: string;
   maxDias?: number;
   children?: ReactNode;
   onSubmit?: FormEventHandler<HTMLFormElement>;
@@ -59,12 +57,12 @@ export function PeriodoFiltro({
 
   return (
     <FilterBar onSubmit={onSubmit}>
-      <FilterField label={`${etiqueta}: desde`}>
+      <FilterField label="Fecha desde">
         <div className="w-40">
           <DateField value={desde} onChange={(v) => cambiar(v, hasta)} />
         </div>
       </FilterField>
-      <FilterField label="Hasta inclusive">
+      <FilterField label="Fecha hasta">
         <div className="w-40">
           <DateField value={hasta} onChange={(v) => cambiar(desde, v)} />
         </div>

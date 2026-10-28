@@ -19,8 +19,12 @@ import type {
   Pedido,
 } from "../types";
 import { CuposPage } from "./cupos-page";
+import { OtorgarCuposPage } from "./otorgar-cupos-page";
+import { PedidosPage } from "./pedidos-page";
 
-const sesion = vi.hoisted(() => ({ roles: ["logistica-cupos"] as RolNombre[] }));
+const sesion = vi.hoisted(() => ({
+  roles: ["logistica-cupos", "logistica-pedidos"] as RolNombre[],
+}));
 vi.mock("@/features/auth/auth-context", () => ({
   useAuth: () => ({ user: { id: 8, nombre: "Operador ficticio", roles: sesion.roles } }),
 }));
@@ -37,7 +41,7 @@ afterEach(() => {
   routers.splice(0).forEach((router) => router.dispose());
   server.resetHandlers();
   resetLogisticaDemo();
-  sesion.roles = ["logistica-cupos"];
+  sesion.roles = ["logistica-cupos", "logistica-pedidos"];
 });
 afterAll(() => server.close());
 
@@ -65,48 +69,48 @@ async function pedir(cantidad = 2, campania = "2025-2026") {
     })
   ).dato;
 }
-function mostrar() {
+async function otorgarPorApi(
+  pedido: Pedido,
+  cupos: { contrato: string; plan: number; cupo: number }[],
+) {
+  return post<OtorgarResultado>("otorgamientos", {
+    pedidoId: pedido.id,
+    pedidoRevision: pedido.revision,
+    cupos,
+  } satisfies OtorgarBody);
+}
+function mostrar(ruta = "/logistica/cupos") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  const router = createMemoryRouter([{ path: "/logistica/cupos", element: <CuposPage /> }], {
-    initialEntries: ["/logistica/cupos"],
-  });
+  const router = createMemoryRouter(
+    [
+      { path: "/logistica/cupos", element: <CuposPage /> },
+      { path: "/logistica/cupos/otorgar", element: <OtorgarCuposPage /> },
+      { path: "/logistica/pedidos", element: <PedidosPage /> },
+    ],
+    { initialEntries: [ruta] },
+  );
   routers.push(router);
   render(
     <QueryClientProvider client={client}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  return client;
+  return { client, router };
 }
-async function abrir() {
-  fireEvent.click(screen.getByRole("tab", { name: "Otorgar" }));
-  return screen.findByRole("table", { name: "Cupos de planta 0 para otorgar" });
-}
-const elegirCupo = async (codigo: string) =>
-  fireEvent.click(await screen.findByRole("checkbox", { name: `Elegir cupo ${codigo}` }));
+/** Del paso de los cupos al Plan de Carga. */
 async function confirmar() {
-  fireEvent.click(screen.getByRole("button", { name: "Revisar otorgamiento" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Confirmar otorgamiento" }));
-  return screen.findByText(/Se otorgaron \d cupos/);
+  fireEvent.click(screen.getByRole("button", { name: /^Revisar/ }));
+  fireEvent.click(await screen.findByRole("button", { name: /^Otorgar \d+ cupos?$/ }));
+  return screen.findByText(/Se otorg(ó|aron) \d+ cupos? al pedido/);
 }
-const registrados = () =>
-  screen.findByRole("table", { name: "Otorgamientos registrados en la app" });
+async function otorgados() {
+  return screen.findByRole("table", { name: "Otorgamientos registrados en la app" });
+}
 
-describe("Otorgamiento contra el cupo de MacroGest", () => {
-  it("lista sólo planta 0 de hoy en adelante: sin vencidos ni planes ya pasados a planta 10", async () => {
-    mostrar();
-    const tabla = await abrir();
-    await within(tabla).findByText("COD-DEMO-1-1");
-    expect(within(tabla).getByText("COD-DEMO-2-2")).toBeInTheDocument();
-    expect(within(tabla).queryByText("COD-DEMO-3-1")).not.toBeInTheDocument();
-    expect(within(tabla).queryByText("COD-DEMO-4-1")).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Cupos recibidos" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Cupos MacroGest" })).not.toBeInTheDocument();
-  });
-
-  it("otorga a un pedido con la clave de MacroGest y lo confirma al leer planta 10 con el mismo productor", async () => {
+describe("Otorgar cupos por pasos, siempre desde un pedido", () => {
+  it("desde la fila del pedido arranca en los cupos de su cereal y campaña, ya elegidos", async () => {
     await pedir(2);
     const cuerpos: OtorgarBody[] = [];
     server.use(
@@ -114,87 +118,105 @@ describe("Otorgamiento contra el cupo de MacroGest", () => {
         cuerpos.push((await request.clone().json()) as OtorgarBody);
       }),
     );
-    const client = mostrar();
-    await abrir();
-    fireEvent.click(
-      await screen.findByRole("radio", { name: "Elegir pedido de Productor ficticio" }),
-    );
-    await elegirCupo("COD-DEMO-1-1");
-    await elegirCupo("COD-DEMO-1-2");
-    await confirmar();
-    expect(cuerpos[0].cupos).toEqual([
-      { contrato: "V-DEMO/1", plan: 1, cupo: 1 },
-      { contrato: "V-DEMO/1", plan: 1, cupo: 2 },
-    ]);
-    expect(cuerpos[0].clienteNumero).toBe(9000000001);
-    const tabla = await registrados();
+    const { client, router } = mostrar("/logistica/pedidos");
+    fireEvent.click(await screen.findByRole("button", { name: "Otorgar" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/logistica/cupos/otorgar"));
+    const tabla = await screen.findByRole("table", { name: "Cupos de planta 0 de Soja 2025-2026" });
+    // Sólo planta 0 de hoy en adelante: sin vencidos ni planes ya pasados a planta 10.
+    await within(tabla).findByText("COD-DEMO-1-1");
+    expect(within(tabla).queryByText("COD-DEMO-3-1")).not.toBeInTheDocument();
+    expect(within(tabla).queryByText("COD-DEMO-4-1")).not.toBeInTheDocument();
+    // Los pendientes del pedido se eligen solos; el tercero queda bloqueado con el motivo.
     await waitFor(() =>
-      expect(within(tabla).getAllByText("Falta pasarlo en MacroGest")).toHaveLength(2),
+      expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" })).toBeChecked(),
     );
-    // El operador pasa el plan en MacroGest; la app lo lee y lo da por confirmado.
+    expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-2" })).toBeChecked();
+    const tercero = screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-2-1" });
+    expect(tercero).toBeDisabled();
+    expect(
+      within(tercero.closest("tr")!).getByText("Ya cubriste los 2 pendientes del pedido"),
+    ).toBeInTheDocument();
+    await confirmar();
+    expect(cuerpos[0]).toMatchObject({
+      cupos: [
+        { contrato: "V-DEMO/1", plan: 1, cupo: 1 },
+        { contrato: "V-DEMO/1", plan: 1, cupo: 2 },
+      ],
+    });
+    expect(cuerpos[0].pedidoId).toBeTruthy();
+    expect(screen.getByText(/productor 9000000001 y planta 10/)).toBeInTheDocument();
+    // En Cupos › Resumen se ve lo otorgado y se confirma al leer planta 10 con el mismo productor.
+    fireEvent.click(screen.getByRole("button", { name: "Ver otorgados" }));
+    const lista = await otorgados();
+    await waitFor(() =>
+      expect(within(lista).getAllByText("Falta pasarlo en MacroGest")).toHaveLength(2),
+    );
     pasarPlanDemo("V-DEMO/1", 1, 10, 9000000001);
     await client.invalidateQueries({ queryKey: ["logistica"] });
     await waitFor(() =>
-      expect(within(tabla).getAllByText("Confirmado en MacroGest")).toHaveLength(2),
+      expect(within(lista).getAllByText("Confirmado en MacroGest")).toHaveLength(2),
     );
-    // Si lo otorgan a otro productor, avisa con el que tiene MacroGest.
     pasarPlanDemo("V-DEMO/1", 1, 10, 1);
     await client.invalidateQueries({ queryKey: ["logistica"] });
     await waitFor(() =>
-      expect(within(tabla).getAllByText("Otro productor en MacroGest")).toHaveLength(2),
+      expect(within(lista).getAllByText("Otro productor en MacroGest")).toHaveLength(2),
     );
-    expect(within(tabla).getAllByText(/Cliente de prueba uno/)).toHaveLength(2);
   });
 
-  it("dice contra qué compara cuando el cupo no coincide con la campaña del pedido", async () => {
-    await pedir(1, "2024-2025");
-    mostrar();
-    await abrir();
+  it("«Otorgar cupo» en Cupos arranca eligiendo el pedido, por prioridad de entrega", async () => {
+    await pedir(1);
+    const { router } = mostrar();
+    expect(screen.queryByRole("tab", { name: "Otorgar" })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Otorgar cupo" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/logistica/cupos/otorgar"));
+    const pedidos = await screen.findByRole("table", { name: "Pedidos con cupos pendientes" });
+    const siguiente = screen.getByRole("button", { name: "Elegir cupos" });
+    expect(siguiente).toBeDisabled();
     fireEvent.click(
-      await screen.findByRole("radio", { name: "Elegir pedido de Productor ficticio" }),
+      await within(pedidos).findByRole("radio", { name: "Elegir pedido de Productor ficticio" }),
     );
-    const cupo = await screen.findByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" });
-    expect(cupo).toBeDisabled();
+    fireEvent.click(siguiente);
+    expect(await screen.findByRole("region", { name: "Pedido elegido" })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" })).toBeChecked(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar pedido" }));
     expect(
-      within(cupo.closest("tr")!).getByText("Cupo Soja 2025-2026 · pedido Soja 2024-2025"),
+      await screen.findByRole("table", { name: "Pedidos con cupos pendientes" }),
     ).toBeInTheDocument();
   });
 
   it("un cupo ya otorgado en la app queda bloqueado hasta que lo pasen o lo deshagan", async () => {
-    await post<OtorgarResultado>("otorgamientos", {
-      destinatarioTipo: "propio",
-      cupos: [{ contrato: "V-DEMO/1", plan: 2, cupo: 1 }],
-    });
-    mostrar();
-    await abrir();
+    const otro = await pedir(1);
+    await otorgarPorApi(otro, [{ contrato: "V-DEMO/1", plan: 2, cupo: 1 }]);
+    const pedido = await pedir(3);
+    mostrar(`/logistica/cupos/otorgar?pedido=${pedido.id}`);
     const cupo = await screen.findByRole("checkbox", { name: "Elegir cupo COD-DEMO-2-1" });
     expect(cupo).toBeDisabled();
     expect(
       within(cupo.closest("tr")!).getByText(
-        "Otorgado en la app a carga propia; falta pasarlo en MacroGest",
+        "Otorgado en la app a Productor ficticio; falta pasarlo en MacroGest",
       ),
     ).toBeInTheDocument();
   });
 
   it("avisa al otorgar parte de un plan, porque en MacroGest el plan va entero a un cliente", async () => {
-    mostrar();
-    await abrir();
-    fireEvent.click(screen.getByRole("radio", { name: "Propio" }));
-    await elegirCupo("COD-DEMO-1-1");
+    const pedido = await pedir(1);
+    mostrar(`/logistica/cupos/otorgar?pedido=${pedido.id}`);
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" })).toBeChecked(),
+    );
     await confirmar();
     expect(screen.getByText(/1 cupo\(s\) más sin otorgar/)).toBeInTheDocument();
   });
 
   it("deshacer pide motivo, libera el cupo y avisa si MacroGest ya tenía el plan pasado", async () => {
-    const otorgado = await post<OtorgarResultado>("otorgamientos", {
-      destinatarioTipo: "propio",
-      cupos: [{ contrato: "V-DEMO/1", plan: 2, cupo: 1 }],
-    });
+    const pedido = await pedir(1);
+    const otorgado = await otorgarPorApi(pedido, [{ contrato: "V-DEMO/1", plan: 2, cupo: 1 }]);
     expect(otorgado.status).toBe(201);
-    pasarPlanDemo("V-DEMO/1", 2, 15, null);
+    pasarPlanDemo("V-DEMO/1", 2, 10, 9000000001);
     mostrar();
-    await abrir();
-    const tabla = await registrados();
+    const tabla = await otorgados();
     await within(tabla).findByText("Confirmado en MacroGest");
     fireEvent.click(within(tabla).getByRole("button", { name: "Deshacer" }));
     const dialogo = await screen.findByRole("dialog", { name: "Deshacer otorgamiento" });
@@ -204,7 +226,7 @@ describe("Otorgamiento contra el cupo de MacroGest", () => {
       target: { value: "Se cargó por error" },
     });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Deshacer otorgamiento" }));
-    expect(await screen.findByText(/sigue en planta 15: volvelo a planta 0/)).toBeInTheDocument();
+    expect(await screen.findByText(/sigue en planta 10: volvelo a planta 0/)).toBeInTheDocument();
     const deshechos = await get<Pagina<OtorgamientoConEstado>>(
       "otorgamientos?desde=2000-01-01&hastaExclusivo=2999-01-01&deshechos=true",
     );
@@ -213,43 +235,42 @@ describe("Otorgamiento contra el cupo de MacroGest", () => {
     expect(await within(tabla).findByText("Deshecho")).toBeInTheDocument();
   });
 
-  it("un 409 refresca y limpia la selección", async () => {
+  it("un 409 relee el pedido y limpia la selección", async () => {
+    const pedido = await pedir(1);
     server.use(
       http.post(`${API}/otorgamientos`, () =>
         HttpResponse.json({ status: 409, detail: "Ya no está disponible" }, { status: 409 }),
       ),
     );
-    mostrar();
-    await abrir();
-    fireEvent.click(screen.getByRole("radio", { name: "Propio" }));
-    await elegirCupo("COD-DEMO-1-1");
-    fireEvent.click(screen.getByRole("button", { name: "Revisar otorgamiento" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Confirmar otorgamiento" }));
+    mostrar(`/logistica/cupos/otorgar?pedido=${pedido.id}`);
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" })).toBeChecked(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /^Revisar/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Otorgar 1 cupo" }));
     expect(await screen.findByText(/MacroGest u otro operador cambió/)).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-1-1" })).not.toBeChecked();
+    expect(await screen.findByRole("region", { name: "Pedido elegido" })).toBeInTheDocument();
   });
 
-  it("lectura ve cupos y otorgamientos sin acciones de otorgar ni deshacer", async () => {
-    await post<OtorgarResultado>("otorgamientos", {
-      destinatarioTipo: "propio",
-      cupos: [{ contrato: "V-DEMO/1", plan: 1, cupo: 1 }],
-    });
+  it("el servidor rechaza otorgar sin pedido", async () => {
+    const r = await post("otorgamientos", { cupos: [{ contrato: "V-DEMO/1", plan: 1, cupo: 1 }] });
+    expect(r.status).toBe(400);
+  });
+
+  it("lectura ve los otorgados sin otorgar ni deshacer", async () => {
+    const pedido = await pedir(1);
+    await otorgarPorApi(pedido, [{ contrato: "V-DEMO/1", plan: 1, cupo: 1 }]);
     sesion.roles = ["logistica-lectura"];
     mostrar();
-    const tabla = await abrir();
-    await within(tabla).findByText("COD-DEMO-1-1");
-    expect(screen.queryByRole("checkbox", { name: /Elegir cupo/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Revisar otorgamiento" })).not.toBeInTheDocument();
-    const lista = await registrados();
+    const lista = await otorgados();
     await within(lista).findByText("Falta pasarlo en MacroGest");
+    expect(screen.queryByRole("button", { name: "Otorgar cupo" })).not.toBeInTheDocument();
     expect(within(lista).queryByRole("button", { name: "Deshacer" })).not.toBeInTheDocument();
   });
 
   it("el historial del otorgamiento muestra la clave de MacroGest y el motivo", async () => {
-    const { dato } = await post<OtorgarResultado>("otorgamientos", {
-      destinatarioTipo: "propio",
-      cupos: [{ contrato: "V-DEMO/1", plan: 1, cupo: 2 }],
-    });
+    const pedido = await pedir(1);
+    const { dato } = await otorgarPorApi(pedido, [{ contrato: "V-DEMO/1", plan: 1, cupo: 2 }]);
     const id = dato.otorgamientos[0].id;
     await post(`otorgamientos/${id}/deshacer`, { revision: 1, motivo: "Motivo ficticio" });
     const h = await get<Pagina<Evento>>(`otorgamientos/${id}/historial`);
@@ -260,7 +281,6 @@ describe("Otorgamiento contra el cupo de MacroGest", () => {
         { campo: "Contrato de venta", anterior: "Sin dato", nuevo: "V-DEMO/1" },
         { campo: "Plan de carga", anterior: "Sin dato", nuevo: "1" },
         { campo: "Cupo", anterior: "Sin dato", nuevo: "2" },
-        { campo: "Tipo de destinatario", anterior: "Sin dato", nuevo: "Propio" },
         { campo: "Motivo", anterior: "Sin dato", nuevo: "Motivo ficticio" },
       ]),
     );
@@ -268,44 +288,60 @@ describe("Otorgamiento contra el cupo de MacroGest", () => {
 });
 
 describe("Plan de Carga", () => {
-  it("al otorgar ofrece el Plan de Carga de cada plan y lo arma con los datos del servidor", async () => {
+  it("al terminar ofrece el Plan de Carga de cada plan y lo arma con los datos del servidor", async () => {
     vi.mocked(descargarPlanCarga).mockClear();
-    mostrar();
-    await abrir();
-    fireEvent.click(screen.getByRole("radio", { name: "Propio" }));
-    await elegirCupo("COD-DEMO-1-1");
-    await elegirCupo("COD-DEMO-2-1");
+    const pedido = await pedir(3);
+    mostrar(`/logistica/cupos/otorgar?pedido=${pedido.id}`);
+    // Se eligen solos 1-1, 1-2 y 2-1: dos planes, dos Planes de Carga.
+    await waitFor(() =>
+      expect(screen.getByRole("checkbox", { name: "Elegir cupo COD-DEMO-2-1" })).toBeChecked(),
+    );
     await confirmar();
     expect(screen.getByRole("button", { name: /Contrato V-DEMO\/1 · plan 1/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /Contrato V-DEMO\/1 · plan 2/ }));
     await waitFor(() => expect(descargarPlanCarga).toHaveBeenCalledOnce());
     const plan = vi.mocked(descargarPlanCarga).mock.calls[0][0];
-    // Propio: titular La Clementina (cargador 1) y planta 15; sólo el cupo otorgado de ese plan.
     expect(plan).toMatchObject({
       contrato: "V-DEMO/1",
       plan: 2,
-      titular: { codigo: 1 },
-      planta: { codigo: 15 },
+      titular: { codigo: 9000000001, nombre: "Productor ficticio" },
+      planta: { codigo: 10, nombre: "DIRECTA" },
     });
     expect(plan.cupos.map((c) => c.codigoOtorgado)).toEqual(["COD-DEMO-2-1"]);
   });
 
-  it("la lista de otorgamientos también descarga el Plan de Carga del cliente", async () => {
+  it("la lista de otorgados también descarga el Plan de Carga", async () => {
     vi.mocked(descargarPlanCarga).mockClear();
-    await post<OtorgarResultado>("otorgamientos", {
-      destinatarioTipo: "cliente",
-      clienteNumero: 9000000001,
-      cupos: [{ contrato: "V-DEMO/1", plan: 1, cupo: 2 }],
-    });
+    const pedido = await pedir(1);
+    await otorgarPorApi(pedido, [{ contrato: "V-DEMO/1", plan: 1, cupo: 2 }]);
     mostrar();
-    await abrir();
-    const tabla = await registrados();
-    fireEvent.click(await within(tabla).findByRole("button", { name: /Plan de Carga/ }));
+    const tabla = await otorgados();
+    fireEvent.click(await within(tabla).findByRole("button", { name: "Descargar Plan de Carga" }));
     await waitFor(() => expect(descargarPlanCarga).toHaveBeenCalledOnce());
-    expect(vi.mocked(descargarPlanCarga).mock.calls[0][0]).toMatchObject({
-      titular: { codigo: 9000000001, nombre: "Productor ficticio" },
-      planta: { codigo: 10, nombre: "DIRECTA" },
+  });
+});
+
+describe("Pedidos por prioridad de entrega", () => {
+  it("muestra hace cuánto se le debe y ordena primero lo más viejo", async () => {
+    await pedir(1);
+    await post<Pedido>("pedidos", {
+      clienteNumero: 9000000001,
+      producto: 10,
+      campania: "2025-2026",
+      fechaSolicitada: hoy(),
+      cantidadCupos: 1,
+      preventa: { operacion: "PF", numero: "PF-DEMO/1" },
+      observacion: null,
     });
+    mostrar("/logistica/pedidos");
+    const tabla = await screen.findByRole("table", { name: "Pedidos de Logística" });
+    await within(tabla).findByText("PF PF-DEMO/1");
+    fireEvent.click(screen.getByRole("button", { name: "Le debemos hace" }));
+    await waitFor(() => {
+      const filas = within(tabla).getAllByRole("row").slice(1);
+      expect(within(filas[0]).getByText("PF PF-DEMO/1")).toBeInTheDocument();
+    });
+    expect(within(tabla).getByText(/Entrega desde|día/)).toBeInTheDocument();
   });
 });
 

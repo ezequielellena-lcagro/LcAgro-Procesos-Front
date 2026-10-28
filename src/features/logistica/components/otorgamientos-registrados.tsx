@@ -1,5 +1,5 @@
+import { History, Undo2 } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { diaArgentina, fecha, fechaInstanteArgentina, hoy, sumarDias } from "../format";
@@ -8,6 +8,7 @@ import type { DeshacerResultado, EstadoOtorgamiento, OtorgamientoConEstado } fro
 import { Campo, FormOperacionFooter } from "./form-operacion";
 import { HistorialDialog } from "./historial-dialog";
 import { PeriodoFiltro } from "./periodo-filtro";
+import { BotonIcono } from "./boton-icono";
 import { PlanCargaBoton } from "./plan-carga-boton";
 import { TablaLogistica } from "./tabla-logistica";
 
@@ -29,20 +30,14 @@ const AVISO: EstadoOtorgamiento[] = ["otro_productor", "otra_planta", "no_esta",
  * otra cosa. Deshacer cierra el otorgamiento y libera el cupo; el cambio en MacroGest sigue siendo
  * a mano.
  */
-export function OtorgamientosRegistrados({
-  gestionar,
-  bloqueado,
-}: {
-  gestionar: boolean;
-  bloqueado: boolean;
-}) {
+export function OtorgamientosRegistrados({ gestionar }: { gestionar: boolean }) {
   const [periodo, setPeriodo] = useState(() => ({
     desde: sumarDias(hoy(), -30),
     hastaExclusivo: sumarDias(hoy(), 1),
   }));
   const [deshechos, setDeshechos] = useState(false);
   const [deshacer, setDeshacer] = useState<OtorgamientoConEstado | null>(null);
-  const [historia, setHistoria] = useState<string | null>(null);
+  const [historia, setHistoria] = useState<OtorgamientoConEstado | null>(null);
   const [avisos, setAvisos] = useState<string[]>([]);
   const lista = useListado<OtorgamientoConEstado>(
     "otorgamientos",
@@ -54,23 +49,14 @@ export function OtorgamientosRegistrados({
   );
   const filas = lista.data?.pages.flatMap((p) => p.filas) ?? [];
   return (
-    <section
-      aria-label="Otorgamientos registrados"
-      className="min-w-0 space-y-3 border-t border-line pt-4"
-    >
+    <section aria-label="Otorgamientos registrados" className="min-w-0 space-y-3">
       <div>
-        <h2 className="font-display text-xl text-ink">Otorgamientos registrados</h2>
         <p className="text-xs text-ink-soft">
           Lo otorgado en la app y lo que dice hoy MacroGest de cada cupo. Se confirma solo cuando el
-          plan pasa a planta 10 con el mismo productor (o a planta 15 si es propio).
+          plan pasa a planta 10 con el mismo productor.
         </p>
       </div>
-      <PeriodoFiltro
-        value={periodo}
-        etiqueta="Fecha de otorgamiento"
-        onChange={setPeriodo}
-        onSubmit={(e) => e.preventDefault()}
-      >
+      <PeriodoFiltro value={periodo} onChange={setPeriodo} onSubmit={(e) => e.preventDefault()}>
         <label className="flex items-center gap-2 self-end pb-2 text-sm text-ink">
           <input
             type="checkbox"
@@ -116,11 +102,8 @@ export function OtorgamientosRegistrados({
             celda: (f) => (f.erp?.fechaCarga ? fecha(f.erp.fechaCarga) : "—"),
           },
           {
-            titulo: "Destinatario",
-            celda: (f) =>
-              f.otorgamiento.destinatarioTipo === "propio"
-                ? "Propio"
-                : (f.otorgamiento.clienteNombre ?? `Cliente ${f.otorgamiento.clienteNumero}`),
+            titulo: "Productor",
+            celda: (f) => f.otorgamiento.clienteNombre ?? `Cliente ${f.otorgamiento.clienteNumero}`,
           },
           {
             titulo: "MacroGest",
@@ -141,23 +124,19 @@ export function OtorgamientosRegistrados({
           {
             titulo: "Acciones",
             celda: (f) => (
-              <div className="flex flex-wrap gap-1">
-                {gestionar && !f.otorgamiento.vigenteHasta && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={bloqueado}
-                    onClick={() => setDeshacer(f)}
-                  >
-                    Deshacer
-                  </Button>
-                )}
+              <div className="flex gap-1">
                 {!f.otorgamiento.vigenteHasta && (
-                  <PlanCargaBoton otorgamientoId={f.otorgamiento.id} variant="ghost" />
+                  <PlanCargaBoton otorgamientoId={f.otorgamiento.id} soloIcono />
                 )}
-                <Button size="sm" variant="ghost" onClick={() => setHistoria(f.otorgamiento.id)}>
-                  Historial
-                </Button>
+                {gestionar && !f.otorgamiento.vigenteHasta && (
+                  <BotonIcono
+                    icono={Undo2}
+                    etiqueta="Deshacer"
+                    className="text-rojo"
+                    onClick={() => setDeshacer(f)}
+                  />
+                )}
+                <BotonIcono icono={History} etiqueta="Historial" onClick={() => setHistoria(f)} />
               </div>
             ),
           },
@@ -174,7 +153,12 @@ export function OtorgamientosRegistrados({
         />
       )}
       {historia && (
-        <HistorialDialog recurso="otorgamientos" id={historia} onClose={() => setHistoria(null)} />
+        <HistorialDialog
+          recurso="otorgamientos"
+          id={historia.otorgamiento.id}
+          descripcion={`Contrato ${historia.otorgamiento.contrato} · plan ${historia.otorgamiento.plan} · cupo ${historia.otorgamiento.cupo}`}
+          onClose={() => setHistoria(null)}
+        />
       )}
     </section>
   );

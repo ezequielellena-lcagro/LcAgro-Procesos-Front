@@ -10,7 +10,11 @@ import { TablaLogistica } from "./tabla-logistica";
 import { PeriodoFiltro } from "./periodo-filtro";
 import { Elegir } from "./elegir";
 import { FiltrosComercialesCampos } from "./filtros-comerciales";
-import { filtrosComercialesVacios, paramsComercialesErp } from "../lib/filtros-comerciales";
+import {
+  filtrosComercialesIniciales,
+  filtrosComercialesVacios,
+  paramsComercialesErp,
+} from "../lib/filtros-comerciales";
 /**
  * Por qué una preventa no se puede usar como referencia de un pedido.
  *
@@ -68,8 +72,8 @@ export function PreventaPicker({
   const [versionFiltros, setVersionFiltros] = useState(0);
   // Cereal y campaña sólo cuando el listado NO viene atado a un cupo ya elegido: en ese caso
   // `filtros` ya fija los tres valores y un filtro del usuario sólo podría contradecirlos.
-  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
-  const [comercial, setComercial] = useState(filtrosComercialesVacios);
+  const [borrador, setBorrador] = useState(filtrosComercialesIniciales);
+  const [comercial, setComercial] = useState(borrador);
   const q = useListado<Preventa>(
     "preventas",
     {
@@ -77,7 +81,13 @@ export function PreventaPicker({
       ...(filtros ?? paramsComercialesErp(comercial)),
       buscar: buscar.trim() || undefined,
     },
-    (p) => ({ despuesOperacion: p.operacion, despuesNumero: p.numero }),
+    // Orden por prioridad de entrega: pendientes primero, de la que debía empezar antes.
+    (p) => ({
+      despuesPrioridad: p.estadoEntrega === "P" ? 0 : 1,
+      despuesEntrega: p.fechaEntregaInicio?.slice(0, 10) ?? "9999-12-31",
+      despuesOperacion: p.operacion,
+      despuesNumero: p.numero,
+    }),
     buscar.trim().length !== 1,
     paginaContexto ? { ...paginaContexto, versionFiltros } : undefined,
     tamano,
@@ -97,7 +107,6 @@ export function PreventaPicker({
           setPeriodo(nuevo);
           if (paginaContexto) setVersionFiltros((v) => v + 1);
         }}
-        etiqueta="Operación de la preventa"
         onSubmit={(e) => {
           e.preventDefault();
           aplicar(borrador);
@@ -216,8 +225,8 @@ export function VentaPicker({
 }) {
   const [periodo, setPeriodo] = useState(() => periodoInicial(true));
   const [buscar, setBuscar] = useState("");
-  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
-  const [comercial, setComercial] = useState(filtrosComercialesVacios);
+  const [borrador, setBorrador] = useState(filtrosComercialesIniciales);
+  const [comercial, setComercial] = useState(borrador);
   const q = useListado<Venta>(
     "contratos",
     { ...periodo, ...paramsComercialesErp(comercial), buscar: buscar.trim() || undefined },
@@ -235,7 +244,6 @@ export function VentaPicker({
       <PeriodoFiltro
         value={periodo}
         onChange={setPeriodo}
-        etiqueta="Operación del contrato"
         onSubmit={(e) => {
           e.preventDefault();
           setComercial(borrador);

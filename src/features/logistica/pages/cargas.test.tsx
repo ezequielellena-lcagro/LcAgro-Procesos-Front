@@ -15,7 +15,14 @@ import {
 } from "@/mocks/handlers/logistica";
 import { logisticaFlotaHandlers, resetFlotaDemo } from "@/mocks/handlers/logistica-flota";
 import { downloadBlob } from "@/shared/export/download-blob";
-import type { FichaFlotaDto, GuardarCargaBody, OtorgarResultado } from "../types";
+import { hoy } from "../format";
+import type {
+  ClaveCupo,
+  FichaFlotaDto,
+  GuardarCargaBody,
+  OtorgarResultado,
+  Pedido,
+} from "../types";
 import { CargasPage } from "./cargas-page";
 
 const sesion = vi.hoisted(() => ({ roles: ["logistica-cargas"] as RolNombre[] }));
@@ -47,8 +54,24 @@ async function post<T>(ruta: string, body: object) {
   return (await r.json()) as T;
 }
 const clave = { contrato: "V-DEMO/1", plan: 1, cupo: 1 };
-const otorgarPropio = () =>
-  post<OtorgarResultado>("otorgamientos", { destinatarioTipo: "propio", cupos: [clave] });
+/** Todo otorgamiento sale de un pedido: se crea uno por cupo y se le otorga. */
+async function otorgar(cupo: ClaveCupo = clave) {
+  const pedido = await post<Pedido>("pedidos", {
+    clienteNumero: 9000000001,
+    producto: 10,
+    campania: "2025-2026",
+    fechaSolicitada: hoy(),
+    cantidadCupos: 1,
+    preventa: null,
+    observacion: null,
+  });
+  return post<OtorgarResultado>("otorgamientos", {
+    pedidoId: pedido.id,
+    pedidoRevision: pedido.revision,
+    cupos: [cupo],
+  });
+}
+const pasarAlProductor = (plan = 1) => pasarPlanDemo("V-DEMO/1", plan, 10, 9000000001);
 function mostrar() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -66,11 +89,11 @@ const tabla = () => screen.findByRole("table", { name: "Cargas a puerto" });
 describe("Cargas a puerto leyendo MacroGest", () => {
   it.each([
     ["sin pasar en MacroGest", () => undefined, "Falta pasarlo en MacroGest"],
-    ["plan en planta 15", () => pasarPlanDemo("V-DEMO/1", 1, 15, null), "Por cargar"],
+    ["plan pasado al productor", () => pasarAlProductor(), "Por cargar"],
     [
       "con carta de porte",
       () => {
-        pasarPlanDemo("V-DEMO/1", 1, 15, null);
+        pasarAlProductor();
         cargarDemo(clave);
       },
       "En viaje",
@@ -78,22 +101,22 @@ describe("Cargas a puerto leyendo MacroGest", () => {
     [
       "con descarga",
       () => {
-        pasarPlanDemo("V-DEMO/1", 1, 15, null);
+        pasarAlProductor();
         cargarDemo(clave);
         descargarDemo(clave, 29500);
       },
       "Descargado",
     ],
   ])("el estado sale de MacroGest: %s", async (_caso, preparar, esperado) => {
-    await otorgarPropio();
+    await otorgar();
     preparar();
     mostrar();
     expect(await within(await tabla()).findByText(esperado)).toBeInTheDocument();
   });
 
   it("muestra carta de porte, CTG, patente y kilos de MacroGest; nada de eso se carga a mano", async () => {
-    await otorgarPropio();
-    pasarPlanDemo("V-DEMO/1", 1, 15, null);
+    await otorgar();
+    pasarAlProductor();
     cargarDemo(clave);
     descargarDemo(clave, 29500);
     mostrar();
@@ -106,7 +129,7 @@ describe("Cargas a puerto leyendo MacroGest", () => {
   });
 
   it("elige un camión del padrón de Flete y anota una observación", async () => {
-    await otorgarPropio();
+    await otorgar();
     const ficha = await post<FichaFlotaDto>("flota", {
       patenteChasis: "AB 123 CD",
       patenteAcoplado: null,
@@ -151,7 +174,7 @@ describe("Cargas a puerto leyendo MacroGest", () => {
 
   it("lectura ve las cargas sin poder elegir camión y exporta el XLSX", async () => {
     sesion.roles = ["logistica-lectura"];
-    await otorgarPropio();
+    await otorgar();
     mostrar();
     await within(await tabla()).findByText("COD-DEMO-1-1");
     expect(screen.queryByRole("button", { name: /Camión/ })).not.toBeInTheDocument();
@@ -160,13 +183,21 @@ describe("Cargas a puerto leyendo MacroGest", () => {
     expect(vi.mocked(downloadBlob).mock.calls[0][1]).toBe("cargas-a-puerto.xlsx");
   });
 
+  it("arranca en la campaña vigente y filtra por la campaña del pedido", async () => {
+    await otorgar();
+    mostrar();
+    const lista = await tabla();
+    expect(await within(lista).findByText("COD-DEMO-1-1")).toBeInTheDocument();
+    expect(screen.getByLabelText("Campaña")).toHaveValue("2025-2026");
+    fireEvent.change(screen.getByLabelText("Campaña"), { target: { value: "2026-2027" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+    await waitFor(() => expect(within(lista).queryByText("COD-DEMO-1-1")).not.toBeInTheDocument());
+  });
+
   it("filtra por estado sobre lo leído de MacroGest", async () => {
-    await otorgarPropio();
-    await post<OtorgarResultado>("otorgamientos", {
-      destinatarioTipo: "propio",
-      cupos: [{ contrato: "V-DEMO/1", plan: 2, cupo: 1 }],
-    });
-    pasarPlanDemo("V-DEMO/1", 1, 15, null);
+    await otorgar();
+    await otorgar({ contrato: "V-DEMO/1", plan: 2, cupo: 1 });
+    pasarAlProductor();
     mostrar();
     const lista = await tabla();
     await within(lista).findByText("Por cargar");

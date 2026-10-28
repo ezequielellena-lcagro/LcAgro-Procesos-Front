@@ -14,13 +14,19 @@ import type { Pedido, Preventa } from "../types";
 import { AvisoDemo } from "../components/aviso-demo";
 import { PreventaPicker } from "../components/contrato-picker";
 import { FormOperacionFooter } from "../components/form-operacion";
+import { BotonIcono } from "../components/boton-icono";
 import { HistorialDialog } from "../components/historial-dialog";
+import { LeDebemos } from "../components/le-debemos";
 import { usePaginacion } from "../lib/paginacion";
 import { Paginacion } from "../components/paginacion";
 import { PedidoDialog } from "../components/pedido-dialog";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
-import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
+import {
+  filtrosComercialesIniciales,
+  filtrosComercialesVacios,
+  paramsComerciales,
+} from "../lib/filtros-comerciales";
 import { TablaLogistica } from "../components/tabla-logistica";
 
 const otrosVacios = { preventaNumero: "", cumplidos: false };
@@ -33,14 +39,17 @@ export function PedidosPage() {
   const otorgar = user?.roles.includes("logistica-cupos") ?? false;
   const [tab, setTab] = useState("agenda");
   const [periodo, setPeriodo] = useState(() => periodoInicial());
-  const [historia, setHistoria] = useState<string | null>(null);
+  const [historia, setHistoria] = useState<Pedido | null>(null);
   const [dialogo, setDialogo] = useState<{ pedido?: Pedido; preventa?: Preventa } | null>(null);
   const [eliminar, setEliminar] = useState<Pedido | null>(null);
   const [preventa, setPreventa] = useState<Preventa | null>(null);
-  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
-  const [comercial, setComercial] = useState(filtrosComercialesVacios);
+  const [borrador, setBorrador] = useState(filtrosComercialesIniciales);
+  const [comercial, setComercial] = useState(borrador);
   const [otrosBorrador, setOtrosBorrador] = useState(otrosVacios);
   const [otros, setOtros] = useState(otrosVacios);
+  // Por fecha del pedido o por prioridad de entrega (a quién se le debe hace más tiempo); se elige
+  // tocando el encabezado de «Para cuándo» o de «Le debemos hace».
+  const [orden, setOrden] = useState<"fecha" | "prioridad">("fecha");
   // Un pedido con todo otorgado sale de la lista; «Ver cumplidos» muestra sólo esos.
   const q = useListado<Pedido>(
     "pedidos",
@@ -49,6 +58,7 @@ export function PedidosPage() {
       ...paramsComerciales(comercial),
       preventaNumero: otros.preventaNumero.trim() || undefined,
       ...(otros.cumplidos ? { cumplidos: true } : { soloPendientes: true }),
+      orden,
     },
     cursorPropio,
   );
@@ -156,12 +166,22 @@ export function PedidosPage() {
                 celda: (f) =>
                   f.preventa ? `${f.preventa.operacion} ${f.preventa.numero}` : "Sin preventa",
               },
+              // Desde el inicio del período de entrega de la preventa (MacroGest).
+              {
+                titulo: "Le debemos hace",
+                celda: (f) => <LeDebemos pedido={f} />,
+                orden: { activo: orden === "prioridad", ordenar: () => setOrden("prioridad") },
+              },
               {
                 titulo: "Cereal / campaña",
                 celda: (f) => `${f.productoNombre ?? f.producto} / ${f.campania}`,
               },
               { titulo: "Carga", celda: (f) => (f.seCargaEnPlanta ? "En planta" : "En campo") },
-              { titulo: "Para cuándo", celda: (f) => fecha(f.fechaSolicitada) },
+              {
+                titulo: "Para cuándo",
+                celda: (f) => fecha(f.fechaSolicitada),
+                orden: { activo: orden === "fecha", ordenar: () => setOrden("fecha") },
+              },
               { titulo: "Solicitados", numero: true, celda: (f) => f.cantidadCupos },
               { titulo: "Otorgados", numero: true, celda: (f) => f.otorgados },
               { titulo: "Pendientes", numero: true, celda: (f) => f.pendientes },
@@ -169,36 +189,35 @@ export function PedidosPage() {
               {
                 titulo: "Acciones",
                 celda: (f) => (
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex gap-1">
                     {otorgar && f.pendientes > 0 && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          void navigate("/logistica/cupos", {
-                            state: { tab: "otorgar", pedidoId: f.id },
-                          })
-                        }
-                      >
-                        <Truck className="size-4" aria-hidden /> Otorgar
-                      </Button>
+                      <BotonIcono
+                        icono={Truck}
+                        etiqueta="Otorgar"
+                        variant="default"
+                        onClick={() => void navigate(`/logistica/cupos/otorgar?pedido=${f.id}`)}
+                      />
                     )}
                     {gestionar && (
                       <>
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <BotonIcono
+                          icono={Pencil}
+                          etiqueta="Corregir"
                           onClick={() => setDialogo({ pedido: f })}
-                        >
-                          <Pencil className="size-4" aria-hidden /> Corregir
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEliminar(f)}>
-                          <Trash2 className="size-4" aria-hidden /> Eliminar
-                        </Button>
+                        />
+                        <BotonIcono
+                          icono={Trash2}
+                          etiqueta="Eliminar"
+                          className="text-rojo"
+                          onClick={() => setEliminar(f)}
+                        />
                       </>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => setHistoria(f.id)}>
-                      <History className="size-4" aria-hidden /> Historial
-                    </Button>
+                    <BotonIcono
+                      icono={History}
+                      etiqueta="Historial"
+                      onClick={() => setHistoria(f)}
+                    />
                   </div>
                 ),
               },
@@ -219,7 +238,12 @@ export function PedidosPage() {
       )}
       {eliminar && <EliminarPedidoDialog pedido={eliminar} onClose={() => setEliminar(null)} />}
       {historia && (
-        <HistorialDialog recurso="pedidos" id={historia} onClose={() => setHistoria(null)} />
+        <HistorialDialog
+          recurso="pedidos"
+          id={historia.id}
+          descripcion={`${historia.clienteNombre ?? `Cliente ${historia.clienteNumero}`} · ${historia.cantidadCupos} ${historia.cantidadCupos === 1 ? "cupo" : "cupos"} para el ${fecha(historia.fechaSolicitada)}`}
+          onClose={() => setHistoria(null)}
+        />
       )}
     </>
   );

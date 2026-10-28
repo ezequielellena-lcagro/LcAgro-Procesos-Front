@@ -1,3 +1,4 @@
+import { Ban, Eye, History, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { fecha } from "../format";
 import { referenciaFlota, textoFlotaValido, trimFlota } from "../lib/flota";
 import { useFichaFlota, useFlota } from "../queries/use-logistica-flota";
 import type { FichaFlotaDto, FiltrosFlota } from "../types";
+import { BotonIcono } from "../components/boton-icono";
 import { FichaFlotaDialog, type ModoFichaFlota } from "../components/ficha-flota-dialog";
 import { HistorialDialog } from "../components/historial-dialog";
 import { AvisoDemo } from "../components/aviso-demo";
@@ -141,11 +143,7 @@ export function FletePage() {
           />
         </FilterField>
         <FilterField label="Estado de la ficha">
-          <Select
-            className="w-40"
-            value={estado}
-            onChange={(e) => setEstado(e.target.value)}
-          >
+          <Select className="w-40" value={estado} onChange={(e) => setEstado(e.target.value)}>
             <option value="">Todas</option>
             <option value="true">Activas</option>
             <option value="false">Inactivas</option>
@@ -226,42 +224,35 @@ export function FletePage() {
             titulo: "Acciones",
             celda: (f) => (
               <div className="flex gap-1">
-                <Button
-                  size="sm"
-                  variant="ghost"
+                <BotonIcono
+                  icono={Eye}
+                  etiqueta="Detalle"
                   disabled={ocupado}
                   onClick={() => abrir(f.id, "detalle")}
-                >
-                  Detalle
-                </Button>
+                />
                 {gestionar && f.activo && (
                   <>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <BotonIcono
+                      icono={Pencil}
+                      etiqueta="Editar"
                       disabled={!editable}
                       onClick={() => abrir(f.id, "editar")}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    />
+                    <BotonIcono
+                      icono={Ban}
+                      etiqueta="Baja"
+                      className="text-rojo"
                       disabled={!editable}
                       onClick={() => abrir(f.id, "baja")}
-                    >
-                      Baja
-                    </Button>
+                    />
                   </>
                 )}
-                <Button
-                  size="sm"
-                  variant="ghost"
+                <BotonIcono
+                  icono={History}
+                  etiqueta="Historial"
                   disabled={ocupado}
                   onClick={() => setHistoria(f.id)}
-                >
-                  Historial
-                </Button>
+                />
               </div>
             ),
           },
