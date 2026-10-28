@@ -329,47 +329,10 @@ export const logisticaHandlers = [
     const tamano = Math.min(200, Number(url.searchParams.get("tamano") ?? 50));
     return pagina(filas.slice(0, tamano), filas.length > tamano);
   }),
-  // Resumen de MacroGest: disponibles de hoy en adelante por cereal, plantas y vencidos sin usar.
-  http.get(`${API}/cupos/disponibles`, ({ request }) => {
-    const url = new URL(request.url);
-    const producto = url.searchParams.get("producto");
-    const campania = url.searchParams.get("campania");
-    const filtrados = macro.filter(
-      (c) =>
-        (!producto || c.producto === Number(producto)) &&
-        (!campania || c.campania === Number(campania)),
-    );
-    const desdeHoy = filtrados.filter((c) => diaCarga(c) >= hoy());
-    const disponibles = desdeHoy.filter((c) => c.planta === 0);
-    const porPlanta = [...new Set(desdeHoy.map((c) => c.planta))].map((planta) => ({
-      planta,
-      cupos: desdeHoy.filter((c) => c.planta === planta).length,
-      conCartaPorte: desdeHoy.filter((c) => c.planta === planta && c.tieneCartaPorte).length,
-    }));
-    return HttpResponse.json({
-      porCereal: disponibles.length
-        ? [
-            {
-              producto: venta.producto,
-              productoNombre: venta.productoNombre,
-              campania: venta.campania,
-              cupos: disponibles.length,
-            },
-          ]
-        : [],
-      porPlanta,
-      vencidosSinUsar: filtrados.filter(
-        (c) => c.planta === 0 && diaCarga(c) < hoy() && !c.tieneCartaPorte,
-      ).length,
-      desde: hoy(),
-      kgPorCupo: 30000,
-      datosAl: new Date().toISOString(),
-    });
-  }),
-  // Planta 0 uno por uno: disponibles (de hoy en adelante) o vencidos sin carta de porte.
+  // Planta 0 uno por uno: los otorgables (de hoy en adelante) o todas las fechas, más nuevo primero.
   http.get(`${API}/cupos/planta-0`, ({ request }) => {
     const url = new URL(request.url);
-    const vencidos = url.searchParams.get("vencidos") === "true";
+    const todas = url.searchParams.get("todasLasFechas") === "true";
     const producto = url.searchParams.get("producto");
     const campania = url.searchParams.get("campania");
     const contrato = url.searchParams.get("contrato");
@@ -383,13 +346,13 @@ export const logisticaHandlers = [
       .filter(
         (c) =>
           c.planta === 0 &&
-          (vencidos ? diaCarga(c) < hoy() && !c.tieneCartaPorte : diaCarga(c) >= hoy()) &&
+          (todas || diaCarga(c) >= hoy()) &&
           (!producto || c.producto === Number(producto)) &&
           (!campania || c.campania === Number(campania)) &&
           (!contrato || c.contrato === contrato) &&
-          (!cursor || clave(c) > cursor),
+          (!cursor || (todas ? clave(c) < cursor : clave(c) > cursor)),
       )
-      .sort((a, b) => clave(a).localeCompare(clave(b)))
+      .sort((a, b) => (todas ? -1 : 1) * clave(a).localeCompare(clave(b)))
       .map(
         (c): CupoPlanta0 => ({
           contrato: c.contrato,

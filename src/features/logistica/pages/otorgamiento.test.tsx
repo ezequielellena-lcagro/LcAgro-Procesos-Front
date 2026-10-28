@@ -346,15 +346,14 @@ describe("Pedidos por prioridad de entrega", () => {
 });
 
 describe("Resumen de Cupos", () => {
-  it("cuenta disponibles de hoy en adelante y avisa los vencidos sin usar", async () => {
+  it("lista todo lo de planta 0, del más nuevo al más viejo, con los vencidos marcados", async () => {
     mostrar();
-    const region = await screen.findByRole("region", { name: "Cupos disponibles" });
-    expect(await within(region).findByText("Total disponibles")).toBeInTheDocument();
-    expect(within(region).getAllByText("4").length).toBeGreaterThan(0);
-    expect(within(region).getByText("1 vencidos sin usar")).toBeInTheDocument();
-    fireEvent.click(within(region).getByRole("button", { name: "Ver vencidos" }));
-    const vencidos = await screen.findByRole("table", { name: "Cupos vencidos sin usar" });
-    expect(await within(vencidos).findByText("COD-DEMO-3-1")).toBeInTheDocument();
-    expect(screen.queryByText("Seguimiento de solicitudes")).not.toBeInTheDocument();
+    const tabla = await screen.findByRole("table", { name: "Cupos disponibles en planta 0" });
+    expect(await within(tabla).findByText("COD-DEMO-1-1")).toBeInTheDocument();
+    const vencido = within(tabla).getByText("COD-DEMO-3-1").closest("tr")!;
+    expect(within(vencido).getByText(/vencido/)).toBeInTheDocument();
+    const filas = within(tabla).getAllByRole("row").slice(1);
+    expect(within(filas.at(-1)!).getByText("COD-DEMO-3-1")).toBeInTheDocument();
+    expect(screen.queryByText(/Total disponibles/)).not.toBeInTheDocument();
   });
 });
