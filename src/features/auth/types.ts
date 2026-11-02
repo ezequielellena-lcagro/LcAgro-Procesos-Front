@@ -12,6 +12,7 @@ export type RolNombre =
   | "stockfisico"
   | "produccionpropia"
   | "volumenacopiado"
+  | "tableroacopio"
   | "comisiones"
   | "prestamos"
   | "semillero"
@@ -37,6 +38,7 @@ export const ETIQUETA_PANTALLA: Record<RolNombre, string> = {
   stockfisico: "Stock Físico de Cereal",
   produccionpropia: "Posición de Producción Propia",
   volumenacopiado: "Volumen Acopiado por Vendedor",
+  tableroacopio: "Tablero de Gestión del Acopio",
   comisiones: "Liquidación de Comisiones",
   prestamos: "Préstamos Bancarios",
   semillero: "Semillero · Stock y Órdenes de Carga",

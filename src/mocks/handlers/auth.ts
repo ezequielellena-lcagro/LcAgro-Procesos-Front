@@ -20,6 +20,7 @@ const USUARIOS: Record<string, User> = {
       "stockfisico",
       "produccionpropia",
       "volumenacopiado",
+      "tableroacopio",
       "comisiones",
       "proveedores",
       "prestamos",

@@ -83,6 +83,13 @@ export const NAV: Area[] = [
         roles: ["volumenacopiado"],
       },
       {
+        kind: "activo",
+        label: "Tablero de Gestión",
+        title: "Tablero de gestión del acopio",
+        to: "/tablero-acopio",
+        roles: ["tableroacopio"],
+      },
+      {
         kind: "grupo",
         label: "Logística",
         procesos: [

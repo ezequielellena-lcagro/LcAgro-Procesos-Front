@@ -17,6 +17,7 @@ import { semilleroHandlers } from "./semillero";
 import { stockHandlers } from "./stock";
 import { stockfisicoHandlers } from "./stockfisico";
 import { usuariosHandlers } from "./usuarios";
+import { tableroAcopioHandlers } from "./tableroacopio";
 import { volumenAcopiadoHandlers } from "./volumenacopiado";
 
 export const handlers = [
@@ -28,6 +29,7 @@ export const handlers = [
   ...planificacionVentasHandlers,
   ...produccionPropiaHandlers,
   ...volumenAcopiadoHandlers,
+  ...tableroAcopioHandlers,
   ...cuentasHandlers,
   ...proveedoresHandlers,
   ...prestamosHandlers,

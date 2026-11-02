@@ -53,6 +53,11 @@ const VolumenAcopiadoPage = lazy(() =>
     default: m.VolumenAcopiadoPage,
   })),
 );
+const TableroAcopioPage = lazy(() =>
+  import("@/features/tableroacopio/pages/tablero-acopio-page").then((m) => ({
+    default: m.TableroAcopioPage,
+  })),
+);
 const ComisionesPage = lazy(() =>
   import("@/features/comisiones/pages/comisiones-page").then((m) => ({
     default: m.ComisionesPage,
@@ -203,6 +208,10 @@ export const router = createBrowserRouter([
           {
             element: <ProtectedRoute roles={["volumenacopiado"]} />,
             children: [{ path: "volumen-acopiado", element: <VolumenAcopiadoPage /> }],
+          },
+          {
+            element: <ProtectedRoute roles={["tableroacopio"]} />,
+            children: [{ path: "tablero-acopio", element: <TableroAcopioPage /> }],
           },
           {
             element: <ProtectedRoute roles={["comisiones"]} />,

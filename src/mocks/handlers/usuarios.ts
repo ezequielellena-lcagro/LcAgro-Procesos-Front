@@ -3,7 +3,7 @@ import type { ActualizarUsuarioInput, CrearUsuarioInput, UsuarioDto } from "@/fe
 import { env } from "@/lib/env";
 
 const API = env.apiUrl;
-const ROLES = ["dashboard", "posicion", "cuentas", "semilla", "stock", "stockfisico", "produccionpropia", "volumenacopiado", "comisiones", "proveedores", "prestamos", "semillero", "planificacionventas", "planificacionventasgestion", "usuarios", "config", "auditoria"];
+const ROLES = ["dashboard", "posicion", "cuentas", "semilla", "stock", "stockfisico", "produccionpropia", "volumenacopiado", "tableroacopio", "comisiones", "proveedores", "prestamos", "semillero", "planificacionventas", "planificacionventasgestion", "usuarios", "config", "auditoria"];
 
 let seq = 6;
 const USUARIOS: UsuarioDto[] = [
