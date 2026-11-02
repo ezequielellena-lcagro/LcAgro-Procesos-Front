@@ -1,4 +1,4 @@
-import { FileSpreadsheet, History, Truck } from "lucide-react";
+import { FileSpreadsheet, History, Pencil } from "lucide-react";
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -10,73 +10,74 @@ import { toAppError } from "@/lib/api-error";
 import { FilterField } from "@/shared/components/filter-bar";
 import { PageHeader } from "@/shared/components/page-header";
 import { downloadBlob, filenameFromContentDisposition } from "@/shared/export/download-blob";
-import { diaArgentina, fecha, hoy, kg, sumarDias } from "../format";
-import { useListado } from "../queries/use-logistica";
-import type { CargaLogistica, EstadoCarga } from "../types";
+import { fecha, hoy, kg, sumarDias } from "../format";
+import { cuerpoCarga, estadoElegido } from "../lib/carga";
+import { ESTADOS_CARGA, tonoEstado } from "../lib/estados-carga";
+import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
+import { usePaginacion } from "../lib/paginacion";
+import { useListado, useOperacion } from "../queries/use-logistica";
+import type { CargaLogistica, CargaPropia } from "../types";
 import { AvisoDemo } from "../components/aviso-demo";
+import { BotonIcono } from "../components/boton-icono";
 import { CargaDialog } from "../components/carga-dialog";
 import { CatalogoSelect } from "../components/catalogo-select";
 import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
-import {
-  filtrosComercialesIniciales,
-  filtrosComercialesVacios,
-  paramsComerciales,
-} from "../lib/filtros-comerciales";
 import { HistorialDialog } from "../components/historial-dialog";
+import { Paginacion } from "../components/paginacion";
 import { PeriodoFiltro } from "../components/periodo-filtro";
-import { BotonIcono } from "../components/boton-icono";
 import { PlanCargaBoton } from "../components/plan-carga-boton";
 import { TablaLogistica } from "../components/tabla-logistica";
 
-/** Cómo se lee cada estado; sale de MacroGest en cada consulta. */
-const ESTADO_CARGA: Record<EstadoCarga, string> = {
-  falta_pasar: "Falta pasarlo en MacroGest",
-  por_cargar: "Por cargar",
-  en_viaje: "En viaje",
-  descargado: "Descargado",
-  revisar: "Revisar en MacroGest",
-  no_esta: "Ya no está en MacroGest",
-  sin_verificar: "Sin verificar",
+const filtrosVacios = {
+  ...filtrosComercialesVacios,
+  contrato: "",
+  productorNumero: 0,
+  planta: "",
+  estado: "",
 };
-const filtrosVacios = { contrato: "", clienteNumero: 0, estado: "", ...filtrosComercialesVacios };
-/** Arranca en la campaña vigente; «Limpiar filtros» muestra todas. */
-const filtrosIniciales = () => ({ ...filtrosVacios, ...filtrosComercialesIniciales() });
-/** Kilos de MacroGest: vienen como texto exacto; vacío es guion. */
-const kgErp = (v: string | number | null | undefined) =>
-  v == null || v === "" ? "—" : kg(Number(v));
-const oDash = (v: string | null | undefined) => (v && v.trim() ? v.trim() : "—");
+const kilos = (v: number | null) => (v == null ? "—" : kg(v));
+const guion = (v: string | null | undefined) => (v && v.trim() ? v.trim() : "—");
 
 /**
- * Cargas a puerto, leyendo MacroGest (devolución del 2026-10-23, tramo 5). Cada cupo otorgado
- * muestra carta de porte, CTG, patente y kilos de carga y descarga de MacroGest, y el estado sale
- * de ahí. Lo propio es el camión de Flete y una observación.
+ * Cargas a puerto como la planilla de logística (pedido de Ezequiel, 2026-10-29): una fila por cupo
+ * de MacroGest en planta 10 (DIRECTO) o 15 (PLANTA), con las mismas columnas. Lo que MacroGest
+ * tiene se completa solo; el estado se elige del desplegable y, si nadie lo toca, sale de
+ * MacroGest. Camión, humedad y observaciones se cargan acá.
  */
 export function CargasPage() {
   const { user } = useAuth();
   const gestionar = user?.roles.includes("logistica-cargas") ?? false;
   const [periodo, setPeriodo] = useState(() => ({
-    desde: sumarDias(hoy(), -30),
-    hastaExclusivo: sumarDias(hoy(), 1),
+    desde: sumarDias(hoy(), -7),
+    hastaExclusivo: sumarDias(hoy(), 8),
   }));
-  const [borrador, setBorrador] = useState(filtrosIniciales);
+  const [borrador, setBorrador] = useState(filtrosVacios);
   const [filtros, setFiltros] = useState(borrador);
   const [editar, setEditar] = useState<CargaLogistica | null>(null);
   const [historia, setHistoria] = useState<CargaLogistica | null>(null);
   const params = {
     ...periodo,
-    contrato: filtros.contrato.trim() || undefined,
-    clienteNumero: filtros.clienteNumero || undefined,
-    // Cereal y campaña del pedido al que se otorgó el cupo.
     ...paramsComerciales(filtros),
+    contrato: filtros.contrato.trim() || undefined,
+    productorNumero: filtros.productorNumero || undefined,
+    planta: filtros.planta || undefined,
   };
-  const q = useListado<CargaLogistica>("cargas", params, (f) => ({
-    despuesDia: diaArgentina(f.otorgamiento.otorgamiento.vigenteDesde),
-    despuesId: f.otorgamiento.otorgamiento.id,
-  }));
-  // El estado sale de MacroGest al leer, así que se filtra sobre lo leído.
-  const filas = (q.data?.pages.flatMap((p) => p.filas) ?? []).filter(
-    (f) => !filtros.estado || f.estado === filtros.estado,
+  const q = useListado<CargaLogistica>(
+    "cargas",
+    params,
+    (f) => ({
+      despuesFecha: f.fechaCarga,
+      despuesContrato: f.contrato,
+      despuesPlan: f.plan,
+      despuesCupo: f.cupo,
+    }),
+    true,
+    undefined,
+    50,
   );
+  const paginacion = usePaginacion(q);
+  // El estado puede salir de MacroGest al leer, así que se filtra sobre lo leído.
+  const filas = paginacion.filas.filter((f) => !filtros.estado || f.estado === filtros.estado);
   const excel = useMutation({
     mutationFn: async () => {
       const res = await apiClient.get("/logistica/cargas/excel", { params, responseType: "blob" });
@@ -90,7 +91,7 @@ export function CargasPage() {
     <>
       <PageHeader
         title="Cargas a puerto"
-        subtitle="Cupos otorgados con lo que dice MacroGest: carta de porte, CTG, patente y kilos. Acá se elige el camión y se anota una observación."
+        subtitle="La planilla de cargas: cada cupo otorgado en MacroGest con lo que ya dice MacroGest. Acá se elige el estado, el camión y se anota humedad y calidad."
         actions={
           <Button variant="outline" disabled={excel.isPending} onClick={() => excel.mutate()}>
             <FileSpreadsheet className="size-4" aria-hidden />{" "}
@@ -112,23 +113,6 @@ export function CargasPage() {
           setFiltros({ ...borrador });
         }}
       >
-        <FilterField label="Contrato">
-          <Input
-            className="w-40"
-            maxLength={15}
-            value={borrador.contrato}
-            onChange={(e) => setBorrador({ ...borrador, contrato: e.target.value })}
-          />
-        </FilterField>
-        <CatalogoSelect
-          className="w-56"
-          tipo="clientes"
-          titulo="Cliente"
-          required={false}
-          modoFiltro
-          value={borrador.clienteNumero}
-          onChange={(clienteNumero) => setBorrador({ ...borrador, clienteNumero })}
-        />
         <FiltrosComercialesCampos
           value={borrador}
           onChange={(v) => setBorrador({ ...borrador, ...v })}
@@ -137,6 +121,34 @@ export function CargasPage() {
             setFiltros(filtrosVacios);
           }}
         >
+          <FilterField label="Contrato">
+            <Input
+              className="w-40"
+              maxLength={15}
+              value={borrador.contrato}
+              onChange={(e) => setBorrador({ ...borrador, contrato: e.target.value })}
+            />
+          </FilterField>
+          <CatalogoSelect
+            className="w-56"
+            tipo="clientes"
+            titulo="Cargo"
+            required={false}
+            modoFiltro
+            value={borrador.productorNumero}
+            onChange={(productorNumero) => setBorrador({ ...borrador, productorNumero })}
+          />
+          <FilterField label="Carga en">
+            <Select
+              className="w-36"
+              value={borrador.planta}
+              onChange={(e) => setBorrador({ ...borrador, planta: e.target.value })}
+            >
+              <option value="">Todas</option>
+              <option value="15">PLANTA</option>
+              <option value="10">DIRECTO</option>
+            </Select>
+          </FilterField>
           <FilterField label="Estado">
             <Select
               className="w-52"
@@ -144,9 +156,9 @@ export function CargasPage() {
               onChange={(e) => setBorrador({ ...borrador, estado: e.target.value })}
             >
               <option value="">Todos</option>
-              {Object.entries(ESTADO_CARGA).map(([valor, texto]) => (
-                <option key={valor} value={valor}>
-                  {texto}
+              {ESTADOS_CARGA.map((x) => (
+                <option key={x} value={x}>
+                  {x}
                 </option>
               ))}
             </Select>
@@ -156,78 +168,95 @@ export function CargasPage() {
       <TablaLogistica
         titulo="Cargas a puerto"
         filas={filas}
-        clave={(f) => f.otorgamiento.otorgamiento.id}
+        clave={(f) => `${f.contrato}/${f.plan}/${f.cupo}`}
         cargando={q.isLoading}
         error={q.error}
         reintentar={() => void q.refetch()}
-        hayMas={q.hasNextPage}
-        mas={() => void q.fetchNextPage()}
-        cargandoMas={q.isFetchingNextPage}
-        vacio="No hay cupos otorgados para estas fechas y filtros."
+        pie={<Paginacion {...paginacion} unidad={{ singular: "carga", plural: "cargas" }} />}
+        vacio="No hay cupos otorgados en MacroGest para estas fechas y filtros."
         columnas={[
+          { titulo: "Fecha", celda: (f) => fecha(f.fechaCarga) },
           {
             titulo: "Estado",
-            celda: (f) => (
-              <span
-                className={
-                  ["revisar", "no_esta", "sin_verificar"].includes(f.estado)
-                    ? "font-medium text-rojo"
-                    : undefined
-                }
-              >
-                {ESTADO_CARGA[f.estado]}
-              </span>
-            ),
+            celda: (f) => (gestionar ? <EstadoCelda carga={f} /> : <EstadoTexto carga={f} />),
           },
+          { titulo: "Producto", celda: (f) => guion(f.productoNombre) },
+          { titulo: "Cargo", celda: (f) => guion(f.cargo) },
           {
-            titulo: "Contrato · plan / cupo",
-            celda: (f) =>
-              `${f.otorgamiento.otorgamiento.contrato} · ${f.otorgamiento.otorgamiento.plan} / ${f.otorgamiento.otorgamiento.cupo}`,
-          },
-          { titulo: "Código otorgado", celda: (f) => oDash(f.otorgamiento.erp?.codigoTerminal) },
-          {
-            titulo: "Fecha de carga",
-            celda: (f) =>
-              f.otorgamiento.erp?.fechaCarga ? fecha(f.otorgamiento.erp.fechaCarga) : "—",
-          },
-          {
-            titulo: "Productor",
-            celda: (f) =>
-              f.otorgamiento.otorgamiento.clienteNombre ??
-              `Cliente ${f.otorgamiento.otorgamiento.clienteNumero}`,
-          },
-          { titulo: "Carta de porte", celda: (f) => f.cartaPorte ?? "—" },
-          { titulo: "CTG", celda: (f) => oDash(f.otorgamiento.erp?.ctg) },
-          { titulo: "Patente", celda: (f) => oDash(f.otorgamiento.erp?.patenteChasis) },
-          { titulo: "Kg carga", numero: true, celda: (f) => kgErp(f.otorgamiento.erp?.kgCargaErp) },
-          {
-            titulo: "Kg descarga",
-            numero: true,
-            celda: (f) => kgErp(f.otorgamiento.erp?.kgDescargaErp),
-          },
-          {
-            titulo: "Camión (Flete)",
+            titulo: "Camión",
             celda: (f) =>
               f.propio?.camion ? (
                 <span>
-                  {f.propio.camion.patenteChasis}
+                  {f.propio.camion.conductor ?? f.propio.camion.patenteChasis}
                   {f.propio.camion.conductor && (
-                    <span className="block text-xs text-ink-soft">{f.propio.camion.conductor}</span>
+                    <span className="block text-xs text-ink-soft">
+                      {f.propio.camion.patenteChasis}
+                    </span>
                   )}
                 </span>
               ) : (
                 "—"
               ),
           },
-          { titulo: "Observación", celda: (f) => f.propio?.observacion ?? "—" },
+          {
+            titulo: "Valor",
+            numero: true,
+            celda: (f) =>
+              f.propio?.camion?.importeReferencia != null
+                ? new Intl.NumberFormat("es-AR").format(f.propio.camion.importeReferencia)
+                : "—",
+          },
+          {
+            titulo: "Contrato",
+            celda: (f) => (
+              <span>
+                {f.contrato}
+                <span className="block text-xs text-ink-soft">
+                  Plan {f.plan} · cupo {f.cupo}
+                  {f.codigoOtorgado ? ` · ${f.codigoOtorgado}` : ""}
+                </span>
+              </span>
+            ),
+          },
+          {
+            titulo: "Humedad",
+            numero: true,
+            celda: (f) => (f.propio?.humedad != null ? `${f.propio.humedad}` : "—"),
+          },
+          { titulo: "Obs. calidad", celda: (f) => guion(f.propio?.obsCalidad) },
+          { titulo: "Puerto", celda: (f) => guion(f.puerto) },
+          { titulo: "Carga en", celda: (f) => f.cargaEn },
+          {
+            titulo: "Patente",
+            celda: (f) => guion(f.patente ?? f.propio?.camion?.patenteChasis),
+          },
+          { titulo: "Kilos carga", numero: true, celda: (f) => kilos(f.kgCarga) },
+          { titulo: "Kilos desc.", numero: true, celda: (f) => kilos(f.kgDescarga) },
+          {
+            titulo: "Dif. kilos",
+            numero: true,
+            celda: (f) =>
+              f.difKilos == null ? (
+                "—"
+              ) : (
+                <span className={f.difKilos < 0 ? "text-rojo" : undefined}>
+                  {new Intl.NumberFormat("es-AR").format(f.difKilos)}
+                </span>
+              ),
+          },
+          { titulo: "Carta de porte", celda: (f) => guion(f.cartaPorte) },
           {
             titulo: "Acciones",
             celda: (f) => (
               <div className="flex gap-1">
                 {gestionar && (
-                  <BotonIcono icono={Truck} etiqueta="Camión" onClick={() => setEditar(f)} />
+                  <BotonIcono
+                    icono={Pencil}
+                    etiqueta="Camión, humedad y observaciones"
+                    onClick={() => setEditar(f)}
+                  />
                 )}
-                <PlanCargaBoton otorgamientoId={f.otorgamiento.otorgamiento.id} soloIcono />
+                {f.otorgamientoId && <PlanCargaBoton otorgamientoId={f.otorgamientoId} soloIcono />}
                 {f.propio && (
                   <BotonIcono icono={History} etiqueta="Historial" onClick={() => setHistoria(f)} />
                 )}
@@ -237,14 +266,52 @@ export function CargasPage() {
         ]}
       />
       {editar && <CargaDialog carga={editar} onClose={() => setEditar(null)} />}
-      {historia && (
+      {historia?.propio && (
         <HistorialDialog
           recurso="cargas"
-          id={historia.otorgamiento.otorgamiento.id}
-          descripcion={`Contrato ${historia.otorgamiento.otorgamiento.contrato} · plan ${historia.otorgamiento.otorgamiento.plan} · cupo ${historia.otorgamiento.otorgamiento.cupo}`}
+          id={historia.propio.id}
+          descripcion={`Contrato ${historia.contrato} · plan ${historia.plan} · cupo ${historia.cupo}`}
           onClose={() => setHistoria(null)}
         />
       )}
     </>
+  );
+}
+
+function EstadoTexto({ carga }: { carga: CargaLogistica }) {
+  return <span className={`whitespace-nowrap ${tonoEstado(carga.estado)}`}>{carga.estado}</span>;
+}
+
+/**
+ * El estado se cambia en la misma fila, como el desplegable de la planilla. Muestra el que vale:
+ * el elegido o, si nadie eligió o MacroGest ya está más adelante en el ciclo, el de MacroGest.
+ */
+function EstadoCelda({ carga }: { carga: CargaLogistica }) {
+  const mutation = useOperacion<CargaPropia>("cargas", "put");
+  return (
+    <span className="flex flex-col gap-0.5">
+      <Select
+        aria-label={`Estado del cupo ${carga.contrato} plan ${carga.plan} cupo ${carga.cupo}`}
+        className={`h-8 w-48 text-xs ${tonoEstado(carga.estado)}`}
+        disabled={mutation.isPending}
+        value={carga.estado}
+        onChange={(e) =>
+          mutation.mutate(cuerpoCarga(carga, { estado: estadoElegido(carga, e.target.value) }), {
+            onError: () => undefined,
+          })
+        }
+      >
+        {ESTADOS_CARGA.map((x) => (
+          <option key={x} value={x}>
+            {x}
+          </option>
+        ))}
+      </Select>
+      {mutation.error && (
+        <span role="alert" className="text-xs text-rojo">
+          {toAppError(mutation.error).message}
+        </span>
+      )}
+    </span>
   );
 }

@@ -1,13 +1,14 @@
-import { CircleOff, History, Truck } from "lucide-react";
+import { CircleOff, History } from "lucide-react";
 import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toAppError } from "@/lib/api-error";
 import { useAuth } from "@/features/auth/auth-context";
 import { PageHeader } from "@/shared/components/page-header";
 import { fecha, periodoInicial } from "../format";
-import { cursorPropio, useListado } from "../queries/use-logistica";
-import type { Solicitud } from "../types";
+import { cursorPropio, useDetalle, useListado } from "../queries/use-logistica";
+import type { Pedido, Solicitud } from "../types";
 import { BotonIcono } from "../components/boton-icono";
 import { HistorialDialog } from "../components/historial-dialog";
 import { AvisoDemo } from "../components/aviso-demo";
@@ -17,28 +18,28 @@ import { TablaLogistica } from "../components/tabla-logistica";
 import { Paginacion } from "../components/paginacion";
 import { usePaginacion } from "../lib/paginacion";
 import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
-import {
-  filtrosComercialesIniciales,
-  filtrosComercialesVacios,
-  paramsComerciales,
-} from "../lib/filtros-comerciales";
-import { ResumenPanel } from "../components/resumen-panel";
+import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
+import { CuposPanel } from "../components/cupos-panel";
+import { ContratosVentaPanel } from "../components/contratos-venta-panel";
 
 /**
- * Cupos, con el cupo de MacroGest como única fuente (decisiones del 2026-10-27): Resumen con lo
- * disponible y lo otorgado, y el historial de pedidos de cupo a terminal. Otorgar es una pantalla
- * por pasos que sale de un pedido (2026-10-28).
+ * Cupos (decidido el 2026-11-02): los cupos del plan de carga de MacroGest, cada uno con el pedido
+ * al que va; el seguimiento de los contratos de venta y el historial de pedidos de cupo a terminal.
+ * César carga los cupos una sola vez, en MacroGest, al armar el plan.
+ *
+ * Desde la fila de un pedido se llega con `?pedido=`: la lista vincula los cupos elegidos a ese
+ * pedido.
  */
 export function CuposPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   // Volver de Solicitar abre el historial de pedidos de cupo.
-  const estado = useLocation().state as { tab?: string } | null;
-  const solapaInicial = estado?.tab;
+  const { state } = useLocation();
+  const [params] = useSearchParams();
+  const pedidoId = params.get("pedido");
   const gestionar = user?.roles.includes("logistica-cupos") ?? false;
-  // Resumen es la pantalla de entrada: lo primero que se pidió ver al abrir Cupos es cuánto hay,
-  // no el formulario de solicitudes.
-  const [tab, setTab] = useState(solapaInicial ?? "resumen");
+  const [tab, setTab] = useState((state as { tab?: string } | null)?.tab ?? "cupos");
+  const pedido = useDetalle<Pedido>(`pedidos/${pedidoId}`, {}, !!pedidoId);
   const [periodo, setPeriodo] = useState(() => periodoInicial());
   const [cerrarSolicitud, setCerrarSolicitud] = useState<Solicitud | null>(null);
   const [historia, setHistoria] = useState<{
@@ -46,7 +47,7 @@ export function CuposPage() {
     id: string;
     descripcion?: string;
   } | null>(null);
-  const [solBorrador, setSolBorrador] = useState(filtrosComercialesIniciales);
+  const [solBorrador, setSolBorrador] = useState(filtrosComercialesVacios);
   const [solComercial, setSolComercial] = useState(solBorrador);
   const solicitudes = useListado<Solicitud>(
     "solicitudes-terminal",
@@ -61,30 +62,43 @@ export function CuposPage() {
     <>
       <PageHeader
         title="Cupos"
-        subtitle="Cupos de MacroGest: lo disponible en planta 0, a quién se otorga y lo pedido a cada terminal."
-        actions={
-          gestionar && (
-            <Button onClick={() => void navigate("/logistica/cupos/otorgar")}>
-              <Truck className="size-4" aria-hidden /> Otorgar cupo
-            </Button>
-          )
-        }
+        subtitle="Los cupos del plan de carga de MacroGest y el pedido al que va cada uno, lo que falta entregar de cada contrato de venta y lo pedido a cada terminal."
       />
       <AvisoDemo />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4 max-w-full overflow-x-auto">
-          <TabsTrigger value="resumen">Resumen</TabsTrigger>
+          <TabsTrigger value="cupos">Cupos</TabsTrigger>
+          <TabsTrigger value="contratos">Contratos de venta</TabsTrigger>
           <TabsTrigger value="historial">Historial de pedidos de cupo</TabsTrigger>
         </TabsList>
-        <TabsContent value="resumen">
-          <ResumenPanel activo={tab === "resumen"} gestionar={gestionar} />
+        <TabsContent value="cupos">
+          {!pedidoId ? (
+            <CuposPanel activo={tab === "cupos"} gestionar={gestionar} />
+          ) : pedido.data ? (
+            <CuposPanel
+              key={pedido.data.id}
+              activo={tab === "cupos"}
+              gestionar={gestionar}
+              pedido={pedido.data}
+              onVolver={() => void navigate("/logistica/pedidos")}
+            />
+          ) : pedido.error ? (
+            <p role="alert" className="text-sm text-rojo">
+              {toAppError(pedido.error).message}
+            </p>
+          ) : (
+            <p className="text-sm text-ink-soft">Cargando el pedido…</p>
+          )}
+        </TabsContent>
+        <TabsContent value="contratos">
+          <ContratosVentaPanel activo={tab === "contratos"} />
         </TabsContent>
         <TabsContent value="historial">
           {/* Lo que se le pidió a cada terminal, por si un contrato no se cumple. Solicitar vive
               acá adentro: es la excepción, no el camino de todos los días (devolución 2026-10-23). */}
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-ink-soft">
-              Los conseguidos se cuentan solos: son los cupos que entraron a MacroGest para ese
+              Los conseguidos se cuentan solos: son los cupos cargados en MacroGest para ese
               contrato con fecha de carga en la fecha pedida.
             </p>
             {gestionar && (
@@ -136,13 +150,13 @@ export function CuposPage() {
               {
                 titulo: "Conseguidos",
                 numero: true,
-                celda: (f) => (f.conseguidos === null ? "Sin verificar" : f.conseguidos),
+                celda: (f) => f.conseguidos ?? "Sin verificar",
               },
               {
                 titulo: "Faltan",
                 numero: true,
                 celda: (f) =>
-                  f.conseguidos === null ? "—" : Math.max(0, f.cantidadCupos - f.conseguidos),
+                  f.conseguidos == null ? "—" : Math.max(0, f.cantidadCupos - f.conseguidos),
               },
               { titulo: "Canal", celda: (f) => f.canal },
               { titulo: "Demanda", celda: (f) => (f.cerradaAl ? "Cerrada" : "Abierta") },

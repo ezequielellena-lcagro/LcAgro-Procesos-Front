@@ -116,6 +116,12 @@
   h3 {
     font-family: var(--font-display);
   }
+  /* El navegador le da a <fieldset> `min-inline-size: min-content`: con una tabla ancha adentro
+     (el buscador de preventas del Nuevo pedido) el fieldset se estira al ancho de la tabla, ignora
+     su `overflow-x-auto` y arrastra filtros y campos fuera del diálogo → scroll horizontal. */
+  fieldset {
+    min-width: 0;
+  }
   .tabular {
     font-variant-numeric: tabular-nums;
   }

@@ -111,7 +111,7 @@ describe("Logística operativa", () => {
     // Solicitar vive dentro de la última solapa, no en la cabecera de Cupos.
     expect(screen.queryByRole("button", { name: "Solicitar cupos" })).not.toBeInTheDocument();
     const solapas = screen.getAllByRole("tab").map((t) => t.textContent);
-    expect(solapas).toEqual(["Resumen", "Historial de pedidos de cupo"]);
+    expect(solapas).toEqual(["Cupos", "Contratos de venta", "Historial de pedidos de cupo"]);
     fireEvent.click(screen.getByRole("tab", { name: "Historial de pedidos de cupo" }));
     fireEvent.click(await screen.findByRole("button", { name: "Solicitar cupos" }));
     // Pantalla propia, no modal: la grilla paginada arriba y los datos de la solicitud abajo.
@@ -133,8 +133,7 @@ describe("Logística operativa", () => {
     // Quedan fecha, cantidad y canal; sin destino y con WhatsApp de arranque.
     expect(screen.queryByLabelText("Destino solicitado")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Canal")).toHaveValue("WhatsApp");
-    // El MacroGest de la demo tiene tres cupos del contrato para mañana (uno ya en planta 10):
-    // cuentan todos, en cualquier planta.
+    // Para mañana hay tres cupos del contrato en los planes de MacroGest: son los conseguidos.
     fireEvent.change(screen.getByLabelText("Fecha solicitada"), {
       target: { value: sumarDias(hoy(), 1) },
     });
@@ -156,10 +155,9 @@ describe("Logística operativa", () => {
     });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Cerrar pedido de cupo" }));
     expect(await within(tabla).findByText("Cerrada")).toBeInTheDocument();
-    // Los cupos ya no se reciben a mano: son los de MacroGest.
-    expect(screen.queryByRole("button", { name: "Recibir" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Recibir cupos" })).not.toBeInTheDocument();
+    // Los cupos salen del plan de carga de MacroGest: no hay solapas de cupos recibidos.
     expect(screen.queryByRole("tab", { name: "Cupos recibidos" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Cupos disponibles" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Cupos MacroGest" })).not.toBeInTheDocument();
   });
   it("soltar la preventa elegida devuelve el alta sin preventa", async () => {

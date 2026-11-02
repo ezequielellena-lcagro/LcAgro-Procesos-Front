@@ -6,13 +6,14 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
-import { hoy, campania } from "../format";
+import { hoy, campania, kg } from "../format";
 import { useDetalle, useOperacion } from "../queries/use-logistica";
 import type { Pedido, Preventa } from "../types";
 import { CampaniaSelect } from "./campania-select";
 import { CatalogoSelect } from "./catalogo-select";
 import { PreventaPicker } from "./contrato-picker";
 import { Campo, FormOperacionFooter } from "./form-operacion";
+import { Vencimiento } from "./vencimiento";
 const schema = z.object({
   clienteNumero: z.number().int().min(1).max(9999999999),
   producto: z.number().int().min(1).max(999999),
@@ -26,6 +27,36 @@ const schema = z.object({
   seCargaEnPlanta: z.boolean(),
 });
 type Valores = z.infer<typeof schema>;
+const KG_POR_CUPO = 30000;
+
+/** Cuánto le queda a la preventa por pedir, y aviso si este pedido se pasa. */
+function SaldoPreventa({
+  preventa,
+  propios,
+  pide,
+}: {
+  preventa: Preventa;
+  propios: number;
+  pide: number;
+}) {
+  const saldo = (preventa.kgSaldo ?? preventa.kgContratados ?? 0) + propios * KG_POR_CUPO;
+  const faltan = saldo > 0 ? Math.ceil(saldo / KG_POR_CUPO) : 0;
+  return (
+    <div
+      role="status"
+      className="mt-3 rounded-card border border-line bg-panel-soft px-3 py-2 text-sm text-ink"
+    >
+      Saldo de la preventa {preventa.operacion} {preventa.numero}: <strong>{kg(saldo)}</strong> ·
+      faltan <strong>{faltan}</strong> {faltan === 1 ? "cupo" : "cupos"} · vencimiento{" "}
+      <Vencimiento hasta={preventa.fechaEntregaFin} />
+      {pide > faltan && (
+        <p className="mt-1 font-medium text-rojo">
+          Pedís {pide} {pide === 1 ? "cupo" : "cupos"} y a la preventa le faltan {faltan}.
+        </p>
+      )}
+    </div>
+  );
+}
 export function PedidoDialog({
   pedido,
   preventaInicial,
@@ -165,8 +196,19 @@ export function PedidoDialog({
           </Campo>
         </div>
       </div>
-      {/* Acá iba una tabla de una fila con la preventa elegida, y después una línea de texto con lo
-          mismo. Las dos repetían lo que ya dice el casillero marcado en la grilla de abajo. */}
+      {modo === "preventa" && seleccion && (
+        <SaldoPreventa
+          preventa={seleccion}
+          // Al corregir, lo que ya pedía este mismo pedido no cuenta contra el saldo.
+          propios={
+            pedido?.preventa?.numero === seleccion.numero &&
+            pedido.preventa.operacion === seleccion.operacion
+              ? pedido.cantidadCupos
+              : 0
+          }
+          pide={valores.cantidadCupos ?? 0}
+        />
+      )}
     </fieldset>
   );
   return (

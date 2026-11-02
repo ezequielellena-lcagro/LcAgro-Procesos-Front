@@ -4,9 +4,9 @@ import { cursorPropio, useListado } from "../queries/use-logistica";
 import type { Solicitud } from "../types";
 
 /**
- * Lo que se le pidió a la terminal y todavía no entró a MacroGest. Un pedido de cupo no crea un
- * cupo: el cupo recién aparece en planta 0 cuando la terminal lo manda y se carga en MacroGest.
- * Sin este aviso, lo pedido no se veía en Otorgar y parecía perdido.
+ * Lo que se le pidió a la terminal y todavía no llegó. Un pedido de cupo no crea un cupo: el cupo
+ * aparece en Cupos cuando César lo carga en el plan de carga de MacroGest. Sin este aviso, lo
+ * pedido no se veía al vincular y parecía perdido.
  */
 export function PedidosCupoEsperando({ onVerHistorial }: { onVerHistorial?: () => void }) {
   const q = useListado<Solicitud>(
@@ -37,13 +37,13 @@ export function PedidosCupoEsperando({ onVerHistorial }: { onVerHistorial?: () =
             Contrato {s.contratoVenta} · {s.productoNombre ?? s.producto} {s.campania} · para el{" "}
             {fecha(s.fechaSolicitada)}:{" "}
             {s.conseguidos === null
-              ? `${s.cantidadCupos} pedidos, sin verificar en MacroGest`
+              ? `${s.cantidadCupos} pedidos`
               : `faltan ${s.cantidadCupos - s.conseguidos} de ${s.cantidadCupos}`}
           </li>
         ))}
       </ul>
       <p className="mt-1 text-xs text-ink-soft">
-        Aparecen para otorgar cuando la terminal los manda y se cargan en MacroGest.
+        Aparecen en Cupos cuando se cargan en el plan de carga de MacroGest.
       </p>
     </section>
   );

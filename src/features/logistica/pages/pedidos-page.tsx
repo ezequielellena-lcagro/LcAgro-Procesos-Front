@@ -1,4 +1,4 @@
-import { History, Pencil, Plus, Trash2, Truck, X } from "lucide-react";
+import { History, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,13 @@ import { PreventaPicker } from "../components/contrato-picker";
 import { FormOperacionFooter } from "../components/form-operacion";
 import { BotonIcono } from "../components/boton-icono";
 import { HistorialDialog } from "../components/historial-dialog";
-import { LeDebemos } from "../components/le-debemos";
+import { PedidoHace, Vencimiento } from "../components/vencimiento";
 import { usePaginacion } from "../lib/paginacion";
 import { Paginacion } from "../components/paginacion";
 import { PedidoDialog } from "../components/pedido-dialog";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { FiltrosComercialesCampos } from "../components/filtros-comerciales";
-import {
-  filtrosComercialesIniciales,
-  filtrosComercialesVacios,
-  paramsComerciales,
-} from "../lib/filtros-comerciales";
+import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
 import { TablaLogistica } from "../components/tabla-logistica";
 
 const otrosVacios = { preventaNumero: "", cumplidos: false };
@@ -35,7 +31,7 @@ export function PedidosPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const gestionar = user?.roles.includes("logistica-pedidos") ?? false;
-  // Otorgar es operación de Cupos: el botón de la fila sólo aparece con ese permiso.
+  // Vincular cupos es operación de Cupos: el botón de la fila sólo aparece con ese permiso.
   const otorgar = user?.roles.includes("logistica-cupos") ?? false;
   const [tab, setTab] = useState("agenda");
   const [periodo, setPeriodo] = useState(() => periodoInicial());
@@ -43,7 +39,7 @@ export function PedidosPage() {
   const [dialogo, setDialogo] = useState<{ pedido?: Pedido; preventa?: Preventa } | null>(null);
   const [eliminar, setEliminar] = useState<Pedido | null>(null);
   const [preventa, setPreventa] = useState<Preventa | null>(null);
-  const [borrador, setBorrador] = useState(filtrosComercialesIniciales);
+  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
   const [comercial, setComercial] = useState(borrador);
   const [otrosBorrador, setOtrosBorrador] = useState(otrosVacios);
   const [otros, setOtros] = useState(otrosVacios);
@@ -151,51 +147,74 @@ export function PedidosPage() {
                 : "Todavía no hay pedidos pendientes para estas fechas. Registrá el primer pedido del productor."
             }
             pie={<Paginacion {...paginacion} unidad={{ singular: "pedido", plural: "pedidos" }} />}
+            // Siete columnas y no doce: cada una junta un dato principal con su detalle debajo
+            // (preventa + vencimiento, cereal + campaña + carga, fecha + antigüedad, cupos). Con
+            // doce, el productor se partía en tres renglones y la fila no se leía de un vistazo.
             columnas={[
               {
                 titulo: "Productor",
                 celda: (f) => (
-                  <>
+                  <div className="min-w-40">
                     <span className="font-medium">{f.clienteNombre ?? "Nombre no disponible"}</span>
                     <div className="text-xs text-ink-soft">Cliente {f.clienteNumero}</div>
-                  </>
+                  </div>
                 ),
               },
               {
                 titulo: "Preventa",
+                // Debajo, el fin del período de entrega (MacroGest); ordena por la que venció antes.
                 celda: (f) =>
-                  f.preventa ? `${f.preventa.operacion} ${f.preventa.numero}` : "Sin preventa",
-              },
-              // Desde el inicio del período de entrega de la preventa (MacroGest).
-              {
-                titulo: "Le debemos hace",
-                celda: (f) => <LeDebemos pedido={f} />,
+                  f.preventa ? (
+                    <>
+                      <span className="whitespace-nowrap font-medium">
+                        {`${f.preventa.operacion} ${f.preventa.numero}`}
+                      </span>
+                      <div className="text-xs">
+                        <Vencimiento hasta={f.preventaEntregaHasta} />
+                      </div>
+                    </>
+                  ) : (
+                    <span className="text-ink-soft">Sin preventa</span>
+                  ),
                 orden: { activo: orden === "prioridad", ordenar: () => setOrden("prioridad") },
               },
               {
-                titulo: "Cereal / campaña",
-                celda: (f) => `${f.productoNombre ?? f.producto} / ${f.campania}`,
+                titulo: "Cereal",
+                celda: (f) => (
+                  <>
+                    <span className="font-medium">{f.productoNombre ?? f.producto}</span>
+                    <div className="whitespace-nowrap text-xs text-ink-soft">
+                      {f.campania} · <span>{f.seCargaEnPlanta ? "En planta" : "En campo"}</span>
+                    </div>
+                  </>
+                ),
               },
-              { titulo: "Carga", celda: (f) => (f.seCargaEnPlanta ? "En planta" : "En campo") },
               {
                 titulo: "Para cuándo",
-                celda: (f) => fecha(f.fechaSolicitada),
+                celda: (f) => (
+                  <>
+                    <span className="whitespace-nowrap font-medium">
+                      {fecha(f.fechaSolicitada)}
+                    </span>
+                    <div className="text-xs text-ink-soft">
+                      <PedidoHace desde={f.creadoAl} />
+                    </div>
+                  </>
+                ),
                 orden: { activo: orden === "fecha", ordenar: () => setOrden("fecha") },
               },
-              { titulo: "Solicitados", numero: true, celda: (f) => f.cantidadCupos },
-              { titulo: "Otorgados", numero: true, celda: (f) => f.otorgados },
-              { titulo: "Pendientes", numero: true, celda: (f) => f.pendientes },
-              { titulo: "Estado", celda: (f) => f.estado },
+              { titulo: "Cupos", celda: (f) => <CuposPedido pedido={f} /> },
+              { titulo: "Estado", celda: (f) => <EstadoPedido estado={f.estado} /> },
               {
                 titulo: "Acciones",
                 celda: (f) => (
                   <div className="flex gap-1">
                     {otorgar && f.pendientes > 0 && (
                       <BotonIcono
-                        icono={Truck}
-                        etiqueta="Otorgar"
+                        icono={Link2}
+                        etiqueta="Vincular cupos"
                         variant="default"
-                        onClick={() => void navigate(`/logistica/cupos/otorgar?pedido=${f.id}`)}
+                        onClick={() => void navigate(`/logistica/cupos?pedido=${f.id}`)}
                       />
                     )}
                     {gestionar && (
@@ -250,9 +269,59 @@ export function PedidosPage() {
 }
 
 /**
+ * Solicitados, otorgados y pendientes en una sola celda: «0 de 1 otorgados» con una barra de
+ * avance y lo que falta debajo. Eran tres columnas de números sueltos que había que sumar a ojo.
+ */
+function CuposPedido({ pedido }: { pedido: Pedido }) {
+  const { cantidadCupos: pide, otorgados, pendientes } = pedido;
+  const avance = pide > 0 ? Math.min(100, (otorgados / pide) * 100) : 0;
+  return (
+    <div className="min-w-32">
+      <div className="whitespace-nowrap tabular-nums">
+        <strong>{otorgados}</strong> de {pide} {pide === 1 ? "otorgado" : "otorgados"}
+      </div>
+      <div
+        className="mt-1 h-1.5 overflow-hidden rounded-full bg-line"
+        role="progressbar"
+        aria-label="Cupos otorgados"
+        aria-valuemin={0}
+        aria-valuemax={pide}
+        aria-valuenow={otorgados}
+      >
+        <div className="h-full rounded-full bg-verde" style={{ width: `${avance}%` }} />
+      </div>
+      {pendientes > 0 && (
+        <div className="mt-1 text-xs text-ink-soft tabular-nums">
+          Faltan {pendientes} {pendientes === 1 ? "cupo" : "cupos"}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const TONO_ESTADO: Record<string, string> = {
+  pendiente: "border-clementina-deep/40 bg-clementina/15 text-ink",
+  parcial: "border-slate-soft bg-secondary text-ink",
+  atendido: "border-verde/30 bg-verde-bg text-verde",
+};
+
+/** El estado como etiqueta de color: en texto plano se perdía entre los números de la fila. */
+function EstadoPedido({ estado }: { estado: string }) {
+  return (
+    <span
+      className={`inline-block whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize ${
+        TONO_ESTADO[estado] ?? "border-line bg-panel-soft text-ink"
+      }`}
+    >
+      {estado}
+    </span>
+  );
+}
+
+/**
  * Eliminar un pedido. Con cupos otorgados se bloquea y dice cuántos: un pedido asignado borrado
- * sin querer era justo lo que el área usuaria pidió evitar. Hay que deshacer esos otorgamientos
- * antes, desde Cupos › Otorgar.
+ * sin querer era justo lo que el área usuaria pidió evitar. Hay que desvincular esos cupos antes,
+ * desde Cupos.
  */
 function EliminarPedidoDialog({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
   const mutation = useOperacion<Pedido>(`pedidos/${pedido.id}/eliminar`);
@@ -268,8 +337,8 @@ function EliminarPedidoDialog({ pedido, onClose }: { pedido: Pedido; onClose: ()
         <>
           <p role="alert" className="text-sm text-rojo">
             Este pedido tiene {pedido.otorgados}{" "}
-            {pedido.otorgados === 1 ? "cupo otorgado" : "cupos otorgados"}. Deshacé esos
-            otorgamientos en Cupos › Otorgar antes de eliminarlo.
+            {pedido.otorgados === 1 ? "cupo otorgado" : "cupos otorgados"}. Desvinculá esos cupos en
+            Cupos antes de eliminarlo.
           </p>
           <div className="mt-4 flex justify-end">
             <Button variant="outline" onClick={onClose}>

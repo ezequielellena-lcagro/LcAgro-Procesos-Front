@@ -597,7 +597,7 @@ describe("Flete UI", () => {
     expect(
       camposHistorial(JSON.stringify({ vigenteDesde: "2026-10-04T12:00:00Z" }), "otorgamientos")[0]
         .campo,
-    ).toBe("Fecha de otorgamiento");
+    ).toBe("Vinculado al");
   });
 });
 

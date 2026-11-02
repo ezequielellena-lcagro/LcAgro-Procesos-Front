@@ -8,8 +8,8 @@ import { descargarPlanCarga } from "../lib/plan-carga-pdf";
 import type { PlanCarga } from "../types";
 
 /**
- * Descarga el Plan de Carga del plan de un otorgamiento. Los datos se leen de MacroGest en el
- * momento (destino, corredores, entregador, códigos de cupo) y el PDF se arma acá, con el logo.
+ * Descarga el Plan de Carga de un cupo vinculado a un pedido. Sale del plan de carga de MacroGest
+ * (destino, corredores, entregador, códigos) y el PDF se arma acá, con el logo.
  */
 export function PlanCargaBoton({
   otorgamientoId,

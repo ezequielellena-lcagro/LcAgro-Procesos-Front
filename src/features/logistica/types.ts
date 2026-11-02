@@ -32,6 +32,13 @@ export interface Preventa extends PreventaRef {
   estado: string | null;
   /** «P» = entrega pendiente en MacroGest; ordena el listado por prioridad de entrega. */
   estadoEntrega?: string | null;
+  /** Cupos pedidos en la app contra la preventa y cupos otorgados (vigentes). */
+  cuposPedidos?: number;
+  cuposOtorgados?: number;
+  /** Contratado − cupos pedidos × 30.000 kg: cada pedido descuenta su total. Negativo = de más. */
+  kgSaldo?: number;
+  /** Cupos de 30.000 kg que faltan pedir para cubrir el saldo. */
+  cuposFaltan?: number;
   /** Kg de descarga en MacroGest de los cupos otorgados en la app a esta preventa. */
   kgDescargados?: number;
   /** Descargado ≥ contratado: deja de estar pendiente (vuelve sola si el puerto rechaza). */
@@ -48,6 +55,33 @@ export interface Venta {
   fechaEntrega: string | null;
   fechaEntrega1: string | null;
   estado: string | null;
+}
+/**
+ * Seguimiento de un contrato de venta: contratado, entregado (kilos cargados: sus cartas de porte) y
+ * saldo, con el plazo de entrega. `posicion` es su lugar en el orden (vencidos con saldo primero).
+ */
+export interface ContratoVentaSeguimiento {
+  posicion: number;
+  numero: string;
+  compradorNumero: number | null;
+  compradorNombre: string | null;
+  producto: number | null;
+  productoNombre: string | null;
+  campania: string | null;
+  entregaDesde: string | null;
+  entregaHasta: string | null;
+  contratado: number;
+  entregado: number;
+  camiones: number;
+  /** Contratado − entregado; negativo = se entregó de más. */
+  saldo: number;
+  cuposFaltan: number;
+  estado:
+    | "Vencido, falta entregar"
+    | "Vencido, entregado de más"
+    | "Vigente"
+    | "Entregado de más"
+    | "Cumplido";
 }
 export interface Solicitud {
   id: string;
@@ -82,8 +116,10 @@ export interface Pedido {
   estado: string;
   /** El camión se carga en la planta propia; el productor sigue siendo el dueño del cereal. */
   seCargaEnPlanta: boolean;
-  /** Inicio del período de entrega de la preventa, leído de MacroGest: desde cuándo se le debe. */
-  preventaEntregaDesde?: string | null;
+  /** Fin del período de entrega de la preventa, leído de MacroGest: desde ahí está vencida. */
+  preventaEntregaHasta?: string | null;
+  /** Cuándo se cargó el pedido en la app. */
+  creadoAl?: string | null;
 }
 /** Clave de un cupo en MacroGest: contrato de venta, plan de carga y cupo. */
 export interface ClaveCupo {
@@ -91,11 +127,13 @@ export interface ClaveCupo {
   plan: number;
   cupo: number;
 }
-/** Otorgamiento registrado en la app contra un cupo de MacroGest. */
+/**
+ * Vínculo de un cupo de MacroGest con un pedido (decidido el 2026-11-02). La clave es la del cupo en
+ * MacroGest; el cliente y la preventa son los del pedido al vincular.
+ */
 export interface Otorgamiento extends ClaveCupo {
   id: string;
   revision: number;
-  /** Siempre sale de un pedido: el cliente y la preventa son los del pedido al otorgar. */
   pedidoId: string;
   clienteNumero: number;
   clienteNombre?: string | null;
@@ -105,20 +143,24 @@ export interface Otorgamiento extends ClaveCupo {
   motivoDeshecho?: string | null;
 }
 /**
- * Un cupo de planta 0 de MacroGest. Cereal y campaña son los del contrato leídos ahora; si ya se
- * otorgó en la app y falta pasarlo en MacroGest, trae ese otorgamiento.
+ * Un cupo de un plan de carga de MacroGest y el pedido con el que se vinculó en la app. César carga
+ * los cupos una sola vez, en MacroGest, al armar el plan; en la app sólo se dice a qué pedido va
+ * cada uno. Planta y productor son los del plan.
  */
-export interface CupoPlanta0 extends ClaveCupo {
-  codigoTerminal: string | null;
+export interface CupoPlan extends ClaveCupo {
+  codigo: string | null;
   fechaCarga: string | null;
   producto: number | null;
   productoNombre: string | null;
   campania: string | null;
   destinoCodigo: number | null;
   destinoNombre: string | null;
-  otorgamientoVigente: Otorgamiento | null;
+  planta: number | null;
+  productorNumero: number | null;
+  productorNombre: string | null;
+  otorgamiento: Otorgamiento | null;
 }
-/** Un cupo de MacroGest con su plan: la planta del plan ES el estado del cupo. */
+/** Un cupo de MacroGest con su plan, como lo lee el servidor (planta y productor son del plan). */
 export interface CupoErp extends ClaveCupo {
   codigoTerminal: string | null;
   fechaCarga: string | null;
@@ -140,29 +182,13 @@ export interface CupoErp extends ClaveCupo {
   kgDescargaErp: string | number | null;
   fechaDescarga: string | null;
 }
-export type EstadoOtorgamiento =
-  | "pendiente"
-  | "confirmado"
-  | "otro_productor"
-  | "otra_planta"
-  | "no_esta"
-  | "deshecho"
-  | "sin_verificar";
-/** Otorgamiento con lo que MacroGest dice hoy de su cupo; se recalcula en cada lectura. */
-export interface OtorgamientoConEstado {
-  otorgamiento: Otorgamiento;
-  estado: EstadoOtorgamiento;
-  detalle: string;
-  erp: CupoErp | null;
-  productorPlanNombre: string | null;
-}
 /** Un maestro de MacroGest tal como sale en el Plan de Carga. */
 export interface ReferenciaPlanCarga {
   codigo: number | null;
   nombre: string | null;
   cuit?: string | null;
 }
-/** Datos del Plan de Carga de un otorgamiento, con el formato del que imprime MacroGest. */
+/** Datos del Plan de Carga de un cupo vinculado, con el formato del que imprime MacroGest. */
 export interface PlanCarga {
   contrato: string;
   plan: number;
@@ -200,34 +226,63 @@ export interface CamionCarga {
   patenteAcoplado: string | null;
   conductor: string | null;
   transportista: string | null;
+  /** Valor de flete de referencia del padrón. */
+  importeReferencia?: number | null;
+  moneda?: string | null;
 }
+/** Lo propio de una carga: lo que la planilla tiene y MacroGest no. */
 export interface CargaPropia {
-  otorgamientoId: string;
+  id: string;
   revision: number;
   camion: CamionCarga | null;
+  /** Estado elegido a mano; nulo = el que sugiere MacroGest. */
+  estado: string | null;
+  humedad: number | null;
+  obsCalidad: string | null;
   observacion: string | null;
 }
-export type EstadoCarga =
-  | "falta_pasar"
-  | "por_cargar"
-  | "en_viaje"
-  | "descargado"
-  | "revisar"
-  | "no_esta"
-  | "sin_verificar";
-/** Un cupo otorgado con lo que dice MacroGest y lo propio (camión y observación). */
-export interface CargaLogistica {
-  otorgamiento: OtorgamientoConEstado;
-  estado: EstadoCarga;
+/**
+ * Una fila de Cargas a puerto, con las columnas de la planilla de logística: cada cupo de MacroGest
+ * en planta 10 (DIRECTO) o 15 (PLANTA), esté o no vinculado a un pedido en la app.
+ */
+export interface CargaLogistica extends ClaveCupo {
+  fechaCarga: string | null;
+  producto: number | null;
+  productoNombre: string | null;
+  campania: string | null;
+  planta: number | null;
+  cargaEn: "PLANTA" | "DIRECTO";
+  productorNumero: number | null;
+  /** Productor del plan, o «SE CARGÓ EN PLANTA». */
+  cargo: string | null;
+  codigoOtorgado: string | null;
+  destinoCodigo: number | null;
+  puerto: string | null;
   cartaPorte: string | null;
+  ctg: string | null;
+  patente: string | null;
+  kgCarga: number | null;
+  kgDescarga: number | null;
+  difKilos: number | null;
+  fechaDescarga: string | null;
+  /** Lo que dice MacroGest: DISPONIBLE, EN VIAJE o DESCARGADO. */
+  estadoSugerido: string;
+  /** El que se muestra: el elegido, salvo que MacroGest ya esté más adelante en el ciclo. */
+  estado: string;
   propio: CargaPropia | null;
+  /** Vínculo vigente del cupo con un pedido, para el Plan de Carga. */
+  otorgamientoId: string | null;
 }
-export interface GuardarCargaBody {
+export interface GuardarCargaBody extends ClaveCupo {
   revision: number | null;
   fichaId: string | null;
   versionId: string | null;
+  estado: string | null;
+  humedad: number | null;
+  obsCalidad: string | null;
   observacion: string | null;
 }
+/** Vincula cupos de MacroGest con un pedido. */
 export interface OtorgarBody {
   pedidoId: string;
   pedidoRevision: number;
@@ -236,12 +291,10 @@ export interface OtorgarBody {
 export interface OtorgarResultado {
   otorgamientos: Otorgamiento[];
   pedido: Pedido;
-  advertencias: string[];
 }
 export interface DeshacerResultado {
   otorgamiento: Otorgamiento;
   pedido: Pedido | null;
-  advertencias: string[];
 }
 export interface Evento {
   id: string;
@@ -254,7 +307,7 @@ export interface Evento {
   /** Nombre del operador; `null` si el usuario ya no existe. */
   registradoPorNombre?: string | null;
 }
-export type Recurso = "pedidos" | "solicitudes-terminal" | "otorgamientos" | "flota";
+export type Recurso = "pedidos" | "solicitudes-terminal" | "otorgamientos" | "flota" | "cupos";
 export const ROLES_LECTURA = [
   "logistica-lectura",
   "logistica-pedidos",

@@ -6,9 +6,14 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { RolNombre } from "@/features/auth/types";
 import { env } from "@/lib/env";
-import { descargarDemo, logisticaHandlers, resetLogisticaDemo } from "@/mocks/handlers/logistica";
+import {
+  armarPlanDemo,
+  descargarDemo,
+  logisticaHandlers,
+  resetLogisticaDemo,
+} from "@/mocks/handlers/logistica";
 import { hoy } from "../format";
-import type { OtorgarResultado, Pedido } from "../types";
+import type { ClaveCupo, OtorgarResultado, Pedido } from "../types";
 import { CuposPage } from "./cupos-page";
 import { PedidosPage } from "./pedidos-page";
 
@@ -48,12 +53,16 @@ const pedir = (cantidad: number, preventa: { operacion: string; numero: string }
     observacion: null,
     seCargaEnPlanta: false,
   });
-const otorgar = (pedido: Pedido, cupos: { contrato: string; plan: number; cupo: number }[]) =>
-  post<OtorgarResultado>("otorgamientos", {
+/** César armó el plan en MacroGest con esos códigos y en la app los vincula con el pedido. */
+const otorgar = (pedido: Pedido, codigos: string[]) => {
+  const plan = armarPlanDemo(codigos, 10, 9000000001);
+  const cupos: ClaveCupo[] = codigos.map((_, i) => ({ contrato: "V-DEMO/1", plan, cupo: i + 1 }));
+  return post<OtorgarResultado>("otorgamientos", {
     pedidoId: pedido.id,
     pedidoRevision: pedido.revision,
     cupos,
-  });
+  }).then(() => cupos);
+};
 function mostrar() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -62,7 +71,6 @@ function mostrar() {
     [
       { path: "/logistica/pedidos", element: <PedidosPage /> },
       { path: "/logistica/cupos", element: <CuposPage /> },
-      { path: "/logistica/cupos/otorgar", element: <div>Otorgar cupos</div> },
     ],
     { initialEntries: ["/logistica/pedidos"] },
   );
@@ -110,7 +118,7 @@ describe("Pedidos (devolución del 2026-10-23)", () => {
   it("el pedido cumplido sale de la lista y se ve con «Ver cumplidos»; se busca por número de orden", async () => {
     const cumplido = await pedir(1, { operacion: "PF", numero: "PF-DEMO/1" });
     await pedir(2);
-    await otorgar(cumplido, [{ contrato: "V-DEMO/1", plan: 1, cupo: 1 }]);
+    await otorgar(cumplido, ["C-1"]);
     mostrar();
     const lista = await tabla();
     await waitFor(() => expect(within(lista).getAllByRole("row")).toHaveLength(2));
@@ -129,10 +137,7 @@ describe("Pedidos (devolución del 2026-10-23)", () => {
 
   it("eliminar se bloquea con cupos otorgados y dice cuántos; sin otorgados elimina", async () => {
     const otorgado = await pedir(3);
-    await otorgar(otorgado, [
-      { contrato: "V-DEMO/1", plan: 2, cupo: 1 },
-      { contrato: "V-DEMO/1", plan: 2, cupo: 2 },
-    ]);
+    await otorgar(otorgado, ["C-1", "C-2"]);
     await pedir(1);
     mostrar();
     const lista = await tabla();
@@ -153,32 +158,31 @@ describe("Pedidos (devolución del 2026-10-23)", () => {
     );
   });
 
-  it("Otorgar desde la fila abre la pantalla por pasos con el pedido ya elegido", async () => {
+  it("«Vincular cupos» desde la fila abre Cupos con el pedido ya elegido", async () => {
     sesion.roles = ["logistica-pedidos", "logistica-cupos"];
     const pedido = await pedir(2);
     const router = mostrar();
-    fireEvent.click(await within(await tabla()).findByRole("button", { name: "Otorgar" }));
+    fireEvent.click(await within(await tabla()).findByRole("button", { name: "Vincular cupos" }));
     await waitFor(() =>
       expect(`${router.state.location.pathname}${router.state.location.search}`).toBe(
-        `/logistica/cupos/otorgar?pedido=${pedido.id}`,
+        `/logistica/cupos?pedido=${pedido.id}`,
       ),
     );
+    expect(await screen.findByRole("region", { name: "Pedido elegido" })).toBeInTheDocument();
   });
 
-  it("sin permiso de Cupos no aparece Otorgar en la fila", async () => {
+  it("sin permiso de Cupos no aparece «Vincular cupos» en la fila", async () => {
     await pedir(1);
     mostrar();
     await within(await tabla()).findByText("pendiente");
-    expect(screen.queryByRole("button", { name: "Otorgar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Vincular cupos" })).not.toBeInTheDocument();
   });
 
   it("la preventa queda cumplida recién cuando la descarga alcanza lo contratado", async () => {
     // La preventa demo tiene 300.000 kg: diez camiones de 30.000.
     const pedido = await pedir(4, { operacion: "PF", numero: "PF-DEMO/1" });
-    const claves = [1, 2].flatMap((plan) =>
-      [1, 2].map((cupo) => ({ contrato: "V-DEMO/1", plan, cupo })),
-    );
-    await otorgar(pedido, claves);
+    // César arma el plan en MacroGest, lo vincula y el puerto descarga los cuatro camiones.
+    const claves = await otorgar(pedido, ["P-1", "P-2", "P-3", "P-4"]);
     claves.forEach((c) => descargarDemo(c, 75000));
     mostrar();
     fireEvent.click(screen.getByRole("tab", { name: "Preventas MacroGest" }));

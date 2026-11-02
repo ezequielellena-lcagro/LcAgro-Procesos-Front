@@ -48,7 +48,7 @@ export function SolicitarCuposPage() {
     <>
       <PageHeader
         title="Solicitar cupos a terminal"
-        subtitle="Qué cupos le pediste a la terminal y sobre qué contrato de venta. Los conseguidos se cuentan solos con lo que entra a MacroGest."
+        subtitle="Qué cupos le pediste a la terminal y sobre qué contrato de venta. Los conseguidos se cuentan solos con los cupos que recibís en la app."
         actions={
           <Button variant="outline" type="button" disabled={bloqueado} onClick={volver}>
             <ArrowLeft className="size-4" aria-hidden /> Volver a Cupos

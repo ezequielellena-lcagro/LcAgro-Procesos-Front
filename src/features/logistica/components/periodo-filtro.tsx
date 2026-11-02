@@ -37,12 +37,15 @@ export function PeriodoFiltro({
   maxDias = 366,
   children,
   onSubmit,
+  etiquetas = { desde: "Fecha desde", hasta: "Fecha hasta" },
 }: {
   value: Periodo;
   onChange: (v: Periodo) => void;
   maxDias?: number;
   children?: ReactNode;
   onSubmit?: FormEventHandler<HTMLFormElement>;
+  /** Cuando la fecha no es la obvia de la pantalla (por ejemplo, el fin del plazo de entrega). */
+  etiquetas?: { desde: string; hasta: string };
 }) {
   const [desde, setDesde] = useState(value.desde);
   const [hasta, setHasta] = useState(sumarDias(value.hastaExclusivo, -1));
@@ -57,12 +60,12 @@ export function PeriodoFiltro({
 
   return (
     <FilterBar onSubmit={onSubmit}>
-      <FilterField label="Fecha desde">
+      <FilterField label={etiquetas.desde}>
         <div className="w-40">
           <DateField value={desde} onChange={(v) => cambiar(v, hasta)} />
         </div>
       </FilterField>
-      <FilterField label="Fecha hasta">
+      <FilterField label={etiquetas.hasta}>
         <div className="w-40">
           <DateField value={hasta} onChange={(v) => cambiar(desde, v)} />
         </div>

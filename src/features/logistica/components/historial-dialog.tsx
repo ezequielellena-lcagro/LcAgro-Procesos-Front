@@ -14,10 +14,10 @@ const ACCIONES: Record<string, string> = {
   pedido_creado: "Pedido creado",
   pedido_corregido: "Pedido corregido",
   pedido_eliminado: "Pedido eliminado",
-  cupos_otorgados: "Cupos otorgados",
-  otorgamiento_creado: "Cupo otorgado",
-  otorgamiento_deshecho: "Otorgamiento deshecho",
-  carga_guardada: "Camión y observación guardados",
+  cupos_otorgados: "Cupos vinculados",
+  otorgamiento_creado: "Cupo vinculado al pedido",
+  otorgamiento_deshecho: "Cupo desvinculado del pedido",
+  carga_guardada: "Datos de la carga guardados",
   ficha_flota_creada: "Ficha creada",
   ficha_flota_editada: "Ficha editada",
   ficha_flota_baja: "Ficha dada de baja",
@@ -26,7 +26,7 @@ const ACCIONES: Record<string, string> = {
 const TITULOS: Record<string, string> = {
   pedidos: "Historial del pedido",
   "solicitudes-terminal": "Historial del pedido de cupo",
-  otorgamientos: "Historial del otorgamiento",
+  otorgamientos: "Historial del cupo vinculado",
   cargas: "Historial de la carga",
   flota: "Historial de la ficha",
 };

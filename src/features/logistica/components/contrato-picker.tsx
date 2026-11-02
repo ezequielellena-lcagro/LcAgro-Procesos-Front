@@ -7,14 +7,11 @@ import type { Preventa, Venta } from "../types";
 import { usePaginacion } from "../lib/paginacion";
 import { Paginacion } from "./paginacion";
 import { TablaLogistica } from "./tabla-logistica";
+import { Vencimiento } from "./vencimiento";
 import { PeriodoFiltro } from "./periodo-filtro";
 import { Elegir } from "./elegir";
 import { FiltrosComercialesCampos } from "./filtros-comerciales";
-import {
-  filtrosComercialesIniciales,
-  filtrosComercialesVacios,
-  paramsComercialesErp,
-} from "../lib/filtros-comerciales";
+import { filtrosComercialesVacios, paramsComercialesErp } from "../lib/filtros-comerciales";
 /**
  * Por qué una preventa no se puede usar como referencia de un pedido.
  *
@@ -72,7 +69,7 @@ export function PreventaPicker({
   const [versionFiltros, setVersionFiltros] = useState(0);
   // Cereal y campaña sólo cuando el listado NO viene atado a un cupo ya elegido: en ese caso
   // `filtros` ya fija los tres valores y un filtro del usuario sólo podría contradecirlos.
-  const [borrador, setBorrador] = useState(filtrosComercialesIniciales);
+  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
   const [comercial, setComercial] = useState(borrador);
   const q = useListado<Preventa>(
     "preventas",
@@ -163,45 +160,99 @@ export function PreventaPicker({
               );
             },
           },
+          // Siete columnas y no catorce: cada una junta un dato con su detalle debajo. Con catorce
+          // las filas ocupaban tres renglones y, con los menús abiertos, había que scrollear de costado.
           {
             titulo: "Preventa",
             celda: (p) => (
-              <span>
-                {p.operacion} {p.numero}
-              </span>
+              <div className="min-w-40">
+                <span className="whitespace-nowrap font-medium">
+                  {p.operacion} {p.numero}
+                </span>
+                <div className="text-xs text-ink-soft">
+                  {p.clienteNombre ?? `Cliente ${p.clienteNumero ?? "sin identificar"}`}
+                </div>
+              </div>
             ),
           },
           {
-            titulo: "Productor",
-            celda: (p) => p.clienteNombre ?? `Cliente ${p.clienteNumero ?? "sin identificar"}`,
-          },
-          {
-            titulo: "Cereal / campaña",
-            celda: (p) =>
-              `${p.productoNombre ?? p.producto ?? "Sin cereal"} / ${campania(p.campania)}`,
+            titulo: "Cereal",
+            celda: (p) => (
+              <>
+                <span className="font-medium">{p.productoNombre ?? p.producto ?? "Sin cereal"}</span>
+                <div className="whitespace-nowrap text-xs text-ink-soft">
+                  {campania(p.campania)}
+                </div>
+              </>
+            ),
           },
           {
             titulo: "Entrega",
-            celda: (p) => `${fecha(p.fechaEntregaInicio)} — ${fecha(p.fechaEntregaFin)}`,
+            celda: (p) => (
+              <>
+                <Vencimiento hasta={p.fechaEntregaFin} />
+                <div className="whitespace-nowrap text-xs text-ink-soft">
+                  {fecha(p.fechaEntregaInicio)} – {fecha(p.fechaEntregaFin)}
+                </div>
+              </>
+            ),
           },
-          { titulo: "Contratado", numero: true, celda: (p) => kg(p.kgContratados) },
           {
-            titulo: "Descargado",
+            titulo: "Saldo",
             numero: true,
-            celda: (p) => (p.kgDescargados ? kg(p.kgDescargados) : "—"),
+            celda: (p) => (
+              <>
+                <span
+                  className={`whitespace-nowrap font-medium ${(p.kgSaldo ?? 0) < 0 ? "text-rojo" : ""}`}
+                >
+                  {kg(p.kgSaldo ?? 0)}
+                </span>
+                <div className="whitespace-nowrap text-xs text-ink-soft">
+                  de {kg(p.kgContratados)}
+                </div>
+                {!!p.kgDescargados && (
+                  <div className="whitespace-nowrap text-xs text-ink-soft">
+                    descargado {kg(p.kgDescargados)}
+                  </div>
+                )}
+              </>
+            ),
+          },
+          {
+            // Cada pedido descuenta su total de la preventa (cupos × 30.000 kg).
+            titulo: "Cupos",
+            celda: (p) => (
+              <div className="whitespace-nowrap">
+                Faltan <strong className="tabular-nums">{p.cuposFaltan ?? 0}</strong>
+                <div className="text-xs text-ink-soft tabular-nums">
+                  {p.cuposPedidos ?? 0} pedidos · {p.cuposOtorgados ?? 0} otorgados
+                </div>
+              </div>
+            ),
           },
           // Cumplida = lo descargado en MacroGest de sus cupos alcanza lo contratado. Si el puerto
           // rechaza un camión no hay descarga, y vuelve sola a pendiente.
-          { titulo: "Estado de entrega", celda: (p) => (p.cumplida ? "Cumplida" : "Pendiente") },
+          {
+            titulo: "Estado",
+            celda: (p) => (
+              <span
+                className={`inline-block whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${
+                  p.cumplida
+                    ? "border-verde/30 bg-verde-bg text-verde"
+                    : "border-clementina-deep/40 bg-clementina/15 text-ink"
+                }`}
+              >
+                {p.cumplida ? "Cumplida" : "Pendiente"}
+              </span>
+            ),
+          },
         ]}
       />
-      {/* Aclara qué NO es la columna "Contratado". Antes decía "el saldo anterior al inicio de
-          Logística queda pendiente de verificación", que no se entendía: lo que importa es que ese
-          número es el contrato entero y no el remanente. */}
+      {/* Aclara qué NO es el "de …" debajo del saldo: es el contrato entero, no el remanente. */}
       <p className="mt-2 text-xs text-ink-soft">
-        «Contratado» son los kilos del contrato en MacroGest. «Descargado» suma la descarga en
-        MacroGest de los cupos otorgados en la app a la preventa; las entregas anteriores al inicio
-        de Logística no se cuentan.
+        Debajo del saldo van los kilos del contrato en MacroGest y lo descargado en MacroGest de los
+        cupos otorgados en la app a la preventa; las entregas anteriores al inicio de Logística no
+        se cuentan.
       </p>
     </div>
   );
@@ -225,7 +276,7 @@ export function VentaPicker({
 }) {
   const [periodo, setPeriodo] = useState(() => periodoInicial(true));
   const [buscar, setBuscar] = useState("");
-  const [borrador, setBorrador] = useState(filtrosComercialesIniciales);
+  const [borrador, setBorrador] = useState(filtrosComercialesVacios);
   const [comercial, setComercial] = useState(borrador);
   const q = useListado<Venta>(
     "contratos",
