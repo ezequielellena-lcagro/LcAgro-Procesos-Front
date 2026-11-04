@@ -16,7 +16,9 @@ import { BotonIcono } from "../components/boton-icono";
 import { FichaFlotaDialog, type ModoFichaFlota } from "../components/ficha-flota-dialog";
 import { HistorialDialog } from "../components/historial-dialog";
 import { AvisoDemo } from "../components/aviso-demo";
+import { Paginacion } from "../components/paginacion";
 import { TablaLogistica } from "../components/tabla-logistica";
+import { usePaginacion } from "../lib/paginacion";
 
 function LecturaFicha({
   id,
@@ -92,6 +94,7 @@ export function FletePage() {
   const [historia, setHistoria] = useState<string | null>(null);
   const [conflicto, setConflicto] = useState(false);
   const q = useFlota(filtros, aplicacion);
+  const paginacion = usePaginacion(q);
   const abrir = (id: string, modo: ModoFichaFlota) => {
     setConflicto(false);
     setLectura({ id, modo, apertura: Date.now() });
@@ -173,14 +176,12 @@ export function FletePage() {
       )}
       <TablaLogistica
         titulo="Flete y camiones"
-        filas={q.data?.pages.flatMap((p) => p.filas) ?? []}
+        filas={paginacion.filas}
         clave={(f) => f.id}
         cargando={q.isLoading}
         error={q.error}
         reintentar={() => void q.refetch()}
-        hayMas={q.hasNextPage}
-        mas={() => void q.fetchNextPage()}
-        cargandoMas={q.isFetchingNextPage}
+        pie={<Paginacion {...paginacion} unidad={{ singular: "camión", plural: "camiones" }} />}
         vacio={
           Object.keys(filtros).length
             ? "No hay fichas para estos filtros."

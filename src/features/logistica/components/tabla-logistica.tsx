@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { ArrowDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/shared/components/error-state";
 export interface Columna<T> {
   titulo: string;
@@ -18,14 +17,8 @@ interface Props<T> {
   cargando?: boolean;
   error?: unknown;
   reintentar?: () => void;
-  hayMas?: boolean;
-  mas?: () => void;
-  cargandoMas?: boolean;
   vacio?: string;
-  /**
-   * Pie propio de la tabla (p. ej. la navegación por páginas). Si se pasa, reemplaza al botón
-   * "Cargar más filas": las dos cosas juntas serían dos formas de avanzar el mismo listado.
-   */
+  /** Pie de la tabla: la paginación (`Paginacion`), igual en todas las listas. */
   pie?: ReactNode;
   /**
    * Qué fila está elegida, para remarcarla.
@@ -64,9 +57,6 @@ export function TablaLogistica<T>({
   cargando,
   error,
   reintentar,
-  hayMas,
-  mas,
-  cargandoMas,
   vacio = "No hay registros en este período.",
   pie,
   elegida,
@@ -154,17 +144,7 @@ export function TablaLogistica<T>({
       {!cargando && error == null && !filas.length && (
         <p className="p-6 text-sm text-ink-soft">{vacio}</p>
       )}
-      {pie ? (
-        <div className="border-t border-line">{pie}</div>
-      ) : (
-        hayMas && (
-          <div className="border-t border-line p-3">
-            <Button variant="outline" disabled={cargandoMas} onClick={mas}>
-              {cargandoMas ? "Cargando…" : "Cargar más filas"}
-            </Button>
-          </div>
-        )
-      )}
+      {pie && <div className="border-t border-line">{pie}</div>}
     </section>
   );
 }

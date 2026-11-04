@@ -7,10 +7,12 @@ import { FilterField } from "@/shared/components/filter-bar";
 import { confirmacionPendiente } from "../lib/comandos";
 import { cuerpoCarga, estadoElegido } from "../lib/carga";
 import { ESTADOS_CARGA } from "../lib/estados-carga";
+import { usePaginacion } from "../lib/paginacion";
 import { useListado, useOperacion } from "../queries/use-logistica";
 import type { CargaLogistica, CargaPropia, FichaFlotaDto } from "../types";
 import { Elegir } from "./elegir";
 import { Campo, FormOperacionFooter } from "./form-operacion";
+import { Paginacion } from "./paginacion";
 import { TablaLogistica } from "./tabla-logistica";
 
 /**
@@ -33,6 +35,7 @@ export function CargaDialog({ carga, onClose }: { carga: CargaLogistica; onClose
     { buscar: buscar.trim().length >= 2 ? buscar.trim() : undefined },
     (f) => ({ despuesId: f.id }),
   );
+  const paginacion = usePaginacion(camiones);
   const mutation = useOperacion<CargaPropia>("cargas", "put");
   const bloqueado = mutation.isPending || confirmacionPendiente(mutation.error);
   const cerrar = () => {
@@ -118,15 +121,13 @@ export function CargaDialog({ carga, onClose }: { carga: CargaLogistica; onClose
           </FilterField>
           <TablaLogistica
             titulo="Camiones del padrón de Flete"
-            filas={camiones.data?.pages.flatMap((p) => p.filas) ?? []}
+            filas={paginacion.filas}
             clave={(f) => f.id}
             elegida={(f) => elegido?.fichaId === f.id}
             cargando={camiones.isLoading}
             error={camiones.error}
             reintentar={() => void camiones.refetch()}
-            hayMas={camiones.hasNextPage}
-            mas={() => void camiones.fetchNextPage()}
-            cargandoMas={camiones.isFetchingNextPage}
+            pie={<Paginacion {...paginacion} unidad={{ singular: "camión", plural: "camiones" }} />}
             vacio="No hay camiones activos en el padrón de Flete para esta búsqueda."
             columnas={[
               {

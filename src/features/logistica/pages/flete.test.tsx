@@ -623,16 +623,18 @@ describe("Flete: continuidad de filtros y errores conocidos", () => {
       }),
     );
     mostrar();
-    fireEvent.click(await screen.findByRole("button", { name: "Cargar más filas" }));
-    await waitFor(() =>
-      expect(screen.queryByRole("button", { name: "Cargar más filas" })).not.toBeInTheDocument(),
-    );
+    // Paginado como el resto de las tablas: Anterior / Página N / Siguiente.
+    expect(screen.queryByRole("button", { name: "Cargar más filas" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Siguiente/ })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /Siguiente/ }));
+    expect(await screen.findByText("Página 2")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Buscar flota"), { target: { value: "Ana" } });
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
     await waitFor(() => expect(screen.getAllByText("Ana ficticia")).toHaveLength(1));
+    expect(screen.getByText("Página 1")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Buscar flota"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
-    expect(await screen.findByRole("button", { name: "Cargar más filas" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Siguiente/ })).toBeEnabled());
     expect(lecturas.at(-1)?.has("despuesId")).toBe(false);
     expect(screen.getByRole("table", { name: "Flete y camiones" }).parentElement).toHaveClass(
       "overflow-x-auto",
