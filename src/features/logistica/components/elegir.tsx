@@ -41,7 +41,11 @@ export function Elegir({
         onClick={onClick}
         onChange={onChange}
       />
-      {bloqueada && <span className="text-[11px] leading-tight text-ink-soft">{motivo}</span>}
+      {bloqueada && (
+        <span className="max-w-[12rem] whitespace-normal text-[11px] leading-tight text-ink-soft">
+          {motivo}
+        </span>
+      )}
     </span>
   );
 }

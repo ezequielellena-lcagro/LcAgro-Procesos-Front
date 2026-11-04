@@ -6,7 +6,7 @@ import { Modal } from "@/components/ui/modal";
 import { Textarea } from "@/components/ui/textarea";
 import { toAppError } from "@/lib/api-error";
 import { FilterField } from "@/shared/components/filter-bar";
-import { fecha, hoy, periodoInicial, sumarDias } from "../format";
+import { fecha, hoy, sumarDias } from "../format";
 import { confirmacionPendiente } from "../lib/comandos";
 import { filtrosComercialesVacios, paramsComerciales } from "../lib/filtros-comerciales";
 import { usePaginacion } from "../lib/paginacion";
@@ -239,6 +239,7 @@ export function CuposPanel({
       </PeriodoFiltro>
       <TablaLogistica
         titulo="Cupos del plan de carga"
+        densa
         filas={paginacion.filas}
         clave={claveTexto}
         elegida={elegido}
@@ -265,30 +266,15 @@ export function CuposPanel({
                 },
               ]
             : []),
-          {
-            titulo: "Fecha de carga",
-            celda: (f) => <span className="whitespace-nowrap">{fecha(f.fechaCarga)}</span>,
-          },
+          { titulo: "Fecha de carga", celda: (f) => fecha(f.fechaCarga) },
           {
             titulo: "Contrato",
-            celda: (f) => (
-              <span>
-                {f.contrato}
-                {f.destinoNombre && (
-                  <span className="block text-xs text-ink-soft">{f.destinoNombre}</span>
-                )}
-              </span>
-            ),
+            celda: (f) => <Renglon principal={f.contrato} secundario={f.destinoNombre} />,
           },
           {
             titulo: "Cupo",
             celda: (f) => (
-              <span>
-                {f.codigo ?? "—"}
-                <span className="block text-xs text-ink-soft">
-                  Plan {f.plan} · cupo {f.cupo}
-                </span>
-              </span>
+              <Renglon principal={f.codigo ?? "—"} secundario={`Plan ${f.plan} · cupo ${f.cupo}`} />
             ),
           },
           { titulo: "Cereal / campaña", celda: (f) => cerealCampania(f) },
@@ -298,28 +284,27 @@ export function CuposPanel({
               f.planta == null ? (
                 "—"
               ) : (
-                <span>
-                  Planta {f.planta}
-                  {(f.productorNombre || f.productorNumero != null) && (
-                    <span className="block text-xs text-ink-soft">
-                      {f.productorNombre ?? `Cliente ${f.productorNumero}`}
-                    </span>
-                  )}
-                </span>
+                <Renglon
+                  principal={`Planta ${f.planta}`}
+                  secundario={
+                    f.productorNombre ??
+                    (f.productorNumero != null ? `Cliente ${f.productorNumero}` : null)
+                  }
+                />
               ),
           },
           {
             titulo: "Pedido",
             celda: (f) =>
               f.otorgamiento ? (
-                <span>
-                  {cliente(f.otorgamiento)}
-                  <span className="block text-xs text-ink-soft">
-                    {f.otorgamiento.preventa
+                <Renglon
+                  principal={cliente(f.otorgamiento)}
+                  secundario={
+                    f.otorgamiento.preventa
                       ? `${f.otorgamiento.preventa.operacion} ${f.otorgamiento.preventa.numero}`
-                      : "Sin preventa"}
-                  </span>
-                </span>
+                      : "Sin preventa"
+                  }
+                />
               ) : (
                 "—"
               ),
@@ -426,6 +411,20 @@ export function CuposPanel({
   );
 }
 
+/** Dato y aclaración en un solo renglón; lo que no entra se corta y se lee al pasar el mouse. */
+function Renglon({ principal, secundario }: { principal: string; secundario?: string | null }) {
+  return (
+    <span className="flex max-w-[18rem] items-baseline gap-1.5">
+      <span className="shrink-0">{principal}</span>
+      {secundario && (
+        <span className="truncate text-xs text-ink-soft" title={secundario}>
+          {secundario}
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** Ficha del pedido al que se vinculan los cupos. */
 function FichaPedido({ pedido }: { pedido: Pedido }) {
   const datos: [string, ReactNode][] = [
@@ -452,8 +451,10 @@ function FichaPedido({ pedido }: { pedido: Pedido }) {
 }
 
 /**
- * Elegir el pedido de los cupos elegidos: los pendientes de su cereal y campaña, por prioridad de
- * entrega. Arriba van los del productor del plan, que es a quien César le armó el plan.
+ * Elegir el pedido de los cupos elegidos entre todos los pedidos pendientes, sin filtros (pedido
+ * de Ezequiel, 2026-11-04). Primero los que se pueden elegir y, entre ellos, los del productor
+ * del plan; después, por prioridad de entrega. Los de otro cereal o campaña, o a los que les
+ * faltan menos cupos, se ven y dicen por qué no se pueden elegir.
  */
 function VincularDialog({
   cupos,
@@ -464,30 +465,28 @@ function VincularDialog({
   onClose: () => void;
   onVinculado: (r: OtorgarResultado, pedido: Pedido) => void;
 }) {
-  const [periodo, setPeriodo] = useState(() => periodoInicial());
   const [elegido, setElegido] = useState<Pedido | null>(null);
   const mutation = useOperacion<OtorgarResultado>("otorgamientos");
   const ocupado = mutation.isPending || confirmacionPendiente(mutation.error);
   const primero = cupos[0];
   const pedidos = useListado<Pedido>(
     "pedidos",
-    {
-      ...periodo,
-      producto: primero.producto ?? undefined,
-      campania: primero.campania ?? undefined,
-      soloPendientes: true,
-      orden: "prioridad",
-    },
+    { soloPendientes: true, orden: "prioridad" },
     cursorPropio,
   );
   const productores = new Set(cupos.map((c) => c.productorNumero));
-  const filas = [...(pedidos.data?.pages[0]?.filas ?? [])].sort(
-    (a, b) => Number(!productores.has(a.clienteNumero)) - Number(!productores.has(b.clienteNumero)),
-  );
+  // El servidor pide el mismo cereal y campaña que el contrato del cupo (devolución del 23/10).
   const motivo = (p: Pedido) =>
-    p.pendientes < cupos.length
-      ? `Le ${p.pendientes === 1 ? "falta 1 cupo" : `faltan ${p.pendientes} cupos`}`
-      : null;
+    p.producto !== primero.producto || p.campania !== primero.campania
+      ? `Es ${cerealCampania(p)}; ${cupos.length === 1 ? "el cupo es" : "los cupos son"} ${cerealCampania(primero)}`
+      : p.pendientes < cupos.length
+        ? `Le ${p.pendientes === 1 ? "falta 1 cupo" : `faltan ${p.pendientes} cupos`}`
+        : null;
+  const filas = [...(pedidos.data?.pages[0]?.filas ?? [])].sort(
+    (a, b) =>
+      Number(motivo(a) != null) - Number(motivo(b) != null) ||
+      Number(!productores.has(a.clienteNumero)) - Number(!productores.has(b.clienteNumero)),
+  );
   const contratos = [...new Set(cupos.map((c) => c.contrato))].join(", ");
   return (
     <Modal
@@ -500,11 +499,6 @@ function VincularDialog({
         <strong>{plural(cupos.length, "cupo", "cupos")}</strong> de {cerealCampania(primero)}{" "}
         (contrato {contratos}). Elegí el pedido al que van.
       </p>
-      <PeriodoFiltro
-        value={periodo}
-        onChange={setPeriodo}
-        etiquetas={{ desde: "Para cuándo desde", hasta: "Para cuándo hasta" }}
-      />
       <TablaLogistica
         titulo="Pedidos con cupos pendientes"
         filas={filas}
@@ -513,7 +507,7 @@ function VincularDialog({
         cargando={pedidos.isLoading}
         error={pedidos.error}
         reintentar={() => void pedidos.refetch()}
-        vacio={`No hay pedidos de ${cerealCampania(primero)} con cupos pendientes para estas fechas.`}
+        vacio="No hay pedidos con cupos pendientes."
         columnas={[
           {
             titulo: "Elegir",
@@ -539,6 +533,7 @@ function VincularDialog({
               </span>
             ),
           },
+          { titulo: "Cereal / campaña", celda: (f) => cerealCampania(f) },
           {
             titulo: "Preventa",
             celda: (f) =>

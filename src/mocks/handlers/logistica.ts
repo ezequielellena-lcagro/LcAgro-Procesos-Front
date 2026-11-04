@@ -773,8 +773,8 @@ export const logisticaHandlers = [
       const todos = filas
         .filter(
           (p) =>
-            p.fechaSolicitada >= desde &&
-            p.fechaSolicitada < hasta &&
+            // Los pendientes se piden sin período al vincular cupos, como en el servicio.
+            (!hasta || (p.fechaSolicitada >= desde && p.fechaSolicitada < hasta)) &&
             (url.searchParams.get("soloPendientes") !== "true" || p.pendientes > 0) &&
             (url.searchParams.get("cumplidos") !== "true" || p.pendientes === 0),
         )

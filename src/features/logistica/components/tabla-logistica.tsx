@@ -34,6 +34,27 @@ interface Props<T> {
    * en una línea de texto decía lo mismo que el casillero marcado.
    */
   elegida?: (fila: T) => boolean;
+  /**
+   * Un renglón por fila: sin cortes de línea y con menos aire. La tabla toma el ancho de lo que
+   * muestra y se desplaza a lo ancho; los textos largos van con `Recortado`.
+   */
+  densa?: boolean;
+}
+
+/** Texto largo en una tabla densa: se corta con «…» y se lee entero al pasar el mouse. */
+export function Recortado({
+  texto,
+  className = "max-w-56",
+}: {
+  texto: string | null | undefined;
+  className?: string;
+}) {
+  if (!texto) return <>—</>;
+  return (
+    <span className={`block truncate ${className}`} title={texto}>
+      {texto}
+    </span>
+  );
 }
 export function TablaLogistica<T>({
   titulo,
@@ -49,12 +70,15 @@ export function TablaLogistica<T>({
   vacio = "No hay registros en este período.",
   pie,
   elegida,
+  densa = false,
 }: Props<T>) {
   return (
     <section className="overflow-hidden rounded-card border border-line bg-panel shadow-card">
       {error != null && <ErrorState error={error} onRetry={reintentar} />}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[700px] text-left text-sm">
+        <table
+          className={`${densa ? "w-max min-w-full" : "w-full min-w-[700px]"} text-left text-sm`}
+        >
           <caption className="sr-only">{titulo}</caption>
           <thead className="border-b border-line bg-panel-soft text-xs uppercase tracking-wide text-ink-soft">
             <tr>
@@ -62,7 +86,9 @@ export function TablaLogistica<T>({
                 <th
                   key={c.titulo}
                   scope="col"
-                  className={`px-4 py-2.5 font-semibold ${c.numero ? "text-right" : ""}`}
+                  className={`${densa ? "whitespace-nowrap px-3 py-2" : "px-4 py-2.5"} font-semibold ${
+                    c.numero ? "text-right" : ""
+                  }`}
                   aria-sort={c.orden?.activo ? "other" : undefined}
                 >
                   {c.orden ? (
@@ -107,9 +133,9 @@ export function TablaLogistica<T>({
                   {columnas.map((c) => (
                     <td
                       key={c.titulo}
-                      className={`px-4 py-3 align-top ${c.numero ? "text-right tabular-nums" : ""} ${
-                        activa ? "font-medium" : ""
-                      }`}
+                      className={`${
+                        densa ? "whitespace-nowrap px-3 py-1.5 align-middle" : "px-4 py-3 align-top"
+                      } ${c.numero ? "text-right tabular-nums" : ""} ${activa ? "font-medium" : ""}`}
                     >
                       {c.celda(f, i)}
                     </td>

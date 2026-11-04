@@ -4,8 +4,18 @@ import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MESES = [
-  "enero", "febrero", "marzo", "abril", "mayo", "junio",
-  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
 ];
 const DIAS = ["lu", "ma", "mi", "ju", "vi", "sá", "do"]; // semana arranca el lunes
 
@@ -38,9 +48,8 @@ function desdeTexto(texto: string): string | null {
 
   const [dia, mes, anio] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const fecha = new Date(anio, mes - 1, dia);
-  const existe = fecha.getFullYear() === anio
-    && fecha.getMonth() === mes - 1
-    && fecha.getDate() === dia;
+  const existe =
+    fecha.getFullYear() === anio && fecha.getMonth() === mes - 1 && fecha.getDate() === dia;
 
   return existe ? toISO(fecha) : null;
 }
@@ -145,10 +154,12 @@ export function DateField({ value, onChange, id, disabled }: Props) {
   // El año del valor entra sí o sí, aunque caiga fuera del rango: si no, una fecha vieja no se
   // podría ni mostrar en el desplegable.
   const base = new Date().getFullYear();
-  const anios = [...new Set([
-    ...Array.from({ length: ANIOS_ALREDEDOR * 2 + 1 }, (_, i) => base - ANIOS_ALREDEDOR + i),
-    anio,
-  ])].sort((a, b) => a - b);
+  const anios = [
+    ...new Set([
+      ...Array.from({ length: ANIOS_ALREDEDOR * 2 + 1 }, (_, i) => base - ANIOS_ALREDEDOR + i),
+      anio,
+    ]),
+  ].sort((a, b) => a - b);
 
   return (
     <div ref={rootRef} className="relative">
@@ -199,7 +210,7 @@ export function DateField({ value, onChange, id, disabled }: Props) {
               left: pos.left,
               transform: pos.arriba ? "translateY(-100%)" : undefined,
             }}
-            className="w-[17rem] rounded-md border border-line bg-panel p-3 shadow-float"
+            className="z-[60] w-[17rem] rounded-md border border-line bg-panel p-3 shadow-float"
           >
             <div className="mb-2 flex items-center gap-1">
               <button

@@ -26,7 +26,7 @@ import { HistorialDialog } from "../components/historial-dialog";
 import { Paginacion } from "../components/paginacion";
 import { PeriodoFiltro } from "../components/periodo-filtro";
 import { PlanCargaBoton } from "../components/plan-carga-boton";
-import { TablaLogistica } from "../components/tabla-logistica";
+import { Recortado, TablaLogistica } from "../components/tabla-logistica";
 
 const filtrosVacios = {
   ...filtrosComercialesVacios,
@@ -91,7 +91,7 @@ export function CargasPage() {
     <>
       <PageHeader
         title="Cargas a puerto"
-        subtitle="La planilla de cargas: cada cupo otorgado en MacroGest con lo que ya dice MacroGest. Acá se elige el estado, el camión y se anota humedad y calidad."
+        subtitle="La planilla de cargas: los cupos de los planes de carga de MacroGest en planta 10 (directo) y 15 (planta), con lo que ya registró MacroGest. Acá se elige el estado y el camión, y se anotan humedad y calidad."
         actions={
           <Button variant="outline" disabled={excel.isPending} onClick={() => excel.mutate()}>
             <FileSpreadsheet className="size-4" aria-hidden />{" "}
@@ -167,6 +167,7 @@ export function CargasPage() {
       </PeriodoFiltro>
       <TablaLogistica
         titulo="Cargas a puerto"
+        densa
         filas={filas}
         clave={(f) => `${f.contrato}/${f.plan}/${f.cupo}`}
         cargando={q.isLoading}
@@ -181,15 +182,17 @@ export function CargasPage() {
             celda: (f) => (gestionar ? <EstadoCelda carga={f} /> : <EstadoTexto carga={f} />),
           },
           { titulo: "Producto", celda: (f) => guion(f.productoNombre) },
-          { titulo: "Cargo", celda: (f) => guion(f.cargo) },
+          { titulo: "Cargo", celda: (f) => <Recortado texto={f.cargo} className="max-w-48" /> },
           {
             titulo: "Camión",
             celda: (f) =>
               f.propio?.camion ? (
-                <span>
-                  {f.propio.camion.conductor ?? f.propio.camion.patenteChasis}
+                <span className="flex max-w-56 items-baseline gap-1.5">
+                  <span className="truncate" title={f.propio.camion.conductor ?? undefined}>
+                    {f.propio.camion.conductor ?? f.propio.camion.patenteChasis}
+                  </span>
                   {f.propio.camion.conductor && (
-                    <span className="block text-xs text-ink-soft">
+                    <span className="shrink-0 text-xs text-ink-soft">
                       {f.propio.camion.patenteChasis}
                     </span>
                   )}
@@ -211,7 +214,7 @@ export function CargasPage() {
             celda: (f) => (
               <span>
                 {f.contrato}
-                <span className="block text-xs text-ink-soft">
+                <span className="ml-1.5 text-xs text-ink-soft">
                   Plan {f.plan} · cupo {f.cupo}
                   {f.codigoOtorgado ? ` · ${f.codigoOtorgado}` : ""}
                 </span>
@@ -223,8 +226,11 @@ export function CargasPage() {
             numero: true,
             celda: (f) => (f.propio?.humedad != null ? `${f.propio.humedad}` : "—"),
           },
-          { titulo: "Obs. calidad", celda: (f) => guion(f.propio?.obsCalidad) },
-          { titulo: "Puerto", celda: (f) => guion(f.puerto) },
+          {
+            titulo: "Obs. calidad",
+            celda: (f) => <Recortado texto={f.propio?.obsCalidad} className="max-w-40" />,
+          },
+          { titulo: "Puerto", celda: (f) => <Recortado texto={f.puerto} className="max-w-48" /> },
           { titulo: "Carga en", celda: (f) => f.cargaEn },
           {
             titulo: "Patente",

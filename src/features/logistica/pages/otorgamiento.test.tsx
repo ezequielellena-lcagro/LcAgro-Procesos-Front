@@ -7,7 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import type { RolNombre } from "@/features/auth/types";
 import { env } from "@/lib/env";
 import { logisticaHandlers, resetLogisticaDemo } from "@/mocks/handlers/logistica";
-import { hoy } from "../format";
+import { hoy, sumarDias } from "../format";
 import { descargarPlanCarga } from "../lib/plan-carga-pdf";
 import type { ClaveCupo, OtorgarBody, OtorgarResultado, Pedido } from "../types";
 import { CuposPage } from "./cupos-page";
@@ -48,13 +48,13 @@ async function post<T>(ruta: string, body: object) {
   });
   return { status: response.status, dato: (await response.json()) as T };
 }
-async function pedir(cantidad = 2) {
+async function pedir(cantidad = 2, producto = 10, fechaSolicitada = hoy()) {
   return (
     await post<Pedido>("pedidos", {
       clienteNumero: PRODUCTOR,
-      producto: 10,
+      producto,
       campania: "2025-2026",
-      fechaSolicitada: hoy(),
+      fechaSolicitada,
       cantidadCupos: cantidad,
       preventa: null,
       observacion: null,
@@ -168,6 +168,32 @@ describe("Cupos: los del plan de carga de MacroGest, vinculados a un pedido", ()
     expect(plan.plan).toBe(1);
     expect(plan.cupos.map((c) => c.codigoOtorgado)).toEqual(["COD-DEMO-1-1", "COD-DEMO-1-2"]);
     server.events.removeAllListeners();
+  });
+
+  it("el diálogo trae todos los pedidos pendientes, sin filtros; los de otro cereal se ven y dicen por qué", async () => {
+    await pedir(1, 1);
+    await pedir(1, 10, sumarDias(hoy(), -90));
+    mostrar();
+    fireEvent.click(
+      within(await fila("COD-DEMO-1-1")).getByRole("checkbox", {
+        name: "Elegir cupo COD-DEMO-1-1",
+      }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Vincular 1 cupo a un pedido" }));
+    const dialogo = await screen.findByRole("dialog", { name: "Vincular a un pedido" });
+    const tabla = await within(dialogo).findByRole("table", {
+      name: "Pedidos con cupos pendientes",
+    });
+    await within(tabla).findByText("Maíz 2025-2026");
+    const filas = within(tabla).getAllByRole("row").slice(1);
+    // Primero el que se puede elegir (soja, de hace tres meses); después el de maíz, bloqueado.
+    expect(filas[0]).toHaveTextContent("Soja 2025-2026");
+    expect(within(filas[0]).getByRole("radio")).toBeEnabled();
+    expect(within(filas[1]).getByRole("radio")).toBeDisabled();
+    expect(
+      within(filas[1]).getByText("Es Maíz 2025-2026; el cupo es Soja 2025-2026"),
+    ).toBeInTheDocument();
+    expect(within(dialogo).queryByLabelText(/desde/)).not.toBeInTheDocument();
   });
 
   it("en el diálogo, un pedido al que le faltan menos cupos que los elegidos no se puede elegir", async () => {
