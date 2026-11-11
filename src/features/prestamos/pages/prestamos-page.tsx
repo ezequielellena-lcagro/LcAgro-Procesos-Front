@@ -27,6 +27,7 @@ import {
   useActualizarCatalogo,
   useCrearCatalogo,
   useEliminarCatalogo,
+  useRevertirPago,
 } from "../queries/use-prestamo-mutations";
 import { useResumen } from "../queries/use-resumen";
 import { useExportarReporte } from "../queries/use-prestamos-excel";
@@ -88,6 +89,7 @@ export function PrestamosPage() {
   const crearCatalogo = useCrearCatalogo();
   const actualizarCatalogo = useActualizarCatalogo();
   const eliminarCatalogo = useEliminarCatalogo();
+  const revertirPago = useRevertirPago();
 
   /**
    * Abre el alta con lo que el banco ya sabe. Para un préstamo de una sola cuota eso es todo lo
@@ -244,6 +246,16 @@ export function PrestamosPage() {
               onPagar={(cuotaId) =>
                 setPagando(datos.vencimientos.items.find((v) => v.cuotaId === cuotaId) ?? null)
               }
+              onRevertir={(cuotaId) => {
+                const v = datos.vencimientos.items.find((x) => x.cuotaId === cuotaId);
+                if (
+                  v &&
+                  window.confirm(
+                    `¿Revertir el pago de la cuota ${v.nroCuota}/${v.cantidadCuotas} de ${v.banco} ${v.nroOperacion ?? ""}? Vuelve a pendiente.`,
+                  )
+                )
+                  revertirPago.mutate(cuotaId);
+              }}
             />
           </TabsContent>
 

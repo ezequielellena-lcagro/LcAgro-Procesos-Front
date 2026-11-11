@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DateField } from "@/components/ui/date-field";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ interface Props {
   onChange: (cuotas: FilaCuota[]) => void;
   /** Cuotas ya pagadas: se muestran bloqueadas porque son historia y no se editan. */
   bloqueadas?: number[];
+  /** Deshace el pago de una cuota bloqueada. Sin esto, una cuota mal imputada no tenía vuelta. */
+  onRevertirPago?: (nroCuota: number) => void;
   disabled?: boolean;
 }
 
@@ -27,7 +29,13 @@ interface Props {
  * El IVA se autocompleta al 12 % del interés, pero se respeta si el usuario lo pisa — ver
  * `aplicarCambio`.
  */
-export function CronogramaEditor({ cuotas, onChange, bloqueadas = [], disabled = false }: Props) {
+export function CronogramaEditor({
+  cuotas,
+  onChange,
+  bloqueadas = [],
+  onRevertirPago,
+  disabled = false,
+}: Props) {
   const t = totales(cuotas);
 
   const editar = (i: number, cambio: Partial<FilaCuota>) =>
@@ -137,6 +145,19 @@ export function CronogramaEditor({ cuotas, onChange, bloqueadas = [], disabled =
                       {importe(totalCuota(c))}
                     </td>
                     <td className="px-2 py-1.5 text-right">
+                      {bloqueada && onRevertirPago && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`Revertir el pago de la cuota ${c.nroCuota}`}
+                          title="Revertir el pago: la cuota vuelve a pendiente"
+                          disabled={disabled}
+                          onClick={() => onRevertirPago(c.nroCuota)}
+                        >
+                          <Undo2 className="size-4" />
+                        </Button>
+                      )}
                       {!bloqueada && (
                         <Button
                           type="button"

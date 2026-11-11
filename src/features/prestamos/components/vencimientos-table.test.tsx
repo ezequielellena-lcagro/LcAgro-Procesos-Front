@@ -99,6 +99,36 @@ describe("VencimientosTable", () => {
     expect(screen.queryByRole("button", { name: "Pagar" })).not.toBeInTheDocument();
   });
 
+  it("deja revertir el pago de una cuota pagada", () => {
+    const onRevertir = vi.fn();
+    render(
+      <VencimientosTable
+        datos={{ ...DATOS, items: [fila({ cuotaId: 7, estado: "Pagada" })] }}
+        onPagar={vi.fn()}
+        onRevertir={onRevertir}
+        puedeGestionar
+        agrupacion="ninguna"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Revertir" }));
+    expect(onRevertir).toHaveBeenCalledWith(7);
+  });
+
+  it("no ofrece revertir a quien sólo puede mirar", () => {
+    render(
+      <VencimientosTable
+        datos={{ ...DATOS, items: [fila({ estado: "Pagada" })] }}
+        onPagar={vi.fn()}
+        onRevertir={vi.fn()}
+        puedeGestionar={false}
+        agrupacion="ninguna"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Revertir" })).not.toBeInTheDocument();
+  });
+
   it("no ofrece pagar a quien sólo puede mirar", () => {
     render(<VencimientosTable datos={DATOS} onPagar={vi.fn()} puedeGestionar={false} agrupacion="ninguna" />);
 

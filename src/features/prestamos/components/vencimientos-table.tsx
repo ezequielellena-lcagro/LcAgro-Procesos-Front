@@ -8,6 +8,8 @@ import type { VencimientoDto, VencimientosDto } from "../types";
 interface Props {
   datos: VencimientosDto;
   onPagar: (cuotaId: number) => void;
+  /** Deshace un pago mal imputado. Sin él, la cuota pagada no muestra el botón. */
+  onRevertir?: (cuotaId: number) => void;
   puedeGestionar: boolean;
   /** Cómo se juntan las cuotas. `ninguna` = el calendario puro, ordenado por fecha. */
   agrupacion: AgrupacionVencimientos;
@@ -67,7 +69,7 @@ function agrupadorDe(
  *   y las dinámicas daban números distintos porque se cargaban por separado);
  * - la cuota pagada no desaparece: queda con su fecha.
  */
-export function VencimientosTable({ datos, onPagar, puedeGestionar, agrupacion }: Props) {
+export function VencimientosTable({ datos, onPagar, onRevertir, puedeGestionar, agrupacion }: Props) {
   const columns: Column<VencimientoDto>[] = [
     {
       key: "fecha",
@@ -130,7 +132,14 @@ export function VencimientosTable({ datos, onPagar, puedeGestionar, agrupacion }
       align: "right",
       cell: (v) =>
         v.estado === "Pagada" ? (
-          <span className="text-xs font-medium text-verde">Pagada</span>
+          <span className="inline-flex items-center gap-2">
+            <span className="text-xs font-medium text-verde">Pagada</span>
+            {puedeGestionar && onRevertir && (
+              <Button variant="ghost" size="sm" onClick={() => onRevertir(v.cuotaId)}>
+                Revertir
+              </Button>
+            )}
+          </span>
         ) : puedeGestionar ? (
           <Button variant="outline" size="sm" onClick={() => onPagar(v.cuotaId)}>
             Pagar

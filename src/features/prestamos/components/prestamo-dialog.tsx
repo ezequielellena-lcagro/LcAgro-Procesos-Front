@@ -19,6 +19,7 @@ import {
   useCrearPrestamo,
   useEliminarPrestamo,
   useReconstruirCronograma,
+  useRevertirPago,
   useSimularCronograma,
 } from "../queries/use-prestamo-mutations";
 import {
@@ -287,6 +288,7 @@ function PrestamoForm({
   const simular = useSimularCronograma();
   const reconstruir = useReconstruirCronograma();
   const eliminar = useEliminarPrestamo();
+  const revertirPago = useRevertirPago();
 
   // Las cuotas anteriores se buscan en MacroGest sólo cuando se lo piden: pega contra la VPN.
   const [buscandoViejas, setBuscandoViejas] = useState(false);
@@ -324,6 +326,20 @@ function PrestamoForm({
   const pagadas = (detalle?.cuotas ?? [])
     .filter((c) => c.estado === "Pagada")
     .map((c) => c.nroCuota);
+
+  // Se aplica en el momento, no al Guardar: es el mismo endpoint que el de Vencimientos.
+  const revertir = (nroCuota: number) => {
+    const cuota = detalle?.cuotas.find((c) => c.nroCuota === nroCuota);
+    if (!cuota) return;
+    if (!window.confirm(`¿Revertir el pago de la cuota ${nroCuota}? Vuelve a pendiente y aparece en los vencimientos.`))
+      return;
+    revertirPago.mutate(cuota.id, {
+      onSuccess: () =>
+        setCuotas((actuales) =>
+          actuales.map((c) => (c.nroCuota === nroCuota ? { ...c, respaldoMacroGest: null } : c)),
+        ),
+    });
+  };
 
   const generar = async () => {
     const capital = numeroOpcional(form.getValues("capitalOriginal"));
@@ -554,7 +570,8 @@ function PrestamoForm({
           cuotas={cuotas}
           onChange={setCuotas}
           bloqueadas={pagadas}
-          disabled={guardando}
+          onRevertirPago={detalle ? revertir : undefined}
+          disabled={guardando || revertirPago.isPending}
         />
 
         {detalle && (
